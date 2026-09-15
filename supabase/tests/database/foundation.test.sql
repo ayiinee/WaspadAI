@@ -15,8 +15,9 @@ select ok(
     'private operations force RLS for their owner'
 );
 select ok(
-    (select not rolcanlogin and not rolbypassrls from pg_roles where rolname = 'product_app'),
-    'product_app begins without login or RLS bypass'
+    (select not rolbypassrls and not rolsuper and not rolcreaterole
+     from pg_roles where rolname = 'product_app'),
+    'product_app cannot bypass RLS or administer roles after provisioning'
 );
 select ok(
     not has_schema_privilege('authenticated', 'private', 'USAGE'),

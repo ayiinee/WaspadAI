@@ -29,6 +29,7 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = ["live_database: opt-in tests against the dedicated Product Supabase development project"]
 
 [tool.uv]
 package = false
