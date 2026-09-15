@@ -1,0 +1,153 @@
+{
+    "format_version":  2,
+    "purpose":  "Preserve the 3.0.0 pre-modularization baseline and imported 3.0.1 monoliths byte-for-byte while active content is maintained as focused modules.",
+    "modularized_on":  "2026-09-15",
+    "updated_on":  "2026-09-15",
+    "previous_archives":  [
+                              {
+                                  "path":  "docs/archive/monoliths/product-prd.v3.0.0-draft.md",
+                                  "sha256":  "b2f21a4953c0ceba601f86a8364ca8bfca60156da25b8563463487cb79f691ac",
+                                  "bytes":  95712
+                              },
+                              {
+                                  "path":  "docs/archive/monoliths/system-and-folder-architecture.v3.0.0-draft.md",
+                                  "sha256":  "5bb6caf9675062103b1f397392f66b05a9977f21ae4d1f06ec9cd4688e2b6189",
+                                  "bytes":  59705
+                              },
+                              {
+                                  "path":  "docs/archive/monoliths/database-architecture.v3.0.0-draft.md",
+                                  "sha256":  "27df3772b47e3c2d1dbd30f775d1fd5f8214d8d73b3e4f536cb7f23ffac5c4d8",
+                                  "bytes":  72769
+                              },
+                              {
+                                  "path":  "docs/archive/monoliths/ai-service.v3.0.0-draft.md",
+                                  "sha256":  "446795dfdc3161d811b5bfe9dafc7cf9f60f1c9fde068c10099bf0d8f9ddacc0",
+                                  "bytes":  39968
+                              },
+                              {
+                                  "path":  "docs/archive/monoliths/setup.v3.0.0-draft.md",
+                                  "sha256":  "513078cb9090848f808a684168fd8b4af7788209be493fac66da157ff4b89668",
+                                  "bytes":  23533
+                              }
+                          ],
+    "documents":  [
+                      {
+                          "original_path":  "docs/product/prd.md",
+                          "byte_exact_archive":  "docs/archive/monoliths/product-prd.v3.0.1-draft.md",
+                          "sha256":  "6ffd6e3ec547a151a229c9c92cf28cd5f276c3d116f83f57430f072740242abf",
+                          "bytes":  96457,
+                          "expected_intentional_line_updates":  3,
+                          "active_modules":  [
+                                                 "docs/product/overview.md",
+                                                 "docs/product/scope-and-taxonomy.md",
+                                                 "docs/product/user-flows.md",
+                                                 "docs/product/quality-and-acceptance.md",
+                                                 "docs/product/delivery-and-governance.md"
+                                             ]
+                      },
+                      {
+                          "original_path":  "docs/architecture/system-and-folder-architecture.md",
+                          "byte_exact_archive":  "docs/archive/monoliths/system-and-folder-architecture.v3.0.1-draft.md",
+                          "sha256":  "a9f4e79d8325006138264cc50d0626ca63bf7b1272b12c5da24f6a9fc5104b32",
+                          "bytes":  60305,
+                          "expected_intentional_line_updates":  1,
+                          "active_module_lock":  "docs/archive/active-module-locks/architecture.3.0.1-initial-baseline.json",
+                          "active_modules":  [
+                                                 "docs/architecture/system-overview.md",
+                                                 "docs/architecture/android-architecture.md",
+                                                 "docs/architecture/backend-architecture.md",
+                                                 "docs/architecture/web-architecture.md",
+                                                 "docs/architecture/runtime-security-configuration.md",
+                                                 "docs/architecture/feature-mapping-and-migration.md"
+                                             ]
+                      },
+                      {
+                          "original_path":  "docs/architecture/database-architecture.md",
+                          "byte_exact_archive":  "docs/archive/monoliths/database-architecture.v3.0.1-draft.md",
+                          "sha256":  "8091fd83e32807e615e2be332b5e09265abb34d7ca308e03381473c634488fe4",
+                          "bytes":  74061,
+                          "expected_intentional_line_updates":  1,
+                          "active_modules":  [
+                                                 "docs/architecture/database-foundations.md",
+                                                 "docs/architecture/database-identity.md",
+                                                 "docs/architecture/database-verification.md",
+                                                 "docs/architecture/database-assets-and-community.md",
+                                                 "docs/architecture/database-learning.md",
+                                                 "docs/architecture/database-outbox-and-audit.md",
+                                                 "docs/architecture/database-access-and-transactions.md",
+                                                 "docs/architecture/database-storage-migrations-and-testing.md"
+                                             ]
+                      },
+                      {
+                          "original_path":  "docs/integration/ai-service.md",
+                          "byte_exact_archive":  "docs/archive/monoliths/ai-service.v3.0.1-draft.md",
+                          "sha256":  "3713996d83761c252f358c1d5e763f1df86da5af9f99e12c6e2ee643ff158545",
+                          "bytes":  42058,
+                          "expected_intentional_line_updates":  1,
+                          "active_modules":  [
+                                                 "docs/integration/ai-contract-and-ownership.md",
+                                                 "docs/integration/ai-requests.md",
+                                                 "docs/integration/ai-response-and-product-api.md",
+                                                 "docs/integration/ai-errors-idempotency-and-timeouts.md",
+                                                 "docs/integration/ai-testing-indexing-and-open-items.md"
+                                             ]
+                      },
+                      {
+                          "original_path":  "docs/development/setup.md",
+                          "byte_exact_archive":  "docs/archive/monoliths/setup.v3.0.1-draft.md",
+                          "sha256":  "a7b253ff9cef320bb75809f52813b01948f879028132a8af878e770c889dac8c",
+                          "bytes":  24490,
+                          "expected_intentional_line_updates":  2,
+                          "active_change_note":  "One additional active setup line freezes the Android SDK 36 baseline from ADR-0002; the archive remains byte-exact.",
+                          "active_module_lock":  "docs/archive/active-module-locks/setup.3.0.1-initial-baseline.json",
+                          "active_modules":  [
+                                                 "docs/development/prerequisites-and-backend-setup.md",
+                                                 "docs/development/database-setup.md",
+                                                 "docs/development/auth-ai-and-client-setup.md",
+                                                 "docs/development/testing-and-ci.md",
+                                                 "docs/development/deployment-and-operations.md",
+                                                 "docs/development/demo-and-release.md"
+                                             ]
+                      }
+                  ],
+    "upstream_snapshot":  {
+                               "path":  "contracts/upstream/waspadai-ai.openapi.json",
+                               "sha256":  "808b4e28d8add349bb676f87511de262a2106b320eed3d18bcdc1c436f51e542",
+                               "api_version":  "0.7.0",
+                               "openapi_version":  "3.1.0",
+                               "verification_scope":  "Uploaded bytes and schema structure; full GitHub commit and deployment remain unverified."
+                           },
+    "product_contract":  {
+                             "path":  "contracts/product-api.openapi.yaml",
+                             "sha256":  "a5a6e3eac165089817a619591c2828fd32dd2390b6a5fff9097656af5c5638c7",
+                             "version":  "3.0.1-draft",
+                             "openapi_version":  "3.1.0",
+                             "validated_source_report":  "docs/archive/validation-report.3.0.1-source.json"
+                         },
+    "contract_lock":  {
+                          "path":  "contracts/upstream/contract-lock.json",
+                          "sha256":  "b5b837baf12cb85ff7387dd6dea0927fa0a6e011cceee0983401cedcc498abab"
+                      },
+    "imported_validation_report":  {
+                                        "path":  "docs/archive/validation-report.3.0.1-source.json",
+                                        "sha256":  "e8ed8669ee77f0073e5e5114643e0959a5138360b9ad8b24e309c0c87485b1ca"
+                                    },
+    "aligned_examples":  [
+                              {
+                                  "path":  "contracts/examples/text-request.json",
+                                  "sha256":  "3eb48d1b296fb455fb69929ba50b07fa5fd4a6279251c729f78f6c597d7e548d"
+                              },
+                              {
+                                  "path":  "contracts/examples/verification-not-required.json",
+                                  "sha256":  "15a22a461617254b57d3eb75ed54cedb42bec1cbab76b387a1b1ea0a82f83f5d"
+                              },
+                              {
+                                  "path":  "contracts/examples/verification-review-saved.json",
+                                  "sha256":  "47a69c7f7d3066c59cfa5c88a000818123a82afa16cbe7c28bcb0f7c02c9d3e9"
+                              },
+                              {
+                                  "path":  "contracts/examples/verification-save-failed.json",
+                                  "sha256":  "fe1e475b616a8ab38d2d8b0ffa0c3f2cfbdf2a69227f206e1792506dc78d3455"
+                              }
+                          ]
+}

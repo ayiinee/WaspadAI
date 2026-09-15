@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "baseline": "2026.09.15",
+  "validated_at": "2026-09-15",
+  "source_of_truth": {
+    "path": "contracts/current/android-api-contract.md",
+    "sha256": "52df0459942ee565a4b5322fec27ca266d0b41384a351fe7f00266e5cd5bb3f2",
+    "workspace_source_byte_identical": true
+  },
+  "architecture": {
+    "current": "Android Kotlin -> public WaspadAI API",
+    "authentication": "Supabase session gate in Android; no Bearer token sent to public AI",
+    "success_response": "Direct WaspadAI response without Product result/history wrapper",
+    "future_backend_isolated": true
+  },
+  "checks": {
+    "active_markdown_files": 27,
+    "relative_links_checked": 58,
+    "json_files_parsed": 20,
+    "current_fixtures_valid": true,
+    "future_contract_marked_non_runtime": true,
+    "archive_marked_non_normative": true,
+    "artifact_build_and_fetch_round_trip": true
+  },
+  "not_tested": [
+    "Live WaspadAI API behavior",
+    "Android build or device flow",
+    "Supabase runtime authentication",
+    "Future Product Backend implementation",
+    "Full OpenAPI semantic validation of the legacy future draft"
+  ],
+  "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify-docs.ps1"
+}

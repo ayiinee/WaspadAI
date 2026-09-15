@@ -1,0 +1,113 @@
+{
+  "status": "PASS_DOCUMENT_AND_DRAFT_STRUCTURE_CHECKS",
+  "markdown_files": 7,
+  "active_word_count": 17978,
+  "operations": 31,
+  "schemas": 61,
+  "resolved_refs": 445,
+  "internal_links_checked": 12,
+  "examples_validated": 7,
+  "validation_scope": "YAML unique-key parse, local refs, operation/path parameters, auth markers, example types/required/enums/limits, Markdown local links, source preservation. Custom focused checks, NOT full OpenAPI specification certification.",
+  "not_tested": [
+    "Live upstream compatibility",
+    "Actual Product code/build",
+    "Database SQL execution/RLS runtime",
+    "Android build/device",
+    "Deployment",
+    "Full OpenAPI specification validator"
+  ],
+  "upstream_status": "UPLOADED_SNAPSHOT_VERIFIED_SCHEMA_ONLY",
+  "snapshot_byte_identical": true,
+  "upstream_schemas_equal": 16,
+  "negative_cases_rejected": [
+    "missing_trace",
+    "wrong_mode",
+    "extra_result_field",
+    "null_question",
+    "long_page_title"
+  ],
+  "changed_files": [
+    "README.md",
+    "contracts/examples/text-request.json",
+    "contracts/examples/verification-not-required.json",
+    "contracts/examples/verification-review-saved.json",
+    "contracts/examples/verification-save-failed.json",
+    "contracts/product-api.openapi.yaml",
+    "contracts/upstream/contract-lock.json",
+    "contracts/upstream/waspadai-ai.openapi.json",
+    "docs/adr/0001-product-ai-boundary.md",
+    "docs/architecture/database-architecture.md",
+    "docs/architecture/system-and-folder-architecture.md",
+    "docs/development/setup.md",
+    "docs/integration/ai-service.md",
+    "docs/product/prd.md",
+    "validation-report.json"
+  ],
+  "unchanged_files": [
+    ".env.example",
+    ".gitignore",
+    "contracts/examples/community-publish-request.json",
+    "contracts/examples/error-timeout.json",
+    "contracts/examples/vote-request.json"
+  ],
+  "historical_appendices_unchanged": true,
+  "sources": [
+    {
+      "name": "Pasted markdown (2).md",
+      "content_preserved": true,
+      "comparison": "full text excluding trailing whitespace",
+      "sha256_original": "a933a33d82ca5ef46996ae818b09d829b5860abada85e6a2a710c9a3d5d604d1"
+    },
+    {
+      "name": "Pasted markdown(3).md",
+      "content_preserved": true,
+      "comparison": "full text excluding trailing whitespace",
+      "sha256_original": "0e890c69ba620d253ef590b117c9247d387d099e5bce0f1bbd6f90da3237093b"
+    },
+    {
+      "name": "docs/product/prd.md",
+      "preserved_source_lines": 1463
+    },
+    {
+      "name": "docs/integration/ai-service.md",
+      "preserved_source_lines": 546
+    }
+  ],
+  "documents": [
+    {
+      "path": "README.md",
+      "bytes": 7974,
+      "active_words": 1032
+    },
+    {
+      "path": "docs/adr/0001-product-ai-boundary.md",
+      "bytes": 6738,
+      "active_words": 932
+    },
+    {
+      "path": "docs/architecture/database-architecture.md",
+      "bytes": 74061,
+      "active_words": 4097
+    },
+    {
+      "path": "docs/architecture/system-and-folder-architecture.md",
+      "bytes": 60305,
+      "active_words": 2219
+    },
+    {
+      "path": "docs/development/setup.md",
+      "bytes": 24490,
+      "active_words": 3106
+    },
+    {
+      "path": "docs/integration/ai-service.md",
+      "bytes": 42058,
+      "active_words": 3078
+    },
+    {
+      "path": "docs/product/prd.md",
+      "bytes": 96457,
+      "active_words": 3514
+    }
+  ]
+}
