@@ -1,0 +1,47 @@
+name: Product CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.11"
+          version: "0.12.15"
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run pytest
+
+  android-unit-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - run: bash ./gradlew testDebugUnitTest --no-daemon
+
+  verify-documentation-artifact:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - shell: pwsh
+        run: ./scripts/fetch-documentation-artifact.ps1
+      - shell: pwsh
+        run: ./.artifacts/documentation/scripts/verify-docs.ps1
