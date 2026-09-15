@@ -202,7 +202,9 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
     run_async(check())
 
 
-def test_backend_health_and_readiness(live_config: LiveConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_backend_health_and_readiness(
+    live_config: LiveConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("DATABASE_URL", live_config.database_url)
     get_settings.cache_clear()
     prior_policy = asyncio.get_event_loop_policy()

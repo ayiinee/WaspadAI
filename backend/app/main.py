@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -8,6 +10,9 @@ from fastapi import FastAPI, HTTPException, status
 
 from app.config import get_settings
 from app.database import create_pool
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 @asynccontextmanager

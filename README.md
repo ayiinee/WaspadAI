@@ -15,7 +15,7 @@ Anggota tim baru mulai dari [panduan setup dan handoff](TEAM_SETUP.md). Panduan 
 
 1. Jika `.env` belum ada, salin `.env.example` menjadi `.env`; jika sudah ada, review nilainya tanpa menimpa file lokal.
 2. Masuk ke `backend/`, lalu jalankan `uv sync --locked` (Python 3.11 dipilih dari `.python-version`). Pada PowerShell mesin ini, `py -m uv sync --locked` juga tersedia.
-3. Jalankan `uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload` atau `py -m uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload`.
+3. Jalankan `uv run python run_server.py` atau `py -m uv run python run_server.py`.
 4. Periksa `http://127.0.0.1:8001/api/health`.
 
 Mode default AI adalah `mock`; production menolak mode tersebut. Credential Supabase dan AI tidak boleh dimasukkan ke commit atau diteruskan ke Android.

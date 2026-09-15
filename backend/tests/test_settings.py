@@ -17,6 +17,7 @@ def test_remote_requires_endpoint_and_key() -> None:
 def test_production_requires_auth_and_database() -> None:
     with pytest.raises(ValidationError, match="production requires Supabase Auth"):
         Settings(
+            _env_file=None,
             app_env="production",
             ai_service_mode="remote",
             ai_service_base_url="https://example.invalid",
