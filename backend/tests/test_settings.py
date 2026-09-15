@@ -21,4 +21,5 @@ def test_production_requires_auth_and_database() -> None:
             ai_service_mode="remote",
             ai_service_base_url="https://example.invalid",
             ai_service_api_key="test-key",
+            _env_file=None,
         )

@@ -40,12 +40,17 @@ def live_config() -> LiveConfig:
     if os.getenv("WASPADAI_RUN_LIVE_DB_TESTS") != "1":
         pytest.skip("live Supabase tests require WASPADAI_RUN_LIVE_DB_TESTS=1")
 
-    required = ("DATABASE_URL", "WASPADAI_DB_TEST_USER_A_ID", "WASPADAI_DB_TEST_USER_B_ID")
+    required = ("WASPADAI_DB_TEST_USER_A_ID", "WASPADAI_DB_TEST_USER_B_ID")
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         pytest.fail("missing live test configuration: " + ", ".join(missing), pytrace=False)
 
-    dsn = os.environ["DATABASE_URL"]
+    dsn = os.getenv("DATABASE_URL")
+    if not dsn:
+        configured_dsn = get_settings().database_url
+        dsn = configured_dsn.get_secret_value() if configured_dsn is not None else None
+    if not dsn:
+        pytest.fail("missing live test configuration: DATABASE_URL or backend .env", pytrace=False)
     sslmode = conninfo_to_dict(dsn).get("sslmode")
     if sslmode not in {"require", "verify-ca", "verify-full"}:
         pytest.fail("DATABASE_URL must explicitly require TLS", pytrace=False)
@@ -202,7 +207,9 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
     run_async(check())
 
 
-def test_backend_health_and_readiness(live_config: LiveConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_backend_health_and_readiness(
+    live_config: LiveConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("DATABASE_URL", live_config.database_url)
     get_settings.cache_clear()
     prior_policy = asyncio.get_event_loop_policy()

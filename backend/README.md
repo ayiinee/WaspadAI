@@ -4,7 +4,7 @@ Python 3.11 dan dependency dikunci di `uv.lock`. Jalankan dari direktori ini:
 
 ```powershell
 py -m uv sync --locked
-py -m uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
+py -m uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload --loop app.uvicorn_loop:selector_loop_factory
 py -m uv run pytest
 ```
 

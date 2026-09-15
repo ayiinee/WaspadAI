@@ -77,7 +77,7 @@ uv sync --locked
 uv lock --check
 uv run ruff check .
 uv run pytest
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload --loop app.uvicorn_loop:selector_loop_factory
 ```
 
 Di terminal PowerShell kedua, periksa `Invoke-RestMethod http://127.0.0.1:8001/api/health`; respons `status=ok` membuktikan proses API hidup. Tanpa `DATABASE_URL`, `/api/ready` **wajar 503**. Saat database dapat dikoneksi, readiness bisa 200, tetapi `select 1` itu belum membuktikan migration/RLS atau fitur bisnis. Stop server dengan Ctrl+C. Jangan mencari/install dari file requirements terpisah: project dan CI memakai `backend/pyproject.toml` + `backend/uv.lock`.
