@@ -2,6 +2,8 @@
 
 Repository ini berisi aplikasi Android dan Product API untuk WaspadAI. Product API memegang workflow pengguna, validasi Supabase Auth, dan data Product; service AI adalah layanan HTTP terpisah dan tidak di-clone atau dijalankan dari repository ini.
 
+Anggota tim baru mulai dari [panduan setup dan handoff](TEAM_SETUP.md). Panduan tersebut menjelaskan tool, akses dokumentasi/secret, perintah verifikasi backend dan Android, serta batas fitur yang belum diimplementasikan.
+
 ## Struktur awal
 
 - `frontend/`: Android Gradle root, package `id.waspadai.app`.
