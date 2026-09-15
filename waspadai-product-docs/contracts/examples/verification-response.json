@@ -1,0 +1,48 @@
+{
+  "request_id": "req_synthetic_contract_fixture",
+  "status": "COMPLETED",
+  "mode": "LIVE",
+  "verdict": "UNVERIFIED",
+  "risk_level": "MEDIUM",
+  "headline": "Bukti belum cukup untuk memastikan klaim",
+  "evidence_sufficiency": 0.42,
+  "evidence_sufficiency_label": "Bukti belum cukup untuk memastikan klaim",
+  "requires_human_review": true,
+  "community_status": "ELIGIBLE_WITH_CONSENT",
+  "what_checked": [
+    "Klaim utama pada pesan"
+  ],
+  "why": [
+    "Bukti yang ditemukan belum mencakup seluruh klaim material."
+  ],
+  "evidence": [],
+  "sources": [],
+  "recommended_actions": [
+    {
+      "code": "RETURN_UNVERIFIED",
+      "title": "Tunggu bukti yang lebih kuat",
+      "detail": "Jangan jadikan informasi ini satu-satunya dasar keputusan."
+    }
+  ],
+  "uncertainty": "Masih diperlukan sumber primer atau sumber tepercaya lain.",
+  "dimensions": {
+    "factual_status": "UNVERIFIED",
+    "source_authenticity": "UNVERIFIED",
+    "sender_identity": "UNVERIFIED",
+    "channel_status": "UNVERIFIED",
+    "scam_risk": "MEDIUM",
+    "content_authenticity": "NOT_APPLICABLE"
+  },
+  "presentation": {
+    "requested_mode": "BOTH",
+    "structured": true,
+    "narrative": {
+      "text": "Hasil pemeriksaan: bukti yang tersedia belum cukup untuk memastikan klaim.",
+      "summary": "Bukti belum cukup untuk memastikan klaim",
+      "paragraphs": [
+        "Hasil pemeriksaan: bukti yang tersedia belum cukup untuk memastikan klaim."
+      ]
+    }
+  },
+  "disclaimer": "Fact-check adalah dukungan keputusan, bukan jaminan."
+}

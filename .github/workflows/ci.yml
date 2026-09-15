@@ -37,11 +37,9 @@ jobs:
       - run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - run: bash ./gradlew testDebugUnitTest --no-daemon
 
-  verify-documentation-artifact:
+  verify-documentation:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
       - shell: pwsh
-        run: ./scripts/fetch-documentation-artifact.ps1
-      - shell: pwsh
-        run: ./.artifacts/documentation/scripts/verify-docs.ps1
+        run: ./waspadai-product-docs/scripts/verify-docs.ps1

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "waspadai-product-docs",
+  "version": "2026.09.15",
+  "status": "CURRENT",
+  "baseline_date": "2026-09-15",
+  "language": "id-ID",
+  "current_contract": {
+    "path": "contracts/current/android-api-contract.md",
+    "sha256": "52df0459942ee565a4b5322fec27ca266d0b41384a351fe7f00266e5cd5bb3f2"
+  },
+  "future_contract": {
+    "path": "contracts/future/product-api.openapi.yaml",
+    "status": "FUTURE_NON_RUNTIME"
+  }
+}

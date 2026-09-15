@@ -1,0 +1,77 @@
+{
+  "request_id": "b683ece9-2d46-4df6-9dac-a9de609af723",
+  "status": "COMPLETED",
+  "history": {
+    "saved": false,
+    "case_id": null,
+    "save_reason": "SAVE_FAILED",
+    "community_eligible": false,
+    "community_state": "NOT_AVAILABLE"
+  },
+  "result": {
+    "request_id": "req_synthetic_fixture",
+    "status": "COMPLETED",
+    "mode": "LIVE",
+    "verdict": "UNVERIFIED",
+    "risk_level": "UNKNOWN",
+    "headline": "Contoh sintetis: bukti belum cukup",
+    "requires_human_review": true,
+    "dimensions": {
+      "factual_status": "UNVERIFIED",
+      "source_authenticity": "UNVERIFIED",
+      "sender_identity": "UNVERIFIED",
+      "channel_status": "UNVERIFIED",
+      "scam_risk": "UNKNOWN",
+      "content_authenticity": "NOT_APPLICABLE"
+    },
+    "evidence": [],
+    "sources": [],
+    "recommended_actions": [],
+    "presentation": {
+      "requested_mode": "BOTH",
+      "structured": true,
+      "narrative": {
+        "text": "SIMULASI. Bukan hasil pemeriksaan live.",
+        "summary": "Fixture kontrak",
+        "paragraphs": [
+          "SIMULASI. Bukan hasil pemeriksaan live."
+        ]
+      }
+    },
+    "disclaimer": "Dukungan keputusan, bukan jaminan.",
+    "trace_id": "trace_synthetic_fixture",
+    "mode_notice": "Fixture sintetis untuk validasi schema; bukan hasil AI live.",
+    "input_summary": {
+      "input_type": "TEXT",
+      "content_type": "MESSAGE",
+      "label": "Fixture sintetis",
+      "media_type": null,
+      "dimensions": null,
+      "extraction_status": "NOT_APPLICABLE",
+      "excerpt": "Contoh data sintetis untuk validasi kontrak.",
+      "source_url": null,
+      "sender_context": "UNKNOWN",
+      "character_count": 44,
+      "urls_detected": 0,
+      "pii_types_redacted": []
+    },
+    "evidence_sufficiency": 0.0,
+    "evidence_sufficiency_label": "Nilai fixture, bukan pengukuran live",
+    "what_checked": [],
+    "why": [],
+    "uncertainty": "Contoh sintetis; tidak membuktikan hasil inferensi.",
+    "community_status": "ELIGIBLE_WITH_CONSENT",
+    "privacy_notice": "Tidak berisi data pengguna nyata.",
+    "rulebook": {
+      "corpus_versions": [],
+      "retrieval_mode": "SYNTHETIC_FIXTURE",
+      "candidate_count": 0,
+      "selected_count": 0,
+      "forced_rule_ids": [],
+      "cache_hit": false,
+      "duration_ms": 0
+    },
+    "pipeline": []
+  },
+  "execution_mode": "MOCK"
+}

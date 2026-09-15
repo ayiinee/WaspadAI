@@ -1,0 +1,39 @@
+{
+  "format_version": 1,
+  "source_document": "docs/development/setup.md",
+  "source_archive": "docs/archive/monoliths/setup.v3.0.1-draft.md",
+  "source_archive_sha256": "a7b253ff9cef320bb75809f52813b01948f879028132a8af878e770c889dac8c",
+  "approved_on": "2026-09-15",
+  "decision_record": "docs/adr/0002-initial-product-baseline.md",
+  "rationale": "The active setup is updated to match Python uv, Android SDK 36, hosted Supabase development without a local stack, and the Docker-free CI artifact implementation. The imported setup monolith remains byte-exact.",
+  "intentional_changes": [
+    {
+      "path": "docs/development/prerequisites-and-backend-setup.md",
+      "reason": "Replace copying documentation and pip requirements instructions with pinned artifact and uv commands; remove Docker as a prerequisite."
+    },
+    {
+      "path": "docs/development/database-setup.md",
+      "reason": "Record pinned Supabase CLI, hosted development project migration review, and the no-login runtime role setup."
+    },
+    {
+      "path": "docs/development/auth-ai-and-client-setup.md",
+      "reason": "Freeze Android Gradle root and SDK 36 baseline; use hosted Supabase development URL on devices."
+    },
+    {
+      "path": "docs/development/testing-and-ci.md",
+      "reason": "Describe the documentation release artifact checksum and CI gate without a local database container job."
+    },
+    {
+      "path": "docs/development/deployment-and-operations.md",
+      "reason": "Replace container-image deployment guidance with versioned Python process artifacts and private network boundaries."
+    }
+  ],
+  "active_modules": {
+    "docs/development/prerequisites-and-backend-setup.md": "4e09123af170a92ccf51bc21f85cf102b5b1458e9f4a9643d4fa2612b2238e60",
+    "docs/development/database-setup.md": "3303c2e5da575ba08576fce5dc7b6bf95e649d99fc663d5b6a3c3b01888735bd",
+    "docs/development/auth-ai-and-client-setup.md": "3f176a2faee88c1b55c43cbce8c622ea559c90d552f2fddfbea94cd580720d7d",
+    "docs/development/testing-and-ci.md": "7f06fd93dfa1c6176bb4fa6f909b4d04cd7bbedf0cae9286109d70ee94cf114c",
+    "docs/development/deployment-and-operations.md": "5c9b69f247135303d637609caafafb1484584733fd9c9cdd879935048decf8c6",
+    "docs/development/demo-and-release.md": "5c577725c413da90922e87e09070927b7d43f6a60b7ac16cd939dc3c6c13bada"
+  }
+}
