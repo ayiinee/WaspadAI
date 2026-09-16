@@ -4,44 +4,27 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.viewmodel.compose.viewModel
+import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
+import id.waspadai.app.feature.verification.presentation.VerificationRoute
+import id.waspadai.app.feature.verification.presentation.VerificationViewModel
 import id.waspadai.app.ui.theme.WaspadAITheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val app = application as WaspadAIApplication
         setContent {
-            WaspadAITheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+            WaspadAITheme(dynamicColor = false) {
+                val viewModel: VerificationViewModel = viewModel(
+                    factory = VerificationViewModel.Factory(
+                        submitTextVerification = SubmitTextVerificationUseCase(app.verificationRepository),
+                        isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED
                     )
-                }
+                )
+                VerificationRoute(viewModel)
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    WaspadAITheme {
-        Greeting("Android")
     }
 }
