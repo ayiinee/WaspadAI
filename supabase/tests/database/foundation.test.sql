@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(15);
 
 select ok(to_regnamespace('private') is not null, 'private schema exists');
 select ok(to_regclass('public.profiles') is not null, 'profiles table exists');
@@ -38,6 +38,14 @@ select ok(
 select ok(
     has_column_privilege('authenticated', 'public.profiles', 'display_name', 'UPDATE'),
     'signed-in clients can edit display name'
+);
+select ok(
+    not has_column_privilege('product_app', 'public.profiles', 'is_active', 'UPDATE'),
+    'product app cannot change active status'
+);
+select ok(
+    not has_table_privilege('product_app', 'public.user_roles', 'INSERT'),
+    'product app cannot assign roles'
 );
 select ok(
     exists (

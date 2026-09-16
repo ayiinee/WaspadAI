@@ -19,7 +19,7 @@ Android memanggil public endpoint `/api/v1/verify/text` dan `/api/v1/verify/imag
 | Komponen | Status baseline |
 | --- | --- |
 | `frontend/` | Android Compose scaffold; integrasi end-to-end belum selesai |
-| `backend/` | Health/readiness scaffold untuk Product Backend future; bukan gateway MVP current |
+| `backend/` | Preview Product Backend future: health/readiness, mock verifikasi teks, dan history owner-only; bukan gateway MVP current |
 | `supabase/` | Migration/tooling awal untuk fitur Product future |
 | `contracts/` | Pin artifact dokumentasi Product |
 | `waspadai-product-docs/` | Dokumentasi aktif, kontrak current/future/reference, dan archive |

@@ -75,10 +75,13 @@ async def open_single_connection_pool(dsn: str) -> AsyncConnectionPool:
         max_size=1,
         open=False,
         kwargs={"autocommit": False},
+        reset=_reset_connection,
     )
     await pool.open(wait=True)
     return pool
 
+async def _reset_connection(connection: psycopg.AsyncConnection) -> None:
+    await connection.execute("RESET ALL")
 
 async def set_test_claim(connection: psycopg.AsyncConnection, user_id: UUID) -> None:
     # Match the Product backend's transaction-local claim mechanism.
@@ -189,18 +192,87 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
                     )
                     assert await cursor.fetchone() is None
 
-            # max_size=1 reuses the pooled client connection. No user claim survives.
+
+            # max_size=1 reuses the pooled client connection. The transaction-local
+            # claim itself must not survive; auth.uid() is intentionally exercised
+            # through RLS policies rather than invoked directly by Product code.
             async with pool.connection() as connection:
-                cursor = await connection.execute("select auth.uid()")
+                cursor = await connection.execute(
+                    "select current_setting('request.jwt.claim.sub', true)"
+                )
                 assert await cursor.fetchone() == (None,)
                 cursor = await connection.execute("select id from public.profiles")
                 assert await cursor.fetchall() == []
             async with user_transaction(pool, live_config.user_b, 15) as connection:
-                cursor = await connection.execute("select auth.uid()")
-                assert await cursor.fetchone() == (live_config.user_b,)
+                cursor = await connection.execute(
+                    "select current_setting('request.jwt.claim.sub', true)"
+                )
+                assert await cursor.fetchone() == (str(live_config.user_b),)
             async with pool.connection() as connection:
-                cursor = await connection.execute("select auth.uid()")
+                cursor = await connection.execute(
+                    "select current_setting('request.jwt.claim.sub', true)"
+                )
                 assert await cursor.fetchone() == (None,)
+        finally:
+            await pool.close()
+
+    run_async(check())
+
+
+def test_verification_history_rls_is_owner_scoped(live_config: LiveConfig) -> None:
+    """The newer history tables must not weaken the original product_app RLS boundary."""
+
+    async def check() -> None:
+        pool = await open_single_connection_pool(live_config.database_url)
+        try:
+            case_id = uuid4()
+            operation_id = uuid4()
+            async with pool.connection() as connection:
+                async with connection.transaction(force_rollback=True):
+                    await set_test_claim(connection, live_config.user_a)
+                    await connection.execute(
+                        """insert into private.request_operations
+                               (id, user_id, route_key, idempotency_key, payload_hash,
+                                state, persistence_state, expires_at)
+                           values (%s, %s, 'history-live-test', %s, %s, 'COMPLETED',
+                                   'SAVED', now() + interval '1 hour')""",
+                        (operation_id, live_config.user_a, uuid4(), "b" * 64),
+                    )
+                    await connection.execute(
+                        """insert into public.verification_cases
+                               (id, user_id, operation_id, product_request_id, input_type,
+                                input_source, input_hash, headline, verdict, risk_level,
+                                requires_human_review, save_reason, community_state,
+                                retention_expires_at)
+                           values (%s, %s, %s, %s, 'TEXT', 'MANUAL', %s, 'Fixture history',
+                                   'UNVERIFIED', 'UNKNOWN', true, 'UNVERIFIED', 'PRIVATE',
+                                   now() + interval '1 day')""",
+                        (case_id, live_config.user_a, operation_id, uuid4(), "c" * 64),
+                    )
+                    await connection.execute(
+                        """insert into public.verification_results
+                               (case_id, factual_status, source_authenticity, sender_identity,
+                                channel_status, scam_risk, content_authenticity, result_json,
+                                execution_mode)
+                           values (%s, 'UNVERIFIED', 'UNVERIFIED', 'UNVERIFIED',
+                                   'UNVERIFIED', 'UNKNOWN', 'NOT_APPLICABLE', %s, 'MOCK')""",
+                        (case_id, json.dumps({"fixture": True})),
+                    )
+                    own_case = await connection.execute(
+                        "select id from public.verification_cases where id = %s", (case_id,)
+                    )
+                    assert await own_case.fetchone() == (case_id,)
+
+                    await set_test_claim(connection, live_config.user_b)
+                    hidden_case = await connection.execute(
+                        "select id from public.verification_cases where id = %s", (case_id,)
+                    )
+                    assert await hidden_case.fetchone() is None
+                    hidden_result = await connection.execute(
+                        "select case_id from public.verification_results where case_id = %s",
+                        (case_id,),
+                    )
+                    assert await hidden_result.fetchone() is None
         finally:
             await pool.close()
 

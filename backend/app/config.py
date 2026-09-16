@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     supabase_jwt_audience: str = "authenticated"
     database_url: SecretStr | None = None
     migration_database_url: SecretStr | None = None
+    history_cursor_signing_key: SecretStr | None = None
     db_pool_size: int = 5
     db_max_overflow: int = 5
     db_statement_timeout_seconds: int = 15
@@ -85,6 +86,10 @@ class Settings(BaseSettings):
     @property
     def database_is_configured(self) -> bool:
         return self.database_url is not None
+
+    @property
+    def history_cursor_is_configured(self) -> bool:
+        return self.history_cursor_signing_key is not None
 
 
 @lru_cache

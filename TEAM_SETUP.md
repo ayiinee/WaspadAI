@@ -65,9 +65,20 @@ Android wajib:
 
 Lakukan smoke remote hanya dengan data sintetis dan catat request ID/status/durasi tanpa payload sensitif.
 
-## 6. Backend scaffold future
+## 6. Backend preview future
 
-Backend tidak dibutuhkan untuk call AI MVP current. Jika mengerjakan health/readiness atau persiapan fitur future:
+Backend tidak dibutuhkan untuk call AI MVP current. Preview development/staging saat ini
+menyediakan health/readiness serta vertical slice mock `POST /api/v1/verifications/text`,
+`GET /api/v1/history`, dan `GET /api/v1/history/{case_id}`. Slice ini memvalidasi
+Bearer Supabase, memakai role database `product_app`, mewajibkan `Idempotency-Key`,
+dan menyimpan history owner-only sesuai policy `REVIEW_REQUIRED`.
+
+Android tetap tidak memanggil endpoint tersebut. Mode mock harus selalu dilabeli sebagai
+simulasi, bukan hasil AI live. Sebelum menjalankan history, isi
+`HISTORY_CURSOR_SIGNING_KEY` lokal/deployment dengan secret acak yang berbeda dari
+password database dan API key.
+
+Untuk menjalankan backend future:
 
 ```powershell
 Set-Location backend
@@ -78,7 +89,11 @@ uv run pytest
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-Tanpa `DATABASE_URL`, `/api/ready` dapat mengembalikan 503. Mode mock/backend tidak boleh disamarkan sebagai hasil AI live dan Android tidak dialihkan ke backend sebelum exit criteria pada dokumentasi future terpenuhi.
+Tanpa `DATABASE_URL`, `/api/ready` dapat mengembalikan 503. Untuk acceptance test RLS
+hosted, buat dua user Auth development sementara lalu set `WASPADAI_RUN_LIVE_DB_TESTS=1`,
+`WASPADAI_DB_TEST_USER_A_ID`, dan `WASPADAI_DB_TEST_USER_B_ID` sebelum menjalankan
+`uv run pytest tests/test_live_supabase.py`; hapus user test setelahnya. Android tidak
+dialihkan ke backend sebelum exit criteria pada dokumentasi future terpenuhi.
 
 ## 7. Supabase future (operator)
 
