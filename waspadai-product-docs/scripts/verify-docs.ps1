@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $packageRoot = Split-Path -Parent $PSScriptRoot
 $workspaceRoot = Split-Path -Parent $packageRoot
 $errors = [System.Collections.Generic.List[string]]::new()
-$expectedContractHash = '55968929b32d2d7f4fe40f12861464d3218d562ddb283aa6e771ddf5bf13f051'
+$expectedContractHash = '042a0ac1232095d5e0d3806546018775d6b81792d1a7ae50e4f1591a0a412bbf'
 
 function Add-Error([string]$message) { $script:errors.Add($message) }
 
@@ -57,7 +57,7 @@ if ((Test-Path $contractPath) -and (Test-Path $sourcePath)) {
         "community_posts.status = 'VERIFIED_EVIDENCE'",
         'consent aktif `RAG_REUSE` tersedia',
         '`PUBLISHED_UNVERIFIED` boleh tampil di feed Product',
-        'Status implementasi: `TARGET`; belum boleh dianggap tersedia'
+        'Status implementasi: `PARTIAL_RUNTIME`; Product Backend sudah mengekspor route'
     )) {
         if (-not $contractText.Contains($required)) { Add-Error "Current contract is missing invariant: $required" }
     }

@@ -9,13 +9,13 @@
   "instructions": "Publish immutable tag docs-v2026.09.16, then set the release asset URL and ZIP SHA-256 before enabling automatic retrieval.",
   "contract_authority": "contracts/current/android-api-contract.md",
   "required_files": {
-    "contracts/current/android-api-contract.md": "55968929b32d2d7f4fe40f12861464d3218d562ddb283aa6e771ddf5bf13f051",
+    "contracts/current/android-api-contract.md": "042a0ac1232095d5e0d3806546018775d6b81792d1a7ae50e4f1591a0a412bbf",
     "contracts/examples/text-request.json": "9ca877efd13be9c7ebfa46feb7d1f5bee64a7cc5706e31448074c0a5e1cd39e8",
     "contracts/examples/verification-response.json": "f054b4119c00029ba99ce8030b68010b128c06a479de729e61ff364324ae60ce",
     "contracts/examples/validation-error.json": "0c5dfdf993d1a6fb74e8de76e70cabb2462c6a351004ac616d0fa1c494dd58ba",
     "docs/README.md": "4c70ddfc9f7e390f4c05064884ea79482548524588786efcf69c85537862c600",
-    "manifest.json": "fb83279b062d844f798be29ae90e712d88eb5463259e77c061d039bcbd7cf8ec",
-    "scripts/verify-docs.ps1": "fa60fc248311cbb9571cdfc14f65c4fc7baad74be1f6a82119f18add3dbbf23c",
-    "validation-report.json": "e52853037f7289644f87b2237b2e9c4201b73321429069942d1612e78dbb8220"
+    "manifest.json": "2c83476194221c8bb2fa6cc022a79480ab42113557db3403917ad75267fd3cfd",
+    "scripts/verify-docs.ps1": "25f18e5aebf59f37870877d3d98eaeff1e77302eaab39f7e806cc87544b775f8",
+    "validation-report.json": "d429c06bf7cfcbda76b812d64e87ac824f8f3aa391152de03d02493cfabf7302"
   }
 }

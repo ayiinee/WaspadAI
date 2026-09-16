@@ -1,10 +1,10 @@
 # Product Backend
 
-Status: `CURRENT` sebagai boundary Android–AI; remote AI dan community evidence masih `TARGET`.
+Status: `CURRENT` sebagai boundary Android–AI; verification remote dan community feed/vote tersedia partial runtime, sedangkan contribution/moderation dan community evidence masih `TARGET`.
 
-Vertical slice yang tersedia: `GET /api/health`, `GET /api/ready`, `POST /api/v1/verifications/text`, `GET /api/v1/history`, dan `GET /api/v1/history/{case_id}`. Verification text memerlukan Bearer Supabase, role database `product_app`, UUID `Idempotency-Key`, dan saat ini menghasilkan fixture `MOCK`.
+Vertical slice yang tersedia: `GET /api/health`, `GET /api/ready`, `POST /api/v1/verifications/text`, `POST /api/v1/verifications/image`, `GET /api/v1/history`, `GET /api/v1/history/{case_id}`, feed/detail komunitas, vote klasifikasi, dan preview/publikasi komunitas. Verification text/image memerlukan Bearer Supabase, role database `product_app`, UUID `Idempotency-Key`, dan mode development masih menghasilkan fixture `MOCK`.
 
-Keputusan Android memakai Product API sudah berlaku, tetapi integrasi end-to-end tidak boleh diklaim live sampai Android adapter dan remote AI mode tersedia serta diuji. Endpoint image, community, contribution/moderation, query community evidence, dan pengiriman field tersebut ke WaspadAI belum diimplementasikan.
+Keputusan Android memakai Product API sudah berlaku, tetapi integrasi end-to-end belum boleh diklaim live sampai adapter remote, migration Supabase, dan smoke test staging selesai. Contribution/moderation, query community evidence, dan pengiriman field tersebut ke WaspadAI belum diimplementasikan.
 
 ```powershell
 uv sync --locked

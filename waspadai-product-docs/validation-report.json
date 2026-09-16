@@ -3,7 +3,7 @@
   "baseline": "2026.09.16",
   "source_of_truth": {
     "path": "contracts/current/android-api-contract.md",
-    "sha256": "55968929b32d2d7f4fe40f12861464d3218d562ddb283aa6e771ddf5bf13f051",
+    "sha256": "042a0ac1232095d5e0d3806546018775d6b81792d1a7ae50e4f1591a0a412bbf",
     "workspace_source_byte_identical": true
   },
   "architecture": {
@@ -13,9 +13,9 @@
     "community_evidence": "Product-owned database selection; transport target not yet runtime"
   },
   "not_tested": [
-    "Remote WaspadAI adapter",
-    "Image Product endpoint",
-    "Community/moderation Product endpoints",
+    "Remote WaspadAI production deployment and live contract smoke",
+    "Image dimension validation and live deployment",
+    "Community contribution/moderation Product endpoints",
     "Community evidence transport to WaspadAI",
     "Android device integration"
   ],

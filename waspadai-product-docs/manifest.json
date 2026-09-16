@@ -7,15 +7,15 @@
   "language": "id-ID",
   "current_contract": {
     "path": "contracts/current/android-api-contract.md",
-    "sha256": "55968929b32d2d7f4fe40f12861464d3218d562ddb283aa6e771ddf5bf13f051"
+    "sha256": "042a0ac1232095d5e0d3806546018775d6b81792d1a7ae50e4f1591a0a412bbf"
   },
   "topology": "ANDROID_PRODUCT_API_INTERNAL_AI",
   "implementation_status": {
     "product_text_mock": "IMPLEMENTED",
     "history_list_detail": "IMPLEMENTED",
-    "remote_ai": "TARGET",
-    "image": "TARGET",
-    "community_api": "TARGET",
+    "remote_ai": "PARTIAL_RUNTIME",
+    "image": "PARTIAL_RUNTIME",
+    "community_api": "PARTIAL_RUNTIME",
     "community_evidence_transport": "TARGET"
   },
   "future_contract": {

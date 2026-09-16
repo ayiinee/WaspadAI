@@ -95,6 +95,19 @@ class TextVerificationRequest(BaseModel):
         return self
 
 
+class ImageVerificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str | None = Field(default=None, max_length=500)
+
+    @field_validator("question", mode="before")
+    @classmethod
+    def strip_question(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
 class AIResult(BaseModel):
     """The Product stores the complete, validated upstream-shaped result."""
 
@@ -156,3 +169,84 @@ class HistoryItem(BaseModel):
 class HistoryPage(BaseModel):
     items: list[HistoryItem]
     next_cursor: str | None
+
+
+class CommunityVoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vote: Literal["HOAKS", "WASPADA", "VALID"]
+
+
+class CommunityVoteCounts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    HOAKS: int = Field(default=0, ge=0)
+    WASPADA: int = Field(default=0, ge=0)
+    VALID: int = Field(default=0, ge=0)
+
+
+class CommunityItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    title: str
+    redacted_text: str
+    status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
+    published_at: str
+    counts: CommunityVoteCounts
+
+
+class CommunityPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[CommunityItem]
+    next_cursor: str | None
+
+
+class CommunityDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    title: str
+    redacted_text: str
+    status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
+    published_at: str
+    counts: CommunityVoteCounts
+    user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
+    result: AIResult
+    execution_mode: Literal["MOCK", "REMOTE"]
+
+
+class CommunityVoteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
+    counts: CommunityVoteCounts
+
+
+class CommunityPreviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preview_id: UUID
+    expires_at: str
+    redacted_text: str
+    redacted_image_url: str | None
+    redactions: list[str]
+    confirmation_required: Literal[True] = True
+
+
+class CommunityPublishRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preview_id: UUID
+    publication_consent: Literal[True]
+    rag_reuse_consent: bool = False
+
+
+class CommunityStateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    community_state: Literal["PRIVATE", "PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE", "WITHDRAWN"]
+    revision: int = Field(ge=1)

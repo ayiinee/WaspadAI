@@ -84,3 +84,23 @@ def build_not_required_result(request: TextVerificationRequest, payload_hash: st
     result.community_status = "NOT_REQUIRED"
     result.headline = "Fixture: klaim didukung"
     return result
+
+
+def build_image_review_required_result(question: str | None, payload_hash: str) -> AIResult:
+    result = build_review_required_result(
+        TextVerificationRequest(
+            text="Gambar yang dikirim untuk pemeriksaan.",
+            question=question,
+        ),
+        payload_hash,
+    )
+    result.input_summary.update(
+        {
+            "input_type": "IMAGE",
+            "content_type": "IMAGE",
+            "media_type": "image/*",
+            "extraction_status": "NOT_APPLICABLE",
+            "excerpt": "Input gambar diproses dalam mode mock.",
+        }
+    )
+    return result

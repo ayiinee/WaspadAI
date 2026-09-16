@@ -181,8 +181,9 @@ Idempotency-Key: <uuid-v4>
 Content-Type: multipart/form-data
 ```
 
-Status implementasi: `TARGET`; belum boleh dianggap tersedia sampai Product
-Backend mengekspor endpoint, OpenAPI, test, dan deployment.
+Status implementasi: `PARTIAL_RUNTIME`; Product Backend sudah mengekspor route,
+validasi multipart dasar, adapter internal, dan test. Validasi dimensi penuh,
+deployment, dan integration test Supabase masih menjadi gate sebelum production.
 
 Multipart fields:
 
@@ -452,7 +453,7 @@ Endpoint Product Backend:
 ```http
 GET    /api/v1/community?limit=20&cursor=<opaque_cursor>
 GET    /api/v1/community/{case_id}
-PUT    /api/v1/community/{case_id}/vote
+POST   /api/v1/community/{case_id}/vote
 DELETE /api/v1/community/{case_id}/vote
 ```
 
@@ -460,25 +461,27 @@ Vote request:
 
 ```json
 {
-  "vote": "DIDUKUNG"
+  "vote": "VALID"
 }
 ```
 
 Nilai vote valid:
 
 ```text
-DIDUKUNG
-DIBANTAH
+HOAKS
+WASPADA
+VALID
 ```
 
 Aturan vote:
 
 - satu pengguna maksimal punya satu vote aktif per kasus;
-- `PUT` membuat atau mengganti vote;
+- `POST` membuat atau mengganti vote;
 - `DELETE` membatalkan vote;
 - pemilik kasus tidak boleh vote pada kasus sendiri;
 - identitas voter tidak ditampilkan;
-- vote adalah opini komunitas, bukan verdict faktual;
+- vote adalah klasifikasi opini komunitas, bukan verdict faktual;
+- response menyediakan count terpisah untuk `HOAKS`, `WASPADA`, dan `VALID`;
 - jumlah vote tidak boleh otomatis membuat kasus menjadi evidence terverifikasi.
 
 Hanya moderator/admin yang boleh menetapkan `VERIFIED_EVIDENCE`.
