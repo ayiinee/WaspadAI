@@ -1,0 +1,27 @@
+{
+  "format_version": 1,
+  "source_document": "docs/architecture/system-and-folder-architecture.md",
+  "source_archive": "docs/archive/monoliths/system-and-folder-architecture.v3.0.1-draft.md",
+  "source_archive_sha256": "a9f4e79d8325006138264cc50d0626ca63bf7b1272b12c5da24f6a9fc5104b32",
+  "approved_on": "2026-09-15",
+  "decision_record": "docs/adr/0002-initial-product-baseline.md",
+  "rationale": "The active architecture is intentionally revised for the actual Product repository layout, Android package, SDK baseline, Docker-free hosted Supabase setup, and CI documentation artifact boundary. The imported monolith remains byte-exact.",
+  "intentional_changes": [
+    {
+      "path": "docs/architecture/system-overview.md",
+      "reason": "Reflect the implemented frontend root, backend lockfile, Supabase directory, non-committed documentation artifact flow, and no-container baseline."
+    },
+    {
+      "path": "docs/architecture/android-architecture.md",
+      "reason": "Freeze id.waspadai.app and SDK 36 in the active Android architecture."
+    }
+  ],
+  "active_modules": {
+    "docs/architecture/system-overview.md": "9642eb1f0c69337af0fd7d9643314d2bef5c2e3e332d1729868679d10ee78427",
+    "docs/architecture/android-architecture.md": "917ca69112f3d4a15c17cb0b3dc3cf26c331886e099e203813ba9612a73926e0",
+    "docs/architecture/backend-architecture.md": "e17d3e957a7b0eafe3e5ff41da55a04933553ed0edd3639361cd9ee1be0d5b8d",
+    "docs/architecture/web-architecture.md": "bb61754e0fb83829cdbbe21cf00aaea260ebeb552e28c9ed670d6c94c3d74862",
+    "docs/architecture/runtime-security-configuration.md": "5ff62fe55d3c254c1d7c55bbc5084c869ea3d0f3e9396c1e5ce2dc9f63dab9af",
+    "docs/architecture/feature-mapping-and-migration.md": "c57437c4993a086a5160cb60b91fda6a59da7aeda8d47765225739a1a75b5b76"
+  }
+}

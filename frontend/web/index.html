@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Demo browser WaspadAI untuk pemeriksaan pesan mencurigakan."
+    />
+    <title>WaspadAI — Demo Browser</title>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="app-frame" aria-label="WaspadAI demo browser">
+        <header class="app-header">
+          <h1>WaspadAI</h1>
+        </header>
+
+        <section id="conversation" class="conversation" aria-label="Riwayat pemeriksaan"></section>
+
+        <section class="composer-section" aria-label="Kirim pesan untuk diperiksa">
+          <div id="attachment-preview" class="attachment-preview" hidden></div>
+          <div class="composer-row">
+            <button class="toggle-button" type="button" aria-label="Aktifkan pemeriksaan pesan"><span aria-hidden="true"></span></button>
+            <label class="attach-button" for="image-input" title="Tambahkan gambar">
+              <span aria-hidden="true">+</span>
+              <span class="sr-only">Tambahkan gambar</span>
+            </label>
+            <textarea
+              id="message-input"
+              rows="1"
+              maxlength="25000"
+              placeholder="Ketik pesan untuk diperiksa…"
+              aria-label="Pesan yang ingin diperiksa"
+            ></textarea>
+            <button id="send-button" class="send-button" type="button" aria-label="Kirim untuk diperiksa">
+              <span aria-hidden="true">↑</span>
+            </button>
+          </div>
+          <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+          <p class="composer-hint">Teks minimal 10 karakter. Gambar: JPG, PNG, atau WEBP, maksimal 8 MB.</p>
+        </section>
+
+        <nav class="bottom-nav" aria-label="Navigasi utama">
+          <button type="button" data-tab="Beranda"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-6h6v6"/></svg>Beranda</button>
+          <button type="button" data-tab="Pelajari"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h5.5A2.5 2.5 0 0 1 12 8v12a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 5.5h-5.5A2.5 2.5 0 0 0 12 8v12a2.5 2.5 0 0 1 2.5-2.5H20z"/></svg>Pelajari</button>
+          <button type="button" data-tab="Periksa" class="center-nav active" aria-label="Periksa"></button>
+          <button type="button" data-tab="Koneksi"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3.5 20v-1.2A4.8 4.8 0 0 1 8.3 14h1.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="M15.1 14.5a4 4 0 0 1 5.4 3.8V20"/></svg>Koneksi</button>
+          <button type="button" data-tab="Progres"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a8 8 0 0 1 16 0"/><path d="m12 14 3.5-3.5"/><path d="M7.5 12.5 6 11M16.5 12.5 18 11M12 9v-2"/><path d="M4 20h16"/></svg>Progres</button>
+        </nav>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,57 @@
+{
+  "status": "PASS_MODULAR_3_0_1_HOSTED_DB_BASELINE_CHECKS",
+  "files": 71,
+  "markdown_files": 50,
+  "active_markdown_files": 40,
+  "active_modules": 30,
+  "byte_exact_monolith_archives": 10,
+  "active_word_count": 20182,
+  "total_markdown_word_count": 93393,
+  "word_count_method": "Whitespace-delimited tokens in all 50 Markdown files; active count excludes the 10 byte-exact monolith archives.",
+  "operations": 31,
+  "schemas": 61,
+  "resolved_refs": 445,
+  "relative_links_checked": 129,
+  "examples_validated": 7,
+  "json_files_validated": 15,
+  "validation_scope": "Byte-exact SHA-256 verification of 3.0.0 and 3.0.1 monolith archives, approved active architecture/setup delta locks including hosted-DB/no-container setup changes, unchanged source coverage checks for other modules, upstream snapshot checksum/version, active Markdown relative links, JSON parsing, and focused 3.0.1 contract checks. Custom checks, not full OpenAPI specification certification.",
+  "not_tested": [
+    "Live upstream compatibility",
+    "Actual Product code/build",
+    "Database SQL execution/RLS runtime",
+    "Android build/device",
+    "Deployment",
+    "Full OpenAPI specification validator"
+  ],
+  "upstream_status": "UPLOADED_SNAPSHOT_VERIFIED_SCHEMA_ONLY",
+  "snapshot": {
+    "path": "contracts/upstream/waspadai-ai.openapi.json",
+    "sha256": "808b4e28d8add349bb676f87511de262a2106b320eed3d18bcdc1c436f51e542",
+    "api_version": "0.7.0",
+    "openapi_version": "3.1.0",
+    "byte_identical_to_docs2": true,
+    "full_commit_verified": false,
+    "remote_smoke_passed": false
+  },
+  "negative_cases_rejected_by_source_validation": [
+    "missing_trace",
+    "wrong_mode",
+    "extra_result_field",
+    "null_question",
+    "long_page_title"
+  ],
+  "content_preservation": {
+    "manifest": "docs/archive/source-manifest.json",
+    "pre_modularization_report": "docs/archive/validation-report.pre-modularization.json",
+    "source_3_0_1_report": "docs/archive/validation-report.3.0.1-source.json",
+    "approved_active_architecture_delta_lock": "docs/archive/active-module-locks/architecture.3.0.1-initial-baseline.json",
+    "approved_active_setup_delta_lock": "docs/archive/active-module-locks/setup.3.0.1-initial-baseline.json",
+    "verification_script": "scripts/verify-docs.ps1",
+    "nonblank_source_lines_covered": 1265,
+    "navigation_only_lines_intentionally_updated": 4,
+    "contract_count_lines_corrected": 3,
+    "verification_response_required_properties": 25,
+    "historical_appendices_unchanged": true,
+    "archive_policy": "3.0.0 and 3.0.1 monoliths remain byte-exact and non-normative; active modular documents are authoritative."
+  }
+}

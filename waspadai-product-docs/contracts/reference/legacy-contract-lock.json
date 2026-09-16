@@ -1,0 +1,35 @@
+{
+  "status": "UPLOADED_SNAPSHOT_VERIFIED_SCHEMA_ONLY",
+  "repository": "https://github.com/ShafwanAdhi/waspadAI-demo",
+  "reported_commit_short": "b456057",
+  "reported_openapi_version": "0.7.0",
+  "reported_source": "Prior conversation audit; not independently reverified in this package",
+  "previous_prd_commit_short": "a84ad57",
+  "full_commit_sha": null,
+  "source_file": "contracts/openapi.json",
+  "snapshot_file": "waspadai-ai.openapi.json",
+  "snapshot_sha256": "808b4e28d8add349bb676f87511de262a2106b320eed3d18bcdc1c436f51e542",
+  "verified_at": null,
+  "verified_by": "Assistant: local uploaded-file inspection",
+  "remote_smoke_passed": false,
+  "reason": "Original uploaded bytes preserved; JSON and schema references checked. Full GitHub commit and runtime are unverified.",
+  "open_decisions": [
+    "History REVIEW_REQUIRED versus ALL",
+    "Product vote POST versus older PUT",
+    "Image byte limit decimal MB versus MiB",
+    "Upstream internal auth security scheme",
+    "Upstream idempotency and unknown outcome handling",
+    "Community indexing revision/retract capability"
+  ],
+  "snapshot_source": "User-uploaded openapi.json",
+  "snapshot_source_library_file_id": "libfile_09f9e17f192c8191b2ce06443f9f058a",
+  "api_version": "0.7.0",
+  "openapi_version": "3.1.0",
+  "verification_scope": "Uploaded-file structure and schema equality, not origin or deployment attestation",
+  "auth_contract_gap": {
+    "header": "x-waspadai-api-key",
+    "required_in_snapshot": false,
+    "security_scheme_present": false,
+    "product_policy": "Always send internal API key; verify runtime enforcement separately"
+  }
+}

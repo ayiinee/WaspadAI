@@ -1,29 +1,37 @@
 # WaspadAI Product
 
-Repository ini berisi aplikasi Android dan Product API untuk WaspadAI. Product API memegang workflow pengguna, validasi Supabase Auth, dan data Product; service AI adalah layanan HTTP terpisah dan tidak di-clone atau dijalankan dari repository ini.
+Repository ini berisi scaffold aplikasi Android, Supabase, dan Product Backend future untuk WaspadAI.
 
-Anggota tim baru mulai dari [panduan setup dan handoff](TEAM_SETUP.md). Panduan tersebut menjelaskan tool, akses dokumentasi/secret, perintah verifikasi backend dan Android, serta batas fitur yang belum diimplementasikan.
+## Arsitektur MVP saat ini
 
-## Struktur awal
+```text
+Android Kotlin ──> Public WaspadAI API ──> fact-check pipeline
+      │
+      └── Supabase login diperiksa di aplikasi
+```
 
-- `frontend/`: Android Gradle root, package `id.waspadai.app`.
-- `backend/`: FastAPI Python 3.11, dikelola dengan `uv`.
-- `supabase/`: migration SQL Product yang forward-only.
-- `contracts/documentation-artifact.lock.json`: pin untuk artifact dokumentasi, bukan salinan dokumentasi atau kontrak sumber.
+Android memanggil public endpoint `/api/v1/verify/text` dan `/api/v1/verify/image` secara langsung. Token Supabase tidak dikirim ke WaspadAI API, response tidak memakai wrapper `result/history`, dan internal API key tidak boleh berada di APK.
 
-## Menjalankan backend
+[`android-api-contract.md`](android-api-contract.md) adalah source of truth untuk integrasi AI. Dokumentasi yang sudah dirapikan berada di [`waspadai-product-docs/`](waspadai-product-docs/README.md).
 
-1. Jika `.env` belum ada, salin `.env.example` menjadi `.env`; jika sudah ada, review nilainya tanpa menimpa file lokal.
-2. Masuk ke `backend/`, lalu jalankan `uv sync --locked` (Python 3.11 dipilih dari `.python-version`). Pada PowerShell mesin ini, `py -m uv sync --locked` juga tersedia.
-3. Jalankan `uv run python run_server.py` atau `py -m uv run python run_server.py`.
-4. Periksa `http://127.0.0.1:8001/api/health`.
+## Status komponen
 
-Mode default AI adalah `mock`; production menolak mode tersebut. Credential Supabase dan AI tidak boleh dimasukkan ke commit atau diteruskan ke Android.
+| Komponen | Status baseline |
+| --- | --- |
+| `frontend/` | Android Compose scaffold; integrasi end-to-end belum selesai |
+| `backend/` | Preview Product Backend future: health/readiness, mock verifikasi teks, dan history owner-only; bukan gateway MVP current |
+| `supabase/` | Migration/tooling awal untuk fitur Product future |
+| `contracts/` | Pin artifact dokumentasi Product |
+| `waspadai-product-docs/` | Dokumentasi aktif, kontrak current/future/reference, dan archive |
 
-## Dokumentasi sebagai artifact
+History server-side, Storage, community, voting, ownership, dan moderation membutuhkan Product Backend fase berikutnya. Keberadaan scaffold atau draft OpenAPI bukan bukti fitur tersebut tersedia.
 
-Dokumentasi lengkap berada di repository `waspadai-product-docs`. Product CI mengunduh bundle versi yang dipin secara eksplisit, memeriksa SHA-256 bundle dan checksum file kontrak di dalamnya, lalu mengekstraknya hanya ke `.artifacts/`. Sebelum publish artifact CI pertama, lengkapi URL dan checksum pada `contracts/documentation-artifact.lock.json`; placeholder sengaja membuat fetch gagal daripada memakai versi dokumentasi yang tidak diketahui.
+## Mulai development
 
-## Supabase
+Baca [`TEAM_SETUP.md`](TEAM_SETUP.md), lalu jalankan quality gate dokumentasi:
 
-`supabase/migrations/` adalah sumber schema yang dapat dieksekusi. Initial setup tidak mewajibkan Docker atau local Supabase stack: gunakan project Supabase development yang terpisah, setelah target dan credential dikonfirmasi. CLI 2.117.0 dipin pada `package-lock.json`; gunakan `npm ci` dari root sebelum `npx --no-install supabase`. Jangan menjalankan `supabase db push` ke cloud tanpa dry-run, project ref, backup, dan operator yang disetujui. Langkah dan batasannya ada di `supabase/README.md`.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\waspadai-product-docs\scripts\verify-docs.ps1
+```
+
+Jangan commit `.env`, keystore, token, screenshot pengguna, database credential, Supabase service-role key, atau `X-Waspadai-API-Key`.

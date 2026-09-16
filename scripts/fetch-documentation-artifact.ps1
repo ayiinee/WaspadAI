@@ -52,12 +52,15 @@ foreach ($property in $lock.required_files.psobject.Properties) {
         throw "Pinned file checksum mismatch: $($property.Name)"
     }
 }
-$manifestPath = Join-Path $Destination 'docs/archive/source-manifest.json'
+$manifestPath = Join-Path $Destination 'manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
-    throw 'Documentation source manifest is missing from the artifact.'
+    throw 'Documentation package manifest is missing from the artifact.'
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($manifest.product_contract.version -ne $lock.version) {
+if ($manifest.version -ne $lock.version) {
     throw "Documentation artifact version does not match the Product lock: $($lock.version)"
+}
+if ($manifest.current_contract.path -ne $lock.contract_authority) {
+    throw "Documentation contract authority does not match the Product lock: $($lock.contract_authority)"
 }
 Write-Output "PASS: documentation artifact $($lock.artifact_name) $($lock.version) is pinned and verified."

@@ -1,0 +1,3341 @@
+# STATUS: FUTURE / NON-RUNTIME CONTRACT.
+# This legacy Product Backend draft is preserved for design review only.
+# The current Android MVP contract is ../current/android-api-contract.md.
+components:
+  schemas:
+    AIResult:
+      $ref: '#/components/schemas/VerificationResponse'
+    Action:
+      $ref: '#/components/schemas/RecommendedAction'
+    Claim:
+      additionalProperties: false
+      properties:
+        claim_expires_at:
+          format: date-time
+          type: string
+        claimed:
+          type: boolean
+        contribution_id:
+          format: uuid
+          type: string
+        revision:
+          minimum: 1
+          type: integer
+      required:
+      - contribution_id
+      - claimed
+      - claim_expires_at
+      - revision
+      type: object
+    CommunityDetail:
+      additionalProperties: false
+      properties:
+        case_id:
+          format: uuid
+          type: string
+        counts:
+          additionalProperties: false
+          properties:
+            DIBANTAH:
+              minimum: 0
+              type: integer
+            DIDUKUNG:
+              minimum: 0
+              type: integer
+          required:
+          - DIDUKUNG
+          - DIBANTAH
+          type: object
+        published_at:
+          format: date-time
+          type: string
+        redacted_image_url:
+          anyOf:
+          - format: uri
+            type: string
+          - type: 'null'
+        redacted_text:
+          type: string
+        result:
+          $ref: '#/components/schemas/AIResult'
+        status:
+          enum:
+          - PUBLISHED_UNVERIFIED
+          - VERIFIED_EVIDENCE
+          type: string
+        title:
+          type: string
+        user_vote:
+          anyOf:
+          - enum:
+            - DIDUKUNG
+            - DIBANTAH
+            type: string
+          - type: 'null'
+        execution_mode:
+          type: string
+          enum:
+          - REMOTE
+          - MOCK
+          description: Product execution provenance; synthetic fixture has MOCK even
+            though strict upstream result.mode is LIVE.
+      required:
+      - case_id
+      - title
+      - redacted_text
+      - status
+      - published_at
+      - counts
+      - redacted_image_url
+      - result
+      - user_vote
+      - execution_mode
+      type: object
+    CommunityItem:
+      additionalProperties: false
+      properties:
+        case_id:
+          format: uuid
+          type: string
+        counts:
+          additionalProperties: false
+          properties:
+            DIBANTAH:
+              minimum: 0
+              type: integer
+            DIDUKUNG:
+              minimum: 0
+              type: integer
+          required:
+          - DIDUKUNG
+          - DIBANTAH
+          type: object
+        published_at:
+          format: date-time
+          type: string
+        redacted_text:
+          type: string
+        status:
+          enum:
+          - PUBLISHED_UNVERIFIED
+          - VERIFIED_EVIDENCE
+          type: string
+        title:
+          type: string
+      required:
+      - case_id
+      - title
+      - redacted_text
+      - status
+      - published_at
+      - counts
+      type: object
+    CommunityPage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/CommunityItem'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+      type: object
+    CommunityState:
+      additionalProperties: false
+      properties:
+        case_id:
+          format: uuid
+          type: string
+        community_state:
+          enum:
+          - PRIVATE
+          - PUBLISHED_UNVERIFIED
+          - VERIFIED_EVIDENCE
+          - WITHDRAWN
+          type: string
+        revision:
+          minimum: 1
+          type: integer
+      required:
+      - case_id
+      - community_state
+      - revision
+      type: object
+    Contribution:
+      additionalProperties: false
+      properties:
+        case_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+        contribution_id:
+          format: uuid
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        reasoning:
+          type: string
+        revision:
+          minimum: 1
+          type: integer
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceInput'
+          type: array
+        status:
+          enum:
+          - DRAFT
+          - SUBMITTED
+          - NEEDS_EVIDENCE
+          - VERIFIED
+          - REJECTED
+          - RETRACTED
+          type: string
+        summary:
+          type: string
+        title:
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+      required:
+      - contribution_id
+      - case_id
+      - title
+      - summary
+      - reasoning
+      - status
+      - revision
+      - sources
+      - created_at
+      - updated_at
+      type: object
+    ContributionCreate:
+      additionalProperties: false
+      properties:
+        case_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+        reasoning:
+          maxLength: 5000
+          minLength: 1
+          type: string
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceInput'
+          type: array
+        summary:
+          maxLength: 5000
+          minLength: 1
+          type: string
+        title:
+          maxLength: 200
+          minLength: 1
+          type: string
+      required:
+      - title
+      - summary
+      - reasoning
+      - sources
+      type: object
+    ContributionPage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Contribution'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+      type: object
+    ContributionPatch:
+      additionalProperties: false
+      minProperties: 2
+      properties:
+        expected_revision:
+          minimum: 1
+          type: integer
+        reasoning:
+          maxLength: 5000
+          minLength: 1
+          type: string
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceInput'
+          type: array
+        summary:
+          maxLength: 5000
+          minLength: 1
+          type: string
+        title:
+          maxLength: 200
+          minLength: 1
+          type: string
+      required:
+      - expected_revision
+      type: object
+    DecisionRequest:
+      additionalProperties: false
+      properties:
+        action:
+          enum:
+          - VERIFY
+          - REJECT
+          - NEEDS_EVIDENCE
+          - RETRACT
+          type: string
+        allow_rag:
+          type: boolean
+        evidence_ids:
+          items:
+            format: uuid
+            type: string
+          type: array
+        expected_revision:
+          minimum: 1
+          type: integer
+        publish_to_connection:
+          type: boolean
+        reason:
+          maxLength: 5000
+          minLength: 1
+          type: string
+      required:
+      - expected_revision
+      - action
+      - reason
+      - evidence_ids
+      - publish_to_connection
+      - allow_rag
+      type: object
+    DecisionResult:
+      additionalProperties: false
+      properties:
+        contribution_id:
+          format: uuid
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        decision_id:
+          format: uuid
+          type: string
+        revision:
+          minimum: 1
+          type: integer
+        status:
+          enum:
+          - NEEDS_EVIDENCE
+          - VERIFIED
+          - REJECTED
+          - RETRACTED
+          type: string
+        sync_state:
+          enum:
+          - NOT_REQUESTED
+          - PENDING
+          - BLOCKED
+          - DEINDEX_PENDING
+          type: string
+      required:
+      - decision_id
+      - contribution_id
+      - status
+      - revision
+      - sync_state
+      - created_at
+      type: object
+    Dimensions:
+      $ref: '#/components/schemas/AssessmentDimensions'
+    Error:
+      additionalProperties: false
+      properties:
+        error:
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            request_id:
+              format: uuid
+              type: string
+            retry_after_seconds:
+              anyOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            retryable:
+              type: boolean
+          required:
+          - code
+          - message
+          - request_id
+          - retryable
+          - retry_after_seconds
+          type: object
+      required:
+      - error
+      type: object
+    Evidence:
+      properties:
+        id:
+          type: string
+          title: Id
+        claim_id:
+          type: string
+          title: Claim Id
+        source_type:
+          type: string
+          title: Source Type
+        publisher:
+          type: string
+          title: Publisher
+        title:
+          type: string
+          title: Title
+        url:
+          type: string
+          title: Url
+        published_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Published At
+        retrieved_at:
+          type: string
+          title: Retrieved At
+        excerpt:
+          type: string
+          title: Excerpt
+        relevance:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Relevance
+        authority:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Authority
+        recency:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Recency
+        stance:
+          type: string
+          enum:
+          - SUPPORTS
+          - REFUTES
+          - CONTEXT
+          - UNKNOWN
+          title: Stance
+        verification_status:
+          type: string
+          enum:
+          - VERIFIED
+          - REVIEWED
+          - UNVERIFIED
+          title: Verification Status
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - claim_id
+      - source_type
+      - publisher
+      - title
+      - url
+      - published_at
+      - retrieved_at
+      - excerpt
+      - relevance
+      - authority
+      - recency
+      - stance
+      - verification_status
+      title: Evidence
+    Health:
+      additionalProperties: false
+      properties:
+        service:
+          enum:
+          - product
+          type: string
+        status:
+          enum:
+          - ok
+          type: string
+        version:
+          type: string
+      required:
+      - status
+      - service
+      - version
+      type: object
+    HistoryDetail:
+      additionalProperties: false
+      properties:
+        history:
+          $ref: '#/components/schemas/HistoryMeta'
+        image_url:
+          anyOf:
+          - format: uri
+            type: string
+          - type: 'null'
+        request_id:
+          format: uuid
+          type: string
+        result:
+          $ref: '#/components/schemas/AIResult'
+        status:
+          enum:
+          - COMPLETED
+          type: string
+        execution_mode:
+          type: string
+          enum:
+          - REMOTE
+          - MOCK
+          description: Product execution provenance; synthetic fixture has MOCK even
+            though strict upstream result.mode is LIVE.
+      required:
+      - request_id
+      - status
+      - history
+      - result
+      - execution_mode
+      type: object
+    HistoryItem:
+      additionalProperties: false
+      properties:
+        case_id:
+          format: uuid
+          type: string
+        community_state:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        headline:
+          type: string
+        input_type:
+          enum:
+          - TEXT
+          - IMAGE
+          type: string
+        requires_human_review:
+          type: boolean
+        verdict:
+          type: string
+      required:
+      - case_id
+      - input_type
+      - headline
+      - verdict
+      - requires_human_review
+      - community_state
+      - created_at
+      type: object
+    HistoryMeta:
+      additionalProperties: false
+      properties:
+        case_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+        community_eligible:
+          type: boolean
+        community_state:
+          enum:
+          - PRIVATE
+          - PUBLISHED_UNVERIFIED
+          - VERIFIED_EVIDENCE
+          - WITHDRAWN
+          - NOT_AVAILABLE
+          type: string
+        save_reason:
+          enum:
+          - UNVERIFIED
+          - HUMAN_REVIEW
+          - ALL_POLICY
+          - NOT_REQUIRED
+          - SAVE_FAILED
+          type: string
+        saved:
+          type: boolean
+      required:
+      - saved
+      - case_id
+      - save_reason
+      - community_eligible
+      - community_state
+      type: object
+    HistoryPage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+      type: object
+    ImageRequest:
+      properties:
+        image:
+          type: string
+          format: binary
+          title: Image
+          description: 'Product policy: JPEG/PNG/WEBP; max8,000,000 bytes, min64x64,
+            max6000x6000, max30M pixels. Runtime AI limits not encoded by upstream
+            schema.'
+        question:
+          type: string
+          title: Question
+          default: Apakah informasi dalam gambar ini benar dan aman ditindaklanjuti?
+          maxLength: 500
+      type: object
+      required:
+      - image
+      title: ProductImageRequest
+    Lesson:
+      additionalProperties: false
+      properties:
+        body_md:
+          type: string
+        completed:
+          type: boolean
+        display_order:
+          minimum: 0
+          type: integer
+        duration_minutes:
+          minimum: 1
+          type: integer
+        lesson_id:
+          format: uuid
+          type: string
+        title:
+          type: string
+      required:
+      - lesson_id
+      - title
+      - body_md
+      - duration_minutes
+      - display_order
+      - completed
+      type: object
+    Me:
+      additionalProperties: false
+      properties:
+        capabilities:
+          additionalProperties: false
+          properties:
+            community:
+              type: boolean
+            community_rag:
+              type: boolean
+            learning:
+              type: boolean
+            verification:
+              type: boolean
+          required:
+          - verification
+          - community
+          - learning
+          - community_rag
+          type: object
+        roles:
+          items:
+            enum:
+            - USER
+            - MODERATOR
+            - ADMIN
+            type: string
+          type: array
+        user_id:
+          format: uuid
+          type: string
+      required:
+      - user_id
+      - roles
+      - capabilities
+      type: object
+    ModuleDetail:
+      additionalProperties: false
+      properties:
+        lessons:
+          items:
+            $ref: '#/components/schemas/Lesson'
+          type: array
+        module_id:
+          format: uuid
+          type: string
+        progress_percent:
+          maximum: 100
+          minimum: 0
+          type: number
+        slug:
+          type: string
+        summary:
+          type: string
+        title:
+          type: string
+        version:
+          minimum: 1
+          type: integer
+      required:
+      - module_id
+      - slug
+      - title
+      - summary
+      - version
+      - progress_percent
+      - lessons
+      type: object
+    ModulePage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ModuleSummary'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+      type: object
+    ModuleSummary:
+      additionalProperties: false
+      properties:
+        module_id:
+          format: uuid
+          type: string
+        progress_percent:
+          maximum: 100
+          minimum: 0
+          type: number
+        slug:
+          type: string
+        summary:
+          type: string
+        title:
+          type: string
+        version:
+          minimum: 1
+          type: integer
+      required:
+      - module_id
+      - slug
+      - title
+      - summary
+      - version
+      - progress_percent
+      type: object
+    Preview:
+      additionalProperties: false
+      properties:
+        confirmation_required:
+          enum:
+          - true
+          type: boolean
+        expires_at:
+          format: date-time
+          type: string
+        preview_id:
+          format: uuid
+          type: string
+        redacted_image_url:
+          anyOf:
+          - format: uri
+            type: string
+          - type: 'null'
+        redacted_text:
+          type: string
+        redactions:
+          items:
+            type: string
+          type: array
+      required:
+      - preview_id
+      - expires_at
+      - redacted_text
+      - redacted_image_url
+      - redactions
+      - confirmation_required
+      type: object
+    Profile:
+      additionalProperties: false
+      properties:
+        avatar_url:
+          anyOf:
+          - format: uri
+            type: string
+          - type: 'null'
+        bio:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+        display_name:
+          maxLength: 80
+          minLength: 1
+          type: string
+        locale:
+          type: string
+      required:
+      - display_name
+      - bio
+      - locale
+      - avatar_url
+      type: object
+    ProfilePatch:
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        bio:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+        display_name:
+          maxLength: 80
+          minLength: 1
+          type: string
+        locale:
+          type: string
+      required: []
+      type: object
+    Progress:
+      additionalProperties: false
+      properties:
+        best_score:
+          anyOf:
+          - maximum: 100
+            minimum: 0
+            type: number
+          - type: 'null'
+        completed_lessons:
+          minimum: 0
+          type: integer
+        latest_score:
+          anyOf:
+          - maximum: 100
+            minimum: 0
+            type: number
+          - type: 'null'
+        module_id:
+          format: uuid
+          type: string
+        progress_percent:
+          maximum: 100
+          minimum: 0
+          type: number
+        total_lessons:
+          minimum: 0
+          type: integer
+        updated_at:
+          format: date-time
+          type: string
+      required:
+      - module_id
+      - completed_lessons
+      - total_lessons
+      - progress_percent
+      - latest_score
+      - best_score
+      - updated_at
+      type: object
+    ProgressPage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Progress'
+          type: array
+      required:
+      - items
+      type: object
+    PublishRequest:
+      additionalProperties: false
+      properties:
+        consent:
+          enum:
+          - true
+          type: boolean
+        preview_id:
+          format: uuid
+          type: string
+      required:
+      - preview_id
+      - consent
+      type: object
+    Quiz:
+      additionalProperties: false
+      properties:
+        module_id:
+          format: uuid
+          type: string
+        module_version:
+          minimum: 1
+          type: integer
+        questions:
+          items:
+            $ref: '#/components/schemas/QuizQuestion'
+          type: array
+      required:
+      - module_id
+      - module_version
+      - questions
+      type: object
+    QuizFeedback:
+      additionalProperties: false
+      properties:
+        correct:
+          type: boolean
+        explanation:
+          type: string
+        question_id:
+          format: uuid
+          type: string
+      required:
+      - question_id
+      - correct
+      - explanation
+      type: object
+    QuizOption:
+      additionalProperties: false
+      properties:
+        option_id:
+          format: uuid
+          type: string
+        text:
+          type: string
+      required:
+      - option_id
+      - text
+      type: object
+    QuizQuestion:
+      additionalProperties: false
+      properties:
+        options:
+          items:
+            $ref: '#/components/schemas/QuizOption'
+          type: array
+        question_id:
+          format: uuid
+          type: string
+        text:
+          type: string
+      required:
+      - question_id
+      - text
+      - options
+      type: object
+    QuizRequest:
+      additionalProperties: false
+      properties:
+        answers:
+          items:
+            additionalProperties: false
+            properties:
+              option_id:
+                format: uuid
+                type: string
+              question_id:
+                format: uuid
+                type: string
+            required:
+            - question_id
+            - option_id
+            type: object
+          minItems: 1
+          type: array
+        module_version:
+          minimum: 1
+          type: integer
+      required:
+      - module_version
+      - answers
+      type: object
+    QuizResult:
+      additionalProperties: false
+      properties:
+        attempt_id:
+          format: uuid
+          type: string
+        correct_answers:
+          minimum: 0
+          type: integer
+        feedback:
+          items:
+            $ref: '#/components/schemas/QuizFeedback'
+          type: array
+        score:
+          maximum: 100
+          minimum: 0
+          type: number
+        total_questions:
+          minimum: 1
+          type: integer
+      required:
+      - attempt_id
+      - score
+      - correct_answers
+      - total_questions
+      - feedback
+      type: object
+    Ready:
+      additionalProperties: false
+      properties:
+        request_id:
+          format: uuid
+          type: string
+        status:
+          enum:
+          - ready
+          - degraded
+          type: string
+      required:
+      - status
+      - request_id
+      type: object
+    Revision:
+      additionalProperties: false
+      properties:
+        expected_revision:
+          minimum: 1
+          type: integer
+      required:
+      - expected_revision
+      type: object
+    SourceInput:
+      additionalProperties: false
+      properties:
+        note:
+          maxLength: 2000
+          type: string
+        publisher:
+          maxLength: 200
+          type: string
+        source_url:
+          format: uri
+          maxLength: 2048
+          type: string
+        title:
+          maxLength: 300
+          type: string
+      required:
+      - source_url
+      type: object
+    TextRequest:
+      properties:
+        text:
+          type: string
+          maxLength: 25000
+          minLength: 10
+          title: Text
+        question:
+          type: string
+          maxLength: 500
+          title: Question
+          default: Apakah isi teks ini benar dan aman ditindaklanjuti?
+        source_url:
+          anyOf:
+          - type: string
+            maxLength: 2048
+            format: uri
+          - type: 'null'
+          title: Source Url
+        sender_context:
+          type: string
+          enum:
+          - NOT_APPLICABLE
+          - UNKNOWN_NUMBER
+          - KNOWN_CONTACT
+          - FORWARDED
+          - SOCIAL_MEDIA
+          - UNKNOWN
+          title: Sender Context
+          default: UNKNOWN
+        page_context:
+          anyOf:
+          - $ref: '#/components/schemas/PageContext'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: ProductTextRequest
+    VerificationEnvelope:
+      additionalProperties: false
+      properties:
+        history:
+          $ref: '#/components/schemas/HistoryMeta'
+        request_id:
+          format: uuid
+          type: string
+        result:
+          $ref: '#/components/schemas/AIResult'
+        status:
+          enum:
+          - COMPLETED
+          type: string
+        execution_mode:
+          type: string
+          enum:
+          - REMOTE
+          - MOCK
+          description: Product execution provenance; synthetic fixture has MOCK even
+            though strict upstream result.mode is LIVE.
+      required:
+      - request_id
+      - status
+      - history
+      - result
+      - execution_mode
+      type: object
+    VoteRequest:
+      additionalProperties: false
+      properties:
+        vote:
+          enum:
+          - DIDUKUNG
+          - DIBANTAH
+          type: string
+      required:
+      - vote
+      type: object
+    VoteResult:
+      additionalProperties: false
+      properties:
+        case_id:
+          format: uuid
+          type: string
+        counts:
+          additionalProperties: false
+          properties:
+            DIBANTAH:
+              minimum: 0
+              type: integer
+            DIDUKUNG:
+              minimum: 0
+              type: integer
+          required:
+          - DIDUKUNG
+          - DIBANTAH
+          type: object
+        user_vote:
+          anyOf:
+          - enum:
+            - DIDUKUNG
+            - DIBANTAH
+            type: string
+          - type: 'null'
+      required:
+      - case_id
+      - user_vote
+      - counts
+      type: object
+    AssessmentDimensions:
+      properties:
+        factual_status:
+          anyOf:
+          - type: string
+            enum:
+            - SUPPORTED
+            - REFUTED
+            - MISLEADING
+            - PARTLY_TRUE
+            - OUTDATED
+            - UNVERIFIED
+            - SATIRE
+            - OPINION
+          - type: string
+            const: NOT_APPLICABLE
+          title: Factual Status
+        source_authenticity:
+          type: string
+          enum:
+          - VERIFIED
+          - UNVERIFIED
+          - SUSPICIOUS
+          - NOT_APPLICABLE
+          title: Source Authenticity
+        sender_identity:
+          type: string
+          enum:
+          - VERIFIED
+          - UNVERIFIED
+          - IMPERSONATION_LIKELY
+          - IMPERSONATION_CONFIRMED
+          - NOT_APPLICABLE
+          title: Sender Identity
+        channel_status:
+          type: string
+          enum:
+          - VERIFIED
+          - UNVERIFIED
+          - SUSPICIOUS
+          - MALICIOUS
+          - NOT_APPLICABLE
+          title: Channel Status
+        scam_risk:
+          type: string
+          enum:
+          - CRITICAL
+          - HIGH
+          - MEDIUM
+          - LOW
+          - UNKNOWN
+          title: Scam Risk
+        content_authenticity:
+          type: string
+          enum:
+          - ORIGINAL
+          - ALTERED
+          - SYNTHETIC
+          - UNVERIFIED
+          - NOT_APPLICABLE
+          title: Content Authenticity
+      additionalProperties: false
+      type: object
+      required:
+      - factual_status
+      - source_authenticity
+      - sender_identity
+      - channel_status
+      - scam_risk
+      - content_authenticity
+      title: AssessmentDimensions
+    Body_verify_image_api_v1_verify_image_post:
+      properties:
+        image:
+          type: string
+          format: binary
+          title: Image
+        question:
+          type: string
+          title: Question
+          default: Apakah informasi dalam gambar ini benar dan aman ditindaklanjuti?
+        output_mode:
+          type: string
+          enum:
+          - STRUCTURED
+          - NARRATIVE
+          - BOTH
+          title: Output Mode
+          default: STRUCTURED
+      type: object
+      required:
+      - image
+      title: Body_verify_image_api_v1_verify_image_post
+    Body_verify_internal_image_api_internal_v1_verify_image_post:
+      properties:
+        image:
+          type: string
+          format: binary
+          title: Image
+        question:
+          type: string
+          title: Question
+          default: Apakah informasi dalam gambar ini benar dan aman ditindaklanjuti?
+        output_mode:
+          type: string
+          enum:
+          - STRUCTURED
+          - NARRATIVE
+          - BOTH
+          title: Output Mode
+          default: STRUCTURED
+      type: object
+      required:
+      - image
+      title: Body_verify_internal_image_api_internal_v1_verify_image_post
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    InputSummary:
+      properties:
+        input_type:
+          type: string
+          enum:
+          - IMAGE
+          - TEXT
+          title: Input Type
+        content_type:
+          type: string
+          title: Content Type
+        label:
+          type: string
+          title: Label
+        media_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Media Type
+        dimensions:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dimensions
+        extraction_status:
+          type: string
+          title: Extraction Status
+        excerpt:
+          type: string
+          title: Excerpt
+        source_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Url
+        sender_context:
+          type: string
+          enum:
+          - NOT_APPLICABLE
+          - UNKNOWN_NUMBER
+          - KNOWN_CONTACT
+          - FORWARDED
+          - SOCIAL_MEDIA
+          - UNKNOWN
+          title: Sender Context
+        character_count:
+          type: integer
+          title: Character Count
+        urls_detected:
+          type: integer
+          title: Urls Detected
+        pii_types_redacted:
+          items:
+            type: string
+          type: array
+          title: Pii Types Redacted
+      additionalProperties: false
+      type: object
+      required:
+      - input_type
+      - content_type
+      - label
+      - media_type
+      - dimensions
+      - extraction_status
+      - excerpt
+      - source_url
+      - sender_context
+      - character_count
+      - urls_detected
+      - pii_types_redacted
+      title: InputSummary
+    NarrativePresentation:
+      properties:
+        text:
+          type: string
+          title: Text
+        summary:
+          type: string
+          title: Summary
+        paragraphs:
+          items:
+            type: string
+          type: array
+          title: Paragraphs
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      - summary
+      - paragraphs
+      title: NarrativePresentation
+    PageContext:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Title
+        before:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Before
+        after:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: After
+      additionalProperties: false
+      type: object
+      title: PageContext
+    PipelineStage:
+      properties:
+        key:
+          type: string
+          title: Key
+        label:
+          type: string
+          title: Label
+        status:
+          type: string
+          enum:
+          - COMPLETED
+          - SKIPPED
+          - FALLBACK
+          title: Status
+        detail:
+          type: string
+          title: Detail
+        duration_ms:
+          type: integer
+          title: Duration Ms
+      additionalProperties: false
+      type: object
+      required:
+      - key
+      - label
+      - status
+      - detail
+      - duration_ms
+      title: PipelineStage
+    RecommendedAction:
+      properties:
+        code:
+          type: string
+          title: Code
+        title:
+          type: string
+          title: Title
+        detail:
+          type: string
+          title: Detail
+      additionalProperties: false
+      type: object
+      required:
+      - code
+      - title
+      - detail
+      title: RecommendedAction
+    ResponsePresentation:
+      properties:
+        requested_mode:
+          type: string
+          enum:
+          - STRUCTURED
+          - NARRATIVE
+          - BOTH
+          title: Requested Mode
+        structured:
+          type: boolean
+          title: Structured
+        narrative:
+          anyOf:
+          - $ref: '#/components/schemas/NarrativePresentation'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - requested_mode
+      - structured
+      - narrative
+      title: ResponsePresentation
+    RulebookTrace:
+      properties:
+        corpus_versions:
+          items:
+            type: string
+          type: array
+          title: Corpus Versions
+        retrieval_mode:
+          type: string
+          title: Retrieval Mode
+        candidate_count:
+          type: integer
+          title: Candidate Count
+        selected_count:
+          type: integer
+          title: Selected Count
+        forced_rule_ids:
+          items:
+            type: string
+          type: array
+          title: Forced Rule Ids
+        cache_hit:
+          type: boolean
+          title: Cache Hit
+        duration_ms:
+          type: integer
+          title: Duration Ms
+      additionalProperties: false
+      type: object
+      required:
+      - corpus_versions
+      - retrieval_mode
+      - candidate_count
+      - selected_count
+      - forced_rule_ids
+      - cache_hit
+      - duration_ms
+      title: RulebookTrace
+    SourceView:
+      properties:
+        publisher:
+          type: string
+          title: Publisher
+        title:
+          type: string
+          title: Title
+        url:
+          type: string
+          title: Url
+        published_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Published At
+      additionalProperties: false
+      type: object
+      required:
+      - publisher
+      - title
+      - url
+      - published_at
+      title: SourceView
+    TextVerificationRequest:
+      properties:
+        text:
+          type: string
+          maxLength: 25000
+          minLength: 10
+          title: Text
+        question:
+          type: string
+          maxLength: 500
+          title: Question
+          default: Apakah isi teks ini benar dan aman ditindaklanjuti?
+        source_url:
+          anyOf:
+          - type: string
+            maxLength: 2048
+          - type: 'null'
+          title: Source Url
+        sender_context:
+          type: string
+          enum:
+          - NOT_APPLICABLE
+          - UNKNOWN_NUMBER
+          - KNOWN_CONTACT
+          - FORWARDED
+          - SOCIAL_MEDIA
+          - UNKNOWN
+          title: Sender Context
+          default: UNKNOWN
+        page_context:
+          anyOf:
+          - $ref: '#/components/schemas/PageContext'
+          - type: 'null'
+        output_mode:
+          type: string
+          enum:
+          - STRUCTURED
+          - NARRATIVE
+          - BOTH
+          title: Output Mode
+          default: STRUCTURED
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: TextVerificationRequest
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VerificationResponse:
+      properties:
+        request_id:
+          type: string
+          title: Request Id
+        trace_id:
+          type: string
+          title: Trace Id
+        status:
+          type: string
+          const: COMPLETED
+          title: Status
+        mode:
+          type: string
+          const: LIVE
+          title: Mode
+        mode_notice:
+          type: string
+          title: Mode Notice
+        input_summary:
+          $ref: '#/components/schemas/InputSummary'
+        verdict:
+          type: string
+          enum:
+          - SUPPORTED
+          - REFUTED
+          - MISLEADING
+          - PARTLY_TRUE
+          - OUTDATED
+          - UNVERIFIED
+          - SATIRE
+          - OPINION
+          title: Verdict
+        risk_level:
+          type: string
+          enum:
+          - CRITICAL
+          - HIGH
+          - MEDIUM
+          - LOW
+          - UNKNOWN
+          title: Risk Level
+        dimensions:
+          $ref: '#/components/schemas/AssessmentDimensions'
+        headline:
+          type: string
+          title: Headline
+        evidence_sufficiency:
+          type: number
+          title: Evidence Sufficiency
+        evidence_sufficiency_label:
+          type: string
+          title: Evidence Sufficiency Label
+        what_checked:
+          items:
+            type: string
+          type: array
+          title: What Checked
+        why:
+          items:
+            type: string
+          type: array
+          title: Why
+        evidence:
+          items:
+            $ref: '#/components/schemas/Evidence'
+          type: array
+          title: Evidence
+        recommended_actions:
+          items:
+            $ref: '#/components/schemas/RecommendedAction'
+          type: array
+          title: Recommended Actions
+        sources:
+          items:
+            $ref: '#/components/schemas/SourceView'
+          type: array
+          title: Sources
+        uncertainty:
+          type: string
+          title: Uncertainty
+        requires_human_review:
+          type: boolean
+          title: Requires Human Review
+        community_status:
+          type: string
+          enum:
+          - NOT_REQUIRED
+          - ELIGIBLE_WITH_CONSENT
+          title: Community Status
+        privacy_notice:
+          type: string
+          title: Privacy Notice
+        rulebook:
+          $ref: '#/components/schemas/RulebookTrace'
+        pipeline:
+          items:
+            $ref: '#/components/schemas/PipelineStage'
+          type: array
+          title: Pipeline
+        presentation:
+          $ref: '#/components/schemas/ResponsePresentation'
+        disclaimer:
+          type: string
+          title: Disclaimer
+      additionalProperties: false
+      type: object
+      required:
+      - request_id
+      - trace_id
+      - status
+      - mode
+      - mode_notice
+      - input_summary
+      - verdict
+      - risk_level
+      - dimensions
+      - headline
+      - evidence_sufficiency
+      - evidence_sufficiency_label
+      - what_checked
+      - why
+      - evidence
+      - recommended_actions
+      - sources
+      - uncertainty
+      - requires_human_review
+      - community_status
+      - privacy_notice
+      - rulebook
+      - pipeline
+      - presentation
+      - disclaimer
+      title: VerificationResponse
+  securitySchemes:
+    SupabaseBearer:
+      bearerFormat: JWT
+      description: Validated Supabase access token; no internal AI key on clients.
+      scheme: bearer
+      type: http
+  responses:
+    SafeError:
+      description: Safe Product error envelope; code/action defined in integration
+        guide.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+info:
+  description: Product target contract aligned to user-uploaded WaspadAI AI OpenAPI
+    0.7.0. All upstream schemas copied exactly. Product workflows remain draft; GitHub
+    commit and live deployment not verified.
+  title: WaspadAI Product API — DRAFT
+  version: 3.0.1-draft
+openapi: 3.1.0
+paths:
+  /api/health:
+    get:
+      operationId: get_api_health
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security: []
+      summary: System GET
+      tags:
+      - System
+      x-implementation-status: TARGET_DRAFT
+  /api/ready:
+    get:
+      description: Operator/network-restricted readiness. Minimal payload; do not
+        expose dependency secrets.
+      operationId: get_api_ready
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ready'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: System GET
+      tags:
+      - System
+      x-implementation-status: TARGET_DRAFT
+      x-network-restricted: true
+  /api/v1/community:
+    get:
+      operationId: get_api_v1_community
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityPage'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Community GET
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/community/{case_id}:
+    get:
+      operationId: get_api_v1_community_case_id
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityDetail'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Community GET
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/community/{case_id}/vote:
+    delete:
+      operationId: delete_api_v1_community_case_id_vote
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResult'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Community DELETE
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+    post:
+      operationId: post_api_v1_community_case_id_vote
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResult'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: PROPOSED POST atomic vote upsert; older source used PUT, confirm before
+        freeze
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/contributions:
+    post:
+      operationId: post_api_v1_contributions
+      parameters:
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contribution'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Contributions POST
+      tags:
+      - Contributions
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/contributions/mine:
+    get:
+      operationId: get_api_v1_contributions_mine
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributionPage'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Contributions GET
+      tags:
+      - Contributions
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/contributions/{contribution_id}:
+    get:
+      operationId: get_api_v1_contributions_contribution_id
+      parameters:
+      - in: path
+        name: contribution_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contribution'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Contributions GET
+      tags:
+      - Contributions
+      x-implementation-status: TARGET_DRAFT
+    patch:
+      operationId: patch_api_v1_contributions_contribution_id
+      parameters:
+      - in: path
+        name: contribution_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionPatch'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contribution'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Contributions PATCH
+      tags:
+      - Contributions
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/contributions/{contribution_id}/submit:
+    post:
+      operationId: post_api_v1_contributions_contribution_id_submit
+      parameters:
+      - in: path
+        name: contribution_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Revision'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contribution'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Contributions POST
+      tags:
+      - Contributions
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/history:
+    get:
+      operationId: get_api_v1_history
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryPage'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: History GET
+      tags:
+      - History
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/history/{case_id}:
+    delete:
+      operationId: delete_api_v1_history_case_id
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '204':
+          description: Completed; no response body
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: History DELETE
+      tags:
+      - History
+      x-implementation-status: TARGET_DRAFT
+    get:
+      operationId: get_api_v1_history_case_id
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryDetail'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: History GET
+      tags:
+      - History
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/history/{case_id}/community:
+    delete:
+      operationId: delete_api_v1_history_case_id_community
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '204':
+          description: Completed; no response body
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Community DELETE
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+    post:
+      operationId: post_api_v1_history_case_id_community
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityState'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Community POST
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/history/{case_id}/community-preview:
+    post:
+      operationId: post_api_v1_history_case_id_community_preview
+      parameters:
+      - in: path
+        name: case_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preview'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Community POST
+      tags:
+      - Community
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/learning/lessons/{lesson_id}/complete:
+    post:
+      operationId: post_api_v1_learning_lessons_lesson_id_complete
+      parameters:
+      - in: path
+        name: lesson_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Progress'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Learning POST
+      tags:
+      - Learning
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/learning/modules:
+    get:
+      operationId: get_api_v1_learning_modules
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModulePage'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Learning GET
+      tags:
+      - Learning
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/learning/modules/{module_id}:
+    get:
+      operationId: get_api_v1_learning_modules_module_id
+      parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleDetail'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Learning GET
+      tags:
+      - Learning
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/learning/modules/{module_id}/quiz:
+    get:
+      operationId: get_api_v1_learning_modules_module_id_quiz
+      parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quiz'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Learning GET
+      tags:
+      - Learning
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/learning/modules/{module_id}/quiz-attempts:
+    post:
+      operationId: post_api_v1_learning_modules_module_id_quiz_attempts
+      parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResult'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Learning POST
+      tags:
+      - Learning
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/learning/progress:
+    get:
+      operationId: get_api_v1_learning_progress
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressPage'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Learning GET
+      tags:
+      - Learning
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/me:
+    get:
+      operationId: get_api_v1_me
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Identity GET
+      tags:
+      - Identity
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/me/profile:
+    get:
+      operationId: get_api_v1_me_profile
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Identity GET
+      tags:
+      - Identity
+      x-implementation-status: TARGET_DRAFT
+    patch:
+      operationId: patch_api_v1_me_profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatch'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Identity PATCH
+      tags:
+      - Identity
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/moderation/contributions/{contribution_id}/claim:
+    post:
+      operationId: post_api_v1_moderation_contributions_contribution_id_claim
+      parameters:
+      - in: path
+        name: contribution_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Revision'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Moderation POST
+      tags:
+      - Moderation
+      x-implementation-status: TARGET_DRAFT
+      x-required-roles:
+      - MODERATOR
+      - ADMIN
+  /api/v1/moderation/contributions/{contribution_id}/decisions:
+    post:
+      operationId: post_api_v1_moderation_contributions_contribution_id_decisions
+      parameters:
+      - in: path
+        name: contribution_id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionResult'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Moderation POST
+      tags:
+      - Moderation
+      x-implementation-status: TARGET_DRAFT
+      x-required-roles:
+      - MODERATOR
+      - ADMIN
+  /api/v1/moderation/queue:
+    get:
+      operationId: get_api_v1_moderation_queue
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          default: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          enum:
+          - SUBMITTED
+          - NEEDS_EVIDENCE
+          - VERIFIED
+          - REJECTED
+          - RETRACTED
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributionPage'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Moderation GET
+      tags:
+      - Moderation
+      x-implementation-status: TARGET_DRAFT
+      x-required-roles:
+      - MODERATOR
+      - ADMIN
+  /api/v1/verifications/image:
+    post:
+      operationId: post_api_v1_verifications_image
+      parameters:
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationEnvelope'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Verification POST
+      tags:
+      - Verification
+      x-implementation-status: TARGET_DRAFT
+  /api/v1/verifications/text:
+    post:
+      operationId: post_api_v1_verifications_text
+      parameters:
+      - description: Product-local idempotency, not a guarantee of upstream exactly-once
+          inference.
+        in: header
+        name: Idempotency-Key
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationEnvelope'
+          description: Successful target response
+        '400':
+          $ref: '#/components/responses/SafeError'
+        '401':
+          $ref: '#/components/responses/SafeError'
+        '403':
+          $ref: '#/components/responses/SafeError'
+        '404':
+          $ref: '#/components/responses/SafeError'
+        '409':
+          $ref: '#/components/responses/SafeError'
+        '413':
+          $ref: '#/components/responses/SafeError'
+        '415':
+          $ref: '#/components/responses/SafeError'
+        '422':
+          $ref: '#/components/responses/SafeError'
+        '429':
+          $ref: '#/components/responses/SafeError'
+        '502':
+          $ref: '#/components/responses/SafeError'
+        '503':
+          $ref: '#/components/responses/SafeError'
+        '504':
+          $ref: '#/components/responses/SafeError'
+      security:
+      - SupabaseBearer: []
+      summary: Verification POST
+      tags:
+      - Verification
+      x-implementation-status: TARGET_DRAFT
+servers:
+- description: Local Product target only
+  url: http://127.0.0.1:8001
+x-contract-status: PRODUCT_DRAFT_ALIGNED_TO_UPLOADED_AI_SCHEMA
+x-history-policy: REVIEW_REQUIRED_PROPOSED
+x-upstream-sha256: 808b4e28d8add349bb676f87511de262a2106b320eed3d18bcdc1c436f51e542

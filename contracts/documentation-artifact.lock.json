@@ -1,19 +1,21 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "artifact_name": "waspadai-product-docs",
-  "version": "3.0.1-draft",
+  "version": "2026.09.15",
   "distribution": "CI-built release asset",
   "release_asset_url": null,
   "archive_sha256": null,
-  "status": "AWAITING_FIRST_CI_PUBLISH",
-  "instructions": "After docs CI publishes docs-v3.0.1-draft, set the immutable release-asset URL and its SHA-256 sidecar before enabling automatic Product CI retrieval.",
+  "status": "AWAITING_CI_PUBLISH",
+  "instructions": "Publish immutable tag docs-v2026.09.15, then set the release asset URL and ZIP SHA-256 before enabling automatic retrieval.",
+  "contract_authority": "contracts/current/android-api-contract.md",
   "required_files": {
-    "contracts/product-api.openapi.yaml": "a5a6e3eac165089817a619591c2828fd32dd2390b6a5fff9097656af5c5638c7",
-    "contracts/upstream/waspadai-ai.openapi.json": "808b4e28d8add349bb676f87511de262a2106b320eed3d18bcdc1c436f51e542",
-    "contracts/examples/text-request.json": "3eb48d1b296fb455fb69929ba50b07fa5fd4a6279251c729f78f6c597d7e548d",
-    "contracts/examples/verification-not-required.json": "15a22a461617254b57d3eb75ed54cedb42bec1cbab76b387a1b1ea0a82f83f5d",
-    "contracts/examples/verification-review-saved.json": "47a69c7f7d3066c59cfa5c88a000818123a82afa16cbe7c28bcb0f7c02c9d3e9",
-    "contracts/examples/verification-save-failed.json": "fe1e475b616a8ab38d2d8b0ffa0c3f2cfbdf2a69227f206e1792506dc78d3455",
-    "docs/archive/validation-report.3.0.1-source.json": "e8ed8669ee77f0073e5e5114643e0959a5138360b9ad8b24e309c0c87485b1ca"
+    "contracts/current/android-api-contract.md": "52df0459942ee565a4b5322fec27ca266d0b41384a351fe7f00266e5cd5bb3f2",
+    "contracts/examples/text-request.json": "7d07624266ed91c2d2122e8cc6ef9caa34f803892f92f3dc0eb5cd66d1b4c708",
+    "contracts/examples/verification-response.json": "3d95c856004e8365247fbe839b0e8d63f85b9e23d4cc5de214ae1d2782846d91",
+    "contracts/examples/validation-error.json": "26621631c50d8b99dfcfadcfbc634283a500e134a362a8170ac4976d23108df3",
+    "docs/README.md": "0e333bc9944899b31f29211c9645d3d487770155dbcdc6178c00922014a7a8a3",
+    "manifest.json": "433bb9ba7c98db76a3844295022155bdbfe83a756816548ba298f0a1ea1bb2ea",
+    "scripts/verify-docs.ps1": "bed1418eac262e3d31aca518c4526e438efb3863858aedb9e1c2c1f1cc3fc748",
+    "validation-report.json": "bf5de0b20f12272a189f5763871f41e6802240502d2f9fffcd4b3e545c678b01"
   }
 }

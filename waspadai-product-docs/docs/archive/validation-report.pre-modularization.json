@@ -1,0 +1,79 @@
+{
+  "status": "PASS_DOCUMENT_AND_DRAFT_STRUCTURE_CHECKS",
+  "markdown_files": 7,
+  "active_word_count": 17274,
+  "operations": 31,
+  "schemas": 46,
+  "resolved_refs": 433,
+  "internal_links_checked": 12,
+  "examples_validated": 7,
+  "validation_scope": "YAML unique-key parse, local refs, operation/path parameters, auth markers, example types/required/enums/limits, Markdown local links, source preservation. Custom focused checks, NOT full OpenAPI specification certification.",
+  "not_tested": [
+    "Live upstream compatibility",
+    "Actual Product code/build",
+    "Database SQL execution/RLS runtime",
+    "Android build/device",
+    "Deployment",
+    "Full OpenAPI specification validator"
+  ],
+  "upstream_status": "UNVERIFIED_UPSTREAM_SNAPSHOT_NOT_AVAILABLE",
+  "sources": [
+    {
+      "name": "Pasted markdown (2).md",
+      "content_preserved": true,
+      "comparison": "full text excluding trailing whitespace",
+      "sha256_original": "a933a33d82ca5ef46996ae818b09d829b5860abada85e6a2a710c9a3d5d604d1"
+    },
+    {
+      "name": "Pasted markdown(3).md",
+      "content_preserved": true,
+      "comparison": "full text excluding trailing whitespace",
+      "sha256_original": "0e890c69ba620d253ef590b117c9247d387d099e5bce0f1bbd6f90da3237093b"
+    },
+    {
+      "name": "docs/product/prd.md",
+      "preserved_source_lines": 1463
+    },
+    {
+      "name": "docs/integration/ai-service.md",
+      "preserved_source_lines": 546
+    }
+  ],
+  "documents": [
+    {
+      "path": "README.md",
+      "bytes": 7372,
+      "active_words": 962
+    },
+    {
+      "path": "docs/adr/0001-product-ai-boundary.md",
+      "bytes": 6707,
+      "active_words": 929
+    },
+    {
+      "path": "docs/architecture/database-architecture.md",
+      "bytes": 72769,
+      "active_words": 3944
+    },
+    {
+      "path": "docs/architecture/system-and-folder-architecture.md",
+      "bytes": 59705,
+      "active_words": 2155
+    },
+    {
+      "path": "docs/development/setup.md",
+      "bytes": 23533,
+      "active_words": 2985
+    },
+    {
+      "path": "docs/integration/ai-service.md",
+      "bytes": 39968,
+      "active_words": 2864
+    },
+    {
+      "path": "docs/product/prd.md",
+      "bytes": 95712,
+      "active_words": 3435
+    }
+  ]
+}

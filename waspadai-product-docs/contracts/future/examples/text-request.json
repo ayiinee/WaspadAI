@@ -1,0 +1,11 @@
+{
+  "text": "Pesan mengaku dari bank dan meminta kode OTP segera.",
+  "question": "Apakah tindakan ini aman?",
+  "source_url": null,
+  "sender_context": "UNKNOWN_NUMBER",
+  "page_context": {
+    "title": "Contoh halaman",
+    "before": "Konteks sebelum kutipan.",
+    "after": null
+  }
+}

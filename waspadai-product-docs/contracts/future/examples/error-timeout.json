@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "AI_TIMEOUT",
+    "message": "Hasil belum diketahui; tidak dilakukan inferensi ulang otomatis.",
+    "request_id": "b683ece9-2d46-4df6-9dac-a9de609af723",
+    "retryable": false,
+    "retry_after_seconds": null
+  }
+}

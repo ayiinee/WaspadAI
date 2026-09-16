@@ -5,6 +5,22 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_live_db_tests:
+        description: Run hosted Supabase acceptance tests with protected secrets
+        required: false
+        default: false
+        type: boolean
+      run_pgtap:
+        description: Run pgTAP through the Docker-enabled GitHub runner
+        required: false
+        default: false
+        type: boolean
+      run_staging_smoke:
+        description: Run the protected staging preview smoke test
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   backend:
@@ -22,6 +38,63 @@ jobs:
       - run: uv run ruff check .
       - run: uv run pytest
 
+  live-supabase:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live_db_tests
+    needs: backend
+    runs-on: ubuntu-latest
+    environment: supabase-development
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCT_APP_DATABASE_URL }}
+      WASPADAI_RUN_LIVE_DB_TESTS: "1"
+      WASPADAI_DB_TEST_USER_A_ID: ${{ secrets.WASPADAI_DB_TEST_USER_A_ID }}
+      WASPADAI_DB_TEST_USER_B_ID: ${{ secrets.WASPADAI_DB_TEST_USER_B_ID }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.11"
+          version: "0.12.15"
+      - run: uv sync --locked
+      - run: uv run pytest tests/test_live_supabase.py -q -rs
+
+  pgtap:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_pgtap
+    needs: backend
+    runs-on: ubuntu-latest
+    environment: supabase-development
+    env:
+      MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.76.8
+      - run: supabase test db --db-url "$MIGRATION_DATABASE_URL" supabase/tests/database
+
+  staging-smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_staging_smoke
+    needs: backend
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+      STAGING_BEARER_USER_A: ${{ secrets.STAGING_BEARER_USER_A }}
+      STAGING_BEARER_USER_B: ${{ secrets.STAGING_BEARER_USER_B }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.11"
+          version: "0.12.15"
+      - run: uv sync --locked
+      - run: uv run python scripts/smoke_staging.py
+
   android-unit-test:
     runs-on: ubuntu-latest
     defaults:
@@ -37,11 +110,9 @@ jobs:
       - run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - run: bash ./gradlew testDebugUnitTest --no-daemon
 
-  verify-documentation-artifact:
+  verify-documentation:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
       - shell: pwsh
-        run: ./scripts/fetch-documentation-artifact.ps1
-      - shell: pwsh
-        run: ./.artifacts/documentation/scripts/verify-docs.ps1
+        run: ./waspadai-product-docs/scripts/verify-docs.ps1

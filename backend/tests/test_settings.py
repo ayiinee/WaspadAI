@@ -11,7 +11,7 @@ def test_production_rejects_mock_ai() -> None:
 
 def test_remote_requires_endpoint_and_key() -> None:
     with pytest.raises(ValidationError, match="remote AI mode requires"):
-        Settings(ai_service_mode="remote")
+        Settings(ai_service_mode="remote", _env_file=None)
 
 
 def test_production_requires_auth_and_database() -> None:
@@ -22,4 +22,5 @@ def test_production_requires_auth_and_database() -> None:
             ai_service_mode="remote",
             ai_service_base_url="https://example.invalid",
             ai_service_api_key="test-key",
+            _env_file=None,
         )

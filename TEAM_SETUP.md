@@ -1,90 +1,46 @@
-# Panduan setup WaspadAI Product untuk tim
 
-Panduan ini dimulai dari checkout repository sampai backend dan Android **scaffold** dapat dijalankan untuk development. Baseline: Android `id.waspadai.app`/SDK 36, Product API Python 3.11 dengan `uv`, Supabase hosted development, dan AI sebagai service HTTP terpisah. Tidak perlu Docker atau menjalankan repository AI.
 
-> Batas saat ini: backend baru menyediakan `/api/health` dan `/api/ready`; Android masih template Compose. Login, pengiriman teks/gambar, history, dan integrasi AI end-to-end belum tersedia. Build yang berhasil bukan berarti fitur Product sudah bisa dipakai pengguna.
+# Setup dan Handoff Tim WaspadAI
 
-## 0. Yang harus disiapkan maintainer sebelum handoff penuh
+Baseline: 15 September 2026. Source of truth integrasi AI adalah [`android-api-contract.md`](android-api-contract.md).
 
-| Kebutuhan | Kondisi/penyerahan yang benar |
-|---|---|
-| Repository Product | Beri tim akses baca ke `https://github.com/ayiinee/WaspadAI.git` dan tentukan branch/commit baseline yang disepakati. |
-| Dokumentasi sumber kebenaran | Terbitkan artifact rilis `waspadai-product-docs` versi `3.0.1-draft`, lalu pin URL asset dan SHA-256 ZIP di `contracts/documentation-artifact.lock.json`. Saat file ini ditulis, kedua nilai tersebut masih kosong; CI dokumentasi belum bisa lulus. Paket dokumentasi tidak dimasukkan ke commit Product. |
-| Supabase | Siapkan project **development** terpisah, project ref, Auth URL, publishable key, dan koneksi PostgreSQL untuk role runtime `product_app`; berikan secret hanya melalui secret manager tim. Tentukan operator migration. |
-| Android | Beri akses ke HP demo atau emulator untuk smoke perangkat. Unit test/build tidak membutuhkan perangkat. |
-| AI remote | Baru diperlukan ketika adapter Product benar-benar diimplementasikan: base URL internal, key backend, full commit SHA, dan hash kontrak dari owner AI. Jangan clone atau jalankan repository AI untuk setup Product. |
+> Status saat ini: Android masih scaffold Compose dan backend hanya menyediakan health/readiness awal. Login, verifikasi teks/gambar, history, dan community belum boleh diklaim selesai tanpa bukti implementasi dan test.
 
-Jika dokumentasi belum dirilis atau Supabase belum disiapkan, anggota tim tetap dapat menjalankan scaffold offline pada langkah 1–5. Jangan mengisi placeholder dengan URL/key tebakan.
+## 1. Urutan membaca
 
-## 1. Temukan sumber informasi yang tepat
+1. [`README.md`](README.md) untuk topology dan status repository.
+2. [`waspadai-product-docs/README.md`](waspadai-product-docs/README.md) untuk peta dokumentasi.
+3. [`waspadai-product-docs/contracts/current/android-api-contract.md`](waspadai-product-docs/contracts/current/android-api-contract.md) untuk wire contract current.
+4. [`waspadai-product-docs/docs/architecture/android-client.md`](waspadai-product-docs/docs/architecture/android-client.md) untuk boundary Android.
+5. [`waspadai-product-docs/docs/api/README.md`](waspadai-product-docs/docs/api/README.md) untuk panduan integrasi.
+6. [`waspadai-product-docs/docs/development/testing.md`](waspadai-product-docs/docs/development/testing.md) untuk test strategy.
 
-Setelah clone, mulai dari `README.md` ini dan panduan ini. Source code dan konfigurasi yang *executable* berada di Product; keputusan produk/kontrak lengkap berada pada artifact dokumentasi yang dipin, diekstrak ke `.artifacts/documentation/` (ignored). Baca dokumen aktif di dalam artifact dengan urutan berikut:
+Dokumen `future/`, `reference/`, dan `archive/` bukan petunjuk runtime current.
 
-1. `README.md` dan `docs/README.md` untuk peta dokumentasi.
-2. `docs/product/prd.md` untuk kebutuhan dan acceptance criteria.
-3. `docs/adr/0001-product-ai-boundary.md` dan `0002-initial-product-baseline.md` untuk keputusan arsitektur/toolchain.
-4. `docs/architecture/` untuk batas komponen, data, RLS, dan Android.
-5. `docs/integration/ai-service.md` untuk HTTP Product→AI, timeout, dan batas kontrak upstream.
-6. `docs/development/setup.md` untuk runbook lanjutan.
-7. `contracts/product-api.openapi.yaml` dan `contracts/upstream/waspadai-ai.openapi.json` untuk kontrak **draft/snapshot**, bukan bukti endpoint sudah terimplementasi.
+## 2. Tool
 
-Arsip di `docs/archive/` adalah sumber historis non-normatif; jika berbeda, ikuti dokumen aktif dan ADR. Jangan menyalin folder dokumentasi atau kontrak lengkap ke repository Product.
-
-## 2. Pasang dan verifikasi tool
-
-Contoh perintah di bawah untuk Windows PowerShell. Pasang Git, `uv` **0.12.15** (versi CI saat ini), Node.js **22**/npm, JDK **21**, Android Studio dan Android SDK Platform **36**. Android Studio dapat mengelola SDK/ADB; Gradle **9.5.0** datang dari wrapper `frontend/gradlew.bat`, bukan instalasi Gradle global. Backend mengunci Python **3.11** melalui `backend/.python-version`; `uv` dapat menyiapkan environment project sesuai pin tersebut. Ikuti [instalasi uv resmi](https://docs.astral.sh/uv/getting-started/installation/) dan [instalasi Android Studio resmi](https://developer.android.com/studio/install.html), lalu periksa:
+Gunakan Git, Node.js/npm, JDK 21, Android Studio/SDK sesuai Gradle project, dan Python 3.11 + `uv` hanya bila mengerjakan backend future. Verifikasi tool yang relevan:
 
 ```powershell
 git --version
-uv --version
 node --version
 npm --version
 java -version
 adb version
+uv --version
 ```
 
-Jika `uv` diinstal lewat pip tetapi executable belum ada di PATH, `py -m uv` dapat menggantikan `uv` pada perintah backend. Untuk macOS/Linux gunakan `./gradlew` dan shell setempat; fetch artifact tetap membutuhkan PowerShell (`pwsh`) atau langkah unduh/verifikasi ekuivalen yang disetujui tim.
+## 3. Verifikasi dokumentasi
 
-## 3. Clone Product dan cek baseline
+Dari root repository:
 
 ```powershell
-git clone https://github.com/ayiinee/WaspadAI.git
-Set-Location WaspadAI
-git status --short
+powershell -NoProfile -ExecutionPolicy Bypass -File .\waspadai-product-docs\scripts\verify-docs.ps1
 ```
 
-Working tree hasil clone seharusnya bersih. Jangan menambahkan `.env`, keystore, `.artifacts/`, `.venv/`, `node_modules/`, atau output build ke commit. Struktur yang penting: `backend/` untuk API dan test, `frontend/` sebagai **Gradle root** Android, `supabase/migrations/` untuk SQL Product, dan `contracts/documentation-artifact.lock.json` untuk pin dokumentasi.
+Gate ini memeriksa checksum kontrak current, fixture, link, JSON, dan isolasi kontrak future.
 
-## 4. Ambil dokumentasi versi yang dipin
-
-Periksa `contracts/documentation-artifact.lock.json`. Jika `release_asset_url` atau `archive_sha256` masih `null`, berhenti di langkah ini dan minta maintainer menerbitkan rilis; jangan memakai ZIP/branch `main` tanpa pin. Setelah lock berisi URL dan hash rilis yang benar, dari root Product jalankan:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\fetch-documentation-artifact.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\.artifacts\documentation\scripts\verify-docs.ps1
-```
-
-Fetcher menolak overwrite destination yang sudah ada, memeriksa SHA-256 ZIP, versi, serta checksum kontrak/fixture yang dipin. Jika rilis dokumentasi bersifat private, maintainer harus memastikan mekanisme fetch terautentikasi tersedia sebelum langkah ini digunakan oleh tim; script sekarang tidak menerima token. Folder `.artifacts/` hanya cache lokal ignored.
-
-## 5. Jalankan backend tanpa credential remote
-
-Di root Product, salin `.env.example` ke `.env` **hanya jika `.env` belum ada**; jangan menimpa konfigurasi lokal orang lain. Untuk smoke offline, pertahankan `APP_ENV=development` dan `AI_SERVICE_MODE=mock`. Jangan taruh secret AI/Supabase di Android atau commit.
-
-```powershell
-if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
-Set-Location backend
-uv sync --locked
-uv lock --check
-uv run ruff check .
-uv run pytest
-uv run python run_server.py
-```
-
-Di terminal PowerShell kedua, periksa `Invoke-RestMethod http://127.0.0.1:8001/api/health`; respons `status=ok` membuktikan proses API hidup. Tanpa `DATABASE_URL`, `/api/ready` **wajar 503**. Saat database dapat dikoneksi, readiness bisa 200, tetapi `select 1` itu belum membuktikan migration/RLS atau fitur bisnis. Stop server dengan Ctrl+C. Jangan mencari/install dari file requirements terpisah: project dan CI memakai `backend/pyproject.toml` + `backend/uv.lock`.
-
-## 6. Build dan jalankan Android scaffold
-
-Buka folder `frontend/` (bukan root Product) sebagai project di Android Studio. Pastikan JDK 21 dan SDK 36 tersedia; namespace/applicationId ada di `frontend/app/build.gradle.kts`. Dari PowerShell:
+## 4. Build Android scaffold
 
 ```powershell
 Set-Location frontend
@@ -93,31 +49,62 @@ Set-Location frontend
 adb devices
 ```
 
-APK debug di `frontend/app/build/outputs/apk/debug/app-debug.apk`. Jika HP/emulator muncul sebagai `device`, Android Studio dapat menjalankan app atau `adb install .\app\build\outputs\apk\debug\app-debug.apk` dapat memasang APK. Jika daftar ADB kosong, build/unit test tetap valid tetapi smoke perangkat belum dilakukan. UI saat ini masih template, sehingga belum memanggil Product API/Supabase; jangan menafsirkan layar template sebagai alur aplikasi selesai.
+APK debug berada di `frontend/app/build/outputs/apk/debug/app-debug.apk`. Build sukses hanya membuktikan scaffold dapat dikompilasi; bukan bukti call Supabase atau AI telah berfungsi.
 
-## 7. Hubungkan Supabase development (operator saja)
+Konfigurasi Android yang boleh diberikan melalui local/build config: Supabase URL, publishable key, dan public AI base URL `https://waspadai.shafwan.digital`. Jangan memasukkan service-role key, database password, atau internal AI key.
 
-Langkah ini **bukan** untuk setiap anggota tim dan membutuhkan target development yang disetujui. Baca `supabase/README.md` dan runbook database pada artifact. Dari root Product, operator memeriksa target tanpa mengubah schema:
+## 5. Integrasi AI current
+
+Android wajib:
+
+- memastikan session Supabase aktif sebelum fitur digunakan;
+- memanggil public singular path `/api/v1/verify/text` atau `/api/v1/verify/image`;
+- tidak mengirim Bearer Supabase ke WaspadAI API;
+- mengirim `output_mode=BOTH`;
+- memakai JSON untuk teks dan multipart binary untuk screenshot;
+- membaca direct response dan menampilkan `presentation.narrative.text`;
+- memakai timeout 120 detik serta mencegah duplicate submit.
+
+Lakukan smoke remote hanya dengan data sintetis dan catat request ID/status/durasi tanpa payload sensitif.
+
+## 6. Backend preview future
+
+Backend tidak dibutuhkan untuk call AI MVP current. Preview development/staging saat ini
+menyediakan health/readiness serta vertical slice mock `POST /api/v1/verifications/text`,
+`GET /api/v1/history`, dan `GET /api/v1/history/{case_id}`. Slice ini memvalidasi
+Bearer Supabase, memakai role database `product_app`, mewajibkan `Idempotency-Key`,
+dan menyimpan history owner-only sesuai policy `REVIEW_REQUIRED`.
+
+Android tetap tidak memanggil endpoint tersebut. Mode mock harus selalu dilabeli sebagai
+simulasi, bukan hasil AI live. Sebelum menjalankan history, isi
+`HISTORY_CURSOR_SIGNING_KEY` lokal/deployment dengan secret acak yang berbeda dari
+password database dan API key.
+
+Untuk menjalankan backend future:
 
 ```powershell
-npm ci
-npx --no-install supabase --version
-npx --no-install supabase login
-npx --no-install supabase link --project-ref REPLACE_WITH_CONFIRMED_DEV_PROJECT_REF
-npx --no-install supabase migration list
-npx --no-install supabase db push --linked --dry-run --skip-vault
+Set-Location backend
+uv sync --locked
+uv lock --check
+uv run ruff check .
+uv run pytest
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-Ganti placeholder dengan project ref **yang sudah diverifikasi**. Setelah backup dan review migration/RLS/grants, operator yang berwenang boleh menerapkan migration pada project development dengan `npx --no-install supabase db push --linked --skip-vault`, lalu lint dengan `npx --no-install supabase db lint --linked --fail-on error`. Jangan menjalankan `db reset --linked` atau push ke production untuk setup: reset remote menghapus data. Alur dry-run/push remote dijelaskan oleh [Supabase](https://supabase.com/docs/guides/local-development/cli-workflows).
+Tanpa `DATABASE_URL`, `/api/ready` dapat mengembalikan 503. Untuk acceptance test RLS
+hosted, buat dua user Auth development sementara lalu set `WASPADAI_RUN_LIVE_DB_TESTS=1`,
+`WASPADAI_DB_TEST_USER_A_ID`, dan `WASPADAI_DB_TEST_USER_B_ID` sebelum menjalankan
+`uv run pytest tests/test_live_supabase.py`; hapus user test setelahnya. Android tidak
+dialihkan ke backend sebelum exit criteria pada dokumentasi future terpenuhi.
 
-Migration awal membuat role `product_app` **NOLOGIN** tanpa password. Operator menyiapkan LOGIN/credential runtime secara terpisah setelah migration berhasil; `DATABASE_URL` backend harus memakai role tersebut, sedangkan migrator/owner memakai credential lain. Isi `.env` lokal melalui secret manager dengan `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, dan `DATABASE_URL` development; jangan mencetak atau membagikan nilainya. `supabase/config.toml` tidak otomatis mengatur Auth/redirect pada project hosted. File pgTAP tetap ada, tetapi test migration/RLS runtime belum dijalankan oleh CI tanpa project test dan harness yang terisolasi.
+## 7. Supabase future (operator)
 
-## 8. Kriteria selesai untuk handoff saat ini
+Migration/database diperlukan untuk fitur server-side future. Ikuti [`supabase/README.md`](supabase/README.md), gunakan project development terpisah, dry-run sebelum push, backup, dan credential operator dari secret manager. Jangan menjalankan reset/push production sebagai langkah onboarding.
 
-- Semua anggota bisa clone commit baseline, membaca panduan ini, dan memperoleh artifact dokumentasi **versi/hash yang sama**.
-- `uv sync --locked`, Ruff, pytest, `/api/health`, `testDebugUnitTest`, dan `assembleDebug` lulus pada mesin tim.
-- Operator memiliki project Supabase development yang tepat; migration head, role runtime, dan hasil test RLS user A/B dicatat sebelum tim mengklaim database siap.
-- CI Product lulus setelah artifact dokumentasi dipublikasikan dan lock diisi. Saat ini CI tidak memiliki gate database runtime.
-- Perangkat Android dan AI remote ditambahkan untuk smoke terpisah ketika fitur Product yang memakainya tersedia.
+## 8. Kriteria handoff
 
-Jika syarat dokumentasi/Supabase belum dipenuhi, statusnya **scaffold development siap**, bukan aplikasi Product end-to-end siap. Catat blocker dan owner-nya pada handoff; jangan menyamarkan mock sebagai hasil AI live.
+- Semua anggota membaca versi/checksum kontrak current yang sama.
+- Quality gate docs dan Android build/unit test lulus.
+- Owner Android/AI sepakat terhadap public endpoint, auth boundary, response shape, dan timeout.
+- Remote smoke memakai data sintetis dan environment yang benar.
+- Fitur future tetap feature-gated/tidak ditampilkan sampai backend, auth, storage, dan test tersedia.

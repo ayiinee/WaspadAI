@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 from psycopg import AsyncConnection
+from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import Settings
@@ -25,7 +26,7 @@ def create_pool(settings: Settings) -> AsyncConnectionPool | None:
         min_size=1,
         max_size=settings.db_pool_size + settings.db_max_overflow,
         open=False,
-        kwargs={"autocommit": False},
+        kwargs={"autocommit": False, "row_factory": dict_row},
     )
 
 
