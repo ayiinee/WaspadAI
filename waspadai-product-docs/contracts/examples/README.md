@@ -2,9 +2,9 @@
 
 Status: `CURRENT`.
 
-- `text-request.json`: JSON body untuk public text verification.
-- `verification-response.json`: direct WaspadAI success response tanpa wrapper Product.
-- `validation-error.json`: bentuk error validasi FastAPI.
+- `text-request.json`: body Product API untuk `POST /api/v1/verifications/text`; Bearer token dan `Idempotency-Key` berada di header.
+- `verification-response.json`: wrapper Product yang valid dan jujur berlabel `execution_mode=MOCK`.
+- `validation-error.json`: error envelope aman Product API.
 
-Image request tidak direpresentasikan sebagai JSON karena wire format-nya `multipart/form-data` dengan field binary `image`, optional `question`, dan `output_mode=BOTH`.
+Image dan community evidence belum memiliki fixture current karena masih `TARGET`. Bentuk target berada pada kontrak kanonik, bukan pada fixture runtime ini.
 

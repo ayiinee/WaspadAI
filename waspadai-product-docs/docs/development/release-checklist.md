@@ -4,33 +4,25 @@ Status: `CURRENT`.
 
 ## Contract
 
-- [ ] Checksum `contracts/current/android-api-contract.md` cocok dengan source yang disetujui.
-- [ ] Android memakai public singular paths `/api/v1/verify/text|image`.
-- [ ] Tidak ada Bearer token atau internal API key pada call AI.
-- [ ] Text JSON dan image multipart sesuai contract; `output_mode=BOTH`.
-- [ ] Direct response dibaca tanpa wrapper `result/history`.
+- [ ] Kontrak root dan salinan `contracts/current/` byte-identik serta checksum benar.
+- [ ] Android memakai `/api/v1/verifications/text`, Bearer token, dan UUID `Idempotency-Key`.
+- [ ] Android tidak mengirim `output_mode` atau community evidence.
+- [ ] Response dibaca dari wrapper `result/history/execution_mode`.
+- [ ] Endpoint `TARGET` tidak dipresentasikan sebagai runtime.
 
-## Security dan privacy
+## Community evidence
 
-- [ ] APK/repository scan tidak menemukan service key, service-role key, atau password.
-- [ ] Network log tidak memuat token, message body, screenshot, atau sensitive response.
-- [ ] Cleartext traffic dinonaktifkan untuk production.
-- [ ] Preview/crop dan temporary file cleanup diuji.
-- [ ] Privacy copy tidak menjanjikan persistence/community yang belum tersedia.
+- [ ] Seluruh gate Bagian 11 kontrak kanonik diuji pada database aktual.
+- [ ] Revocation/withdrawal/retraction/expiry menghilangkan record lama.
+- [ ] Vote, post unverified, prior AI result, PII, consent ID, dan private Storage tidak terkirim.
+- [ ] Batas array/payload telah dibekukan pada schema internal AI.
+- [ ] Contract test lintas repository dan staging smoke lulus.
 
-## Quality
+## Security dan operasi
 
-- [ ] Unit, contract, UI, dan build lulus.
-- [ ] Remote smoke test memakai data sintetis dan endpoint environment yang benar.
-- [ ] Timeout 120 detik serta error `413`, `415`, `422`, `429`, dan `5xx` memiliki UX.
-- [ ] Accessibility minimum: screen reader label, focus order, contrast, dan scalable text.
-- [ ] Monitoring membedakan client/network/API error tanpa merekam PII.
-
-## Documentation dan handoff
-
-- [ ] `scripts/verify-docs.ps1` lulus.
-- [ ] Scope/status sesuai kode yang dirilis.
-- [ ] Perubahan contract memiliki ADR/changelog dan owner review.
-- [ ] Future/archive tidak ditautkan sebagai petunjuk current.
-- [ ] Rollback build/config telah diuji.
+- [ ] APK tidak memuat internal AI key, service-role key, atau database credential.
+- [ ] Product runtime memakai role `product_app` dan transaction-local user claim.
+- [ ] Log tidak memuat token, body, screenshot, atau community content.
+- [ ] Timeout Android 150 detik dan upstream AI 120 detik.
+- [ ] Rollback dan deindex/tombstone behavior diuji.
 

@@ -2,46 +2,25 @@
 
 Status: `CURRENT`.
 
-## Error contract current
-
-Public WaspadAI API mengikuti bentuk error FastAPI. Validasi umumnya berupa:
+Product API mengirim error aman berbentuk:
 
 ```json
 {
-  "detail": [
-    {
-      "type": "string_too_short",
-      "loc": ["body", "text"],
-      "msg": "String should have at least 10 characters"
-    }
-  ]
+  "error": {
+    "code": "INVALID_ACCESS_TOKEN",
+    "message": "Sesi tidak valid atau sudah berakhir.",
+    "request_id": "c9602d76-69a1-45ee-85f4-da42f9c9f08f",
+    "retryable": false,
+    "retry_after_seconds": null
+  }
 }
 ```
 
-Android memetakan HTTP status ke pesan ramah dan menyimpan detail teknis hanya untuk debug non-sensitif. Jangan mengasumsikan envelope `{ "error": ... }` pada mode current.
+- `401`: refresh Supabase session lalu retry paling banyak sekali.
+- `409`: jangan membuat aksi baru; gunakan state/key sesuai error.
+- `422`: perbaiki field input.
+- `429`: hormati `Retry-After`.
+- `502`/`503`/timeout: pertahankan input dan tampilkan retry aman.
 
-| HTTP | Perilaku Android |
-| --- | --- |
-| `400`/`422` | Tampilkan masalah input/field |
-| `401` | Tampilkan gangguan akses API; jangan otomatis refresh Supabase sebagai alur normal |
-| `403`/`404`/`409` | Tampilkan alasan aman; jangan retry otomatis |
-| `413` | Minta crop atau kompres image |
-| `415` | Minta JPG, PNG, atau WEBP |
-| `429` | Tunggu sesuai `Retry-After` bila tersedia; tawarkan retry |
-| `502`/`503` | Tawarkan coba lagi kemudian |
-| Network/timeout | Pertahankan input dan tawarkan retry manual |
-
-## Timeout dan retry
-
-- Pemeriksaan synchronous; timeout client yang disarankan 120 detik.
-- `Idempotency-Key` boleh dikirim dengan UUID tetap untuk satu aksi, tetapi public API belum memprosesnya.
-- Karena upstream belum menjamin idempotency, jangan melakukan retry otomatis berulang setelah request mungkin sudah terkirim.
-- Retry manual menggunakan input yang sama dan selalu diperlakukan sebagai kemungkinan pemeriksaan baru.
-- Jangan menjalankan dua submit paralel dari satu layar.
-
-## Logging
-
-Log yang diperbolehkan: request ID, endpoint, HTTP status, durasi, network class, build version, dan error category. Redact body teks, file/image bytes, token, API key, serta exception yang mengandung payload.
-
-Error envelope standar Product Backend, refresh-on-401, dan exactly-once workflow hanya berlaku pada [future API](future-product-api.md).
+Android timeout 150 detik; Product Backend memberi upstream AI deadline 120 detik. Retry aksi yang sama wajib memakai UUID `Idempotency-Key` yang sama. Log hanya metadata non-sensitif dan tidak memuat token, body, screenshot, community text, atau secret.
 

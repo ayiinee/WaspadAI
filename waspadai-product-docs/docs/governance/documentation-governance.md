@@ -30,7 +30,7 @@ Hindari duplikasi detail wire. Dokumen implementasi merujuk kontrak kanonik; jik
 
 ## Mengubah kontrak current
 
-1. Owner AI/Android menyetujui source contract baru.
+1. Owner Android/Backend/AI menyetujui source contract baru.
 2. Buat ADR bila topology/auth/compatibility berubah.
 3. Ganti salinan `contracts/current/android-api-contract.md` secara byte-identik.
 4. Perbarui checksum, fixture, implementation guide, test, dan release checklist.
@@ -40,4 +40,3 @@ Hindari duplikasi detail wire. Dokumen implementasi merujuk kontrak kanonik; jik
 ## Archive policy
 
 Dokumen superseded dipindahkan utuh ke folder versi di `archive/`; jangan dihapus jika masih diperlukan untuk audit. Archive tidak diperiksa sebagai source current dan tidak boleh muncul dalam onboarding utama selain sebagai tautan audit yang jelas.
-

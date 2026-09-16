@@ -1,15 +1,14 @@
-# Request dan Response Android–AI
+# Request dan Response Product API
 
-Status: `CURRENT`.
-
-Dokumen ini adalah implementation guide. Untuk definisi lengkap, gunakan [kontrak kanonik](../../contracts/current/android-api-contract.md).
+Status: `CURRENT` untuk text; image/community ditandai `TARGET` pada kontrak kanonik.
 
 ## Text verification
 
 ```http
-POST /api/v1/verify/text
+POST /api/v1/verifications/text
+Authorization: Bearer <supabase_access_token>
+Idempotency-Key: <uuid-v4>
 Content-Type: application/json
-Accept: application/json
 ```
 
 ```json
@@ -18,84 +17,40 @@ Accept: application/json
   "question": "Apakah pesan ini aman?",
   "source_url": null,
   "sender_context": "UNKNOWN_NUMBER",
-  "output_mode": "BOTH"
+  "page_context": null
 }
 ```
 
-| Field | Wajib | Rule current |
-| --- | --- | --- |
-| `text` | Ya | 10–25.000 karakter setelah trim |
-| `question` | Tidak | Maksimal 500 karakter |
-| `source_url` | Tidak | Public URL, maksimal 2.048 karakter |
-| `sender_context` | Tidak | Default `UNKNOWN`; enum di bawah |
-| `output_mode` | Tidak | Kirim `BOTH` untuk UI Android |
-
-`sender_context`: `NOT_APPLICABLE`, `UNKNOWN_NUMBER`, `KNOWN_CONTACT`, `FORWARDED`, `SOCIAL_MEDIA`, atau `UNKNOWN`.
-
-Teks yang hanya berisi public URL tetap valid. Localhost, loopback, private IP, dan internal URL harus ditolak.
-
-## Image verification
-
-```http
-POST /api/v1/verify/image
-Content-Type: multipart/form-data
-Accept: application/json
-```
-
-| Field | Wajib | Rule current |
-| --- | --- | --- |
-| `image` | Ya | Binary JPEG/JPG, PNG, atau WEBP |
-| `question` | Tidak | Maksimal 500 karakter |
-| `output_mode` | Tidak | Kirim `BOTH` |
-
-Limit image: maksimal 8 MB; sisi 64–6.000 piksel; total maksimal 30.000.000 piksel. Kirim file hasil preview/crop sebagai multipart, bukan Base64 JSON.
+`text` berukuran 10–25.000 karakter. `question` maksimal 500, `source_url` maksimal 2.048 dan harus public HTTP(S), sedangkan `page_context` opsional berisi `title` maksimal 300 serta `before`/`after` maksimal 500 karakter. Unknown field, termasuk `output_mode`, ditolak.
 
 ## Success response
 
-Response dikembalikan langsung oleh WaspadAI. Tidak ada wrapper `result` atau metadata `history`.
-
 ```json
 {
-  "request_id": "req_example",
+  "request_id": "c9602d76-69a1-45ee-85f4-da42f9c9f08f",
   "status": "COMPLETED",
-  "mode": "LIVE",
-  "verdict": "UNVERIFIED",
-  "risk_level": "MEDIUM",
-  "headline": "Bukti belum cukup untuk memastikan klaim",
-  "evidence_sufficiency": 0.42,
-  "evidence_sufficiency_label": "Bukti belum cukup untuk memastikan klaim",
-  "requires_human_review": true,
-  "community_status": "ELIGIBLE_WITH_CONSENT",
-  "what_checked": [],
-  "why": [],
-  "evidence": [],
-  "sources": [],
-  "recommended_actions": [],
-  "uncertainty": "Masih diperlukan sumber primer atau sumber tepercaya lain.",
-  "dimensions": {
-    "factual_status": "UNVERIFIED",
-    "source_authenticity": "UNVERIFIED",
-    "sender_identity": "UNVERIFIED",
-    "channel_status": "UNVERIFIED",
-    "scam_risk": "MEDIUM",
-    "content_authenticity": "NOT_APPLICABLE"
+  "history": {
+    "saved": true,
+    "case_id": "56f50192-7dd1-4bec-9a52-d838174c9d23",
+    "save_reason": "UNVERIFIED",
+    "community_eligible": true,
+    "community_state": "PRIVATE"
   },
-  "presentation": {
-    "requested_mode": "BOTH",
-    "structured": true,
-    "narrative": {
-      "text": "Hasil pemeriksaan: bukti yang tersedia belum cukup untuk memastikan klaim.",
-      "summary": "Bukti belum cukup untuk memastikan klaim",
-      "paragraphs": [
-        "Hasil pemeriksaan: bukti yang tersedia belum cukup untuk memastikan klaim."
-      ]
+  "result": {
+    "request_id": "req_upstream_example",
+    "status": "COMPLETED",
+    "mode": "LIVE",
+    "verdict": "UNVERIFIED",
+    "headline": "Bukti belum cukup untuk memastikan klaim",
+    "presentation": {
+      "narrative": {
+        "text": "Bukti belum cukup; periksa sumber resmi."
+      }
     }
   },
-  "disclaimer": "Fact-check adalah dukungan keputusan, bukan jaminan."
+  "execution_mode": "MOCK"
 }
 ```
 
-Fixture parseable tersedia di [`contracts/examples/verification-response.json`](../../contracts/examples/verification-response.json).
-
-Android menampilkan `presentation.narrative.text` sebagai jawaban utama. `evidence`, `sources`, `recommended_actions`, `uncertainty`, dan `dimensions` ditampilkan sebagai detail. Client tidak boleh menghitung ulang atau “memperbaiki” verdict.
+Contoh di atas memperlihatkan struktur; object `result` runtime berisi seluruh field AI yang diwajibkan kontrak kanonik. Android membaca naratif dari `result.presentation.narrative.text`.
 
