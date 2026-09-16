@@ -4,24 +4,13 @@ Status: `CURRENT`.
 
 | Area | Accountable owner | Required reviewer |
 | --- | --- | --- |
-| Android UX, session gate, dan public AI adapter | Android lead | Product + AI contract owner |
-| Public/internal AI API dan pipeline | AI lead | Android lead untuk public contract |
-| Product scope dan acceptance | Product owner | Engineering + QA |
-| Product Backend future | Backend lead | Security, Android, AI lead |
-| Supabase data/RLS/Storage future | Backend/data owner | Security reviewer |
-| Documentation structure dan release | Tech lead | Owner domain yang berubah |
-| Contract/regression testing | QA lead | Android + AI lead |
+| Android UX, Supabase session, Product API adapter | Android lead | Backend + Product |
+| Product API, auth, database query, idempotency | Backend lead | Security + Data |
+| Community eligibility, consent, moderation | Backend/Data owner | Product + Security + AI |
+| Internal AI API dan fact-check pipeline | AI lead | Backend contract owner |
+| Database migration/RLS/Storage | Data owner | Backend + Security |
+| Contract/regression testing | QA lead | Android + Backend + AI |
+| Documentation release | Tech lead | Owner domain yang berubah |
 
-## Handoff rule
-
-Perubahan contract tidak cukup disampaikan lewat chat. PR/release note harus memuat:
-
-- alasan dan owner;
-- status `CURRENT` atau `FUTURE`;
-- endpoint, auth, request, response, error, timeout, dan compatibility impact;
-- fixture/test yang berubah;
-- migration dan rollback Android/backend;
-- tanggal berlaku dan target environment.
-
-Secret diserahkan melalui secret manager, bukan dokumentasi, issue, chat, screenshot, atau fixture.
+Perubahan community payload harus memperbarui kontrak kanonik, exported schema kedua service, fixtures, test, dan rollback/deindex behavior dalam release yang sama. Secret diserahkan melalui secret manager, bukan dokumentasi atau chat.
 

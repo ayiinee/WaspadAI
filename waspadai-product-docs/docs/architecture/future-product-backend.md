@@ -1,32 +1,24 @@
-# Future Product Backend
+# Product Backend Gateway
 
-Status: `FUTURE` — belum berada pada jalur verifikasi MVP.
+Status: `CURRENT` untuk peran arsitektur; sebagian capability masih `TARGET`.
 
-## Kapan backend diperlukan
+Product Backend adalah boundary Android–AI. Backend memvalidasi Bearer token Supabase, mengambil `sub`, mengelola data Product, menyimpan internal AI key, dan menyeragamkan response/error Android.
 
-Product Backend diperlukan ketika produk harus menegakkan autentikasi/ownership server-side, menyimpan history, mengelola private Storage, melakukan redaksi publikasi, menyediakan community/vote, atau menjalankan moderation.
+## Sudah tersedia
 
-Pada fase tersebut, topology berubah menjadi Android→Product Backend→internal WaspadAI API. Perubahan ini adalah migration arsitektur dan contract, bukan sekadar mengganti base URL.
+- health/readiness;
+- validasi Supabase token;
+- `POST /api/v1/verifications/text` dengan mode `MOCK`;
+- idempotency Product;
+- persistence dan history owner-only.
 
-## Tanggung jawab future
+## Target berikutnya
 
-- validasi Bearer access token Supabase dan mengambil `sub` sebagai `user_id` terpercaya;
-- menyimpan history sesuai policy yang disepakati;
-- memakai private bucket dan signed URL berumur pendek;
-- menjalankan preview/redaksi, consent, ownership, vote, dan moderation;
-- menyimpan `X-Waspadai-API-Key` hanya pada server;
-- memanggil `/api/internal/v1/verify/text|image` dengan `output_mode=BOTH`;
-- menyeragamkan error envelope, idempotency, audit, dan observability.
+- remote adapter ke `/api/internal/v1/verify/text`;
+- query community evidence yang relevan dan eligible;
+- pengiriman `community_evidence` tanpa memberi WaspadAI akses database;
+- image verification;
+- preview, publication, feed, vote, contributions, moderation, dan cleanup.
 
-## Exit criteria untuk menjadi current
-
-1. ADR migration disetujui owner Android, Product Backend, AI, dan Product.
-2. OpenAPI Product direview dan ditandai current.
-3. Endpoint diimplementasikan dan exported schema cocok dengan kontrak.
-4. Supabase auth validation, RLS, ownership, consent, serta retention lulus test.
-5. Internal API key diserahkan melalui secret manager dan diuji di staging.
-6. Android migration, rollback, dan backward compatibility disepakati.
-7. Dokumentasi current diubah dalam release yang sama.
-
-Draft lama tersedia di [`contracts/future/product-api.openapi.yaml`](../../contracts/future/product-api.openapi.yaml). Draft itu tidak otomatis memenuhi exit criteria.
+Target tidak menjadi runtime hanya karena schema database atau draft OpenAPI tersedia. Exit criteria: route/schema exported, authorization dan RLS teruji, AI contract kompatibel, smoke staging lulus, serta rollback tersedia.
 

@@ -1,4 +1,5 @@
 {
   "preview_id": "2a0c1358-e9ab-43da-91a8-e1680f965236",
-  "consent": true
+  "publication_consent": true,
+  "rag_reuse_consent": true
 }

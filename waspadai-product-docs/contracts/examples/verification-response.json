@@ -1,48 +1,66 @@
 {
-  "request_id": "req_synthetic_contract_fixture",
+  "request_id": "c9602d76-69a1-45ee-85f4-da42f9c9f08f",
   "status": "COMPLETED",
-  "mode": "LIVE",
-  "verdict": "UNVERIFIED",
-  "risk_level": "MEDIUM",
-  "headline": "Bukti belum cukup untuk memastikan klaim",
-  "evidence_sufficiency": 0.42,
-  "evidence_sufficiency_label": "Bukti belum cukup untuk memastikan klaim",
-  "requires_human_review": true,
-  "community_status": "ELIGIBLE_WITH_CONSENT",
-  "what_checked": [
-    "Klaim utama pada pesan"
-  ],
-  "why": [
-    "Bukti yang ditemukan belum mencakup seluruh klaim material."
-  ],
-  "evidence": [],
-  "sources": [],
-  "recommended_actions": [
-    {
-      "code": "RETURN_UNVERIFIED",
-      "title": "Tunggu bukti yang lebih kuat",
-      "detail": "Jangan jadikan informasi ini satu-satunya dasar keputusan."
-    }
-  ],
-  "uncertainty": "Masih diperlukan sumber primer atau sumber tepercaya lain.",
-  "dimensions": {
-    "factual_status": "UNVERIFIED",
-    "source_authenticity": "UNVERIFIED",
-    "sender_identity": "UNVERIFIED",
-    "channel_status": "UNVERIFIED",
-    "scam_risk": "MEDIUM",
-    "content_authenticity": "NOT_APPLICABLE"
+  "history": {
+    "saved": true,
+    "case_id": "56f50192-7dd1-4bec-9a52-d838174c9d23",
+    "save_reason": "UNVERIFIED",
+    "community_eligible": true,
+    "community_state": "PRIVATE"
   },
-  "presentation": {
-    "requested_mode": "BOTH",
-    "structured": true,
-    "narrative": {
-      "text": "Hasil pemeriksaan: bukti yang tersedia belum cukup untuk memastikan klaim.",
-      "summary": "Bukti belum cukup untuk memastikan klaim",
-      "paragraphs": [
-        "Hasil pemeriksaan: bukti yang tersedia belum cukup untuk memastikan klaim."
-      ]
-    }
+  "result": {
+    "request_id": "mock-7b0cf4b662bec1b2",
+    "trace_id": "mock-trace-7b0cf4b662bec1b2",
+    "status": "COMPLETED",
+    "mode": "LIVE",
+    "mode_notice": "Hasil fixture mode mock; bukan pemeriksaan AI live.",
+    "input_summary": {
+      "input_type": "TEXT",
+      "content_type": "MESSAGE",
+      "label": "Input mode mock"
+    },
+    "verdict": "UNVERIFIED",
+    "risk_level": "UNKNOWN",
+    "dimensions": {
+      "factual_status": "UNVERIFIED",
+      "source_authenticity": "UNVERIFIED",
+      "sender_identity": "UNVERIFIED",
+      "channel_status": "UNVERIFIED",
+      "scam_risk": "UNKNOWN",
+      "content_authenticity": "NOT_APPLICABLE"
+    },
+    "headline": "Fixture: bukti belum cukup untuk memastikan klaim",
+    "evidence_sufficiency": 0.0,
+    "evidence_sufficiency_label": "Fixture, bukan pengukuran AI live",
+    "what_checked": [],
+    "why": ["Mode mock tidak melakukan inferensi ke layanan AI."],
+    "evidence": [],
+    "recommended_actions": [],
+    "sources": [],
+    "uncertainty": "Gunakan mode remote yang tervalidasi untuk hasil faktual.",
+    "requires_human_review": true,
+    "community_status": "ELIGIBLE_WITH_CONSENT",
+    "privacy_notice": "Fixture tidak menyimpan teks mentah dalam hasil AI.",
+    "rulebook": {
+      "corpus_versions": [],
+      "retrieval_mode": "MOCK_FIXTURE",
+      "candidate_count": 0,
+      "selected_count": 0,
+      "forced_rule_ids": [],
+      "cache_hit": false,
+      "duration_ms": 0
+    },
+    "pipeline": [],
+    "presentation": {
+      "requested_mode": "BOTH",
+      "structured": true,
+      "narrative": {
+        "text": "SIMULASI. Ini bukan hasil pemeriksaan AI live.",
+        "summary": "Fixture mode mock",
+        "paragraphs": ["SIMULASI. Ini bukan hasil pemeriksaan AI live."]
+      }
+    },
+    "disclaimer": "Fact-check adalah dukungan keputusan, bukan jaminan."
   },
-  "disclaimer": "Fact-check adalah dukungan keputusan, bukan jaminan."
+  "execution_mode": "MOCK"
 }

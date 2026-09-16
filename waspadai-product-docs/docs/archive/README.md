@@ -2,13 +2,13 @@
 
 Status: `ARCHIVED` — non-normatif.
 
-Folder ini menyimpan baseline 3.0.x, monolith sumber, lock, dan laporan validasi lama untuk kebutuhan audit. Isinya dapat menyebut arsitektur Android→Product Backend→AI, endpoint internal, Bearer auth Product API, wrapper response, atau schema OpenAPI yang bertentangan dengan mode MVP saat ini.
+Folder ini menyimpan baseline 3.0.x, monolith sumber, lock, dan laporan validasi lama untuk audit. Isinya mencampur keputusan historis direct Android→AI dan Android→Product Backend→AI, beserta path, schema, serta status implementasi lama. Kesamaan sebagian topology dengan keputusan sekarang tidak membuat detail archive berlaku.
 
 Aturan penggunaan:
 
-- jangan menjadikan isi archive sebagai requirement implementasi;
+- jangan menjadikan archive sebagai requirement implementasi;
 - jangan menautkan archive dari source code atau onboarding sebagai petunjuk current;
-- gunakan archive hanya untuk menelusuri alasan/perubahan historis;
-- jika informasi archive berbeda dari [`contracts/current/android-api-contract.md`](../../contracts/current/android-api-contract.md), kontrak current selalu menang.
+- gunakan archive hanya untuk menelusuri perubahan historis;
+- bila berbeda dari [`contracts/current/android-api-contract.md`](../../contracts/current/android-api-contract.md), kontrak current menang.
 
-Baseline aktif lama yang sebelumnya berada di root `docs/` dipindahkan ke `legacy-3.0.1-draft/active-docs/`. Berkas monolith dan manifest checksum lama tetap dipertahankan tanpa diubah.
+Baseline lama berada di `legacy-3.0.1-draft/active-docs/`; monolith dan checksum historis dipertahankan tanpa diubah.

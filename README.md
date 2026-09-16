@@ -1,37 +1,36 @@
 # WaspadAI Product
 
-Repository ini berisi scaffold aplikasi Android, Supabase, dan Product Backend future untuk WaspadAI.
+Repository ini berisi aplikasi Android, Product API FastAPI, migration Supabase, dan dokumentasi integrasi WaspadAI.
 
-## Arsitektur MVP saat ini
+## Arsitektur yang berlaku
 
 ```text
-Android Kotlin ──> Public WaspadAI API ──> fact-check pipeline
-      │
-      └── Supabase login diperiksa di aplikasi
+Android ──Bearer Supabase──> Product API ──X-Waspadai-API-Key──> WaspadAI
+                                  │
+                                  └── Supabase Database/Storage
 ```
 
-Android memanggil public endpoint `/api/v1/verify/text` dan `/api/v1/verify/image` secara langsung. Token Supabase tidak dikirim ke WaspadAI API, response tidak memakai wrapper `result/history`, dan internal API key tidak boleh berada di APK.
+Android tidak memanggil WaspadAI secara langsung. Product API memvalidasi identity, mengelola state Product, mengambil community evidence eligible dari database, lalu—setelah integrasi remote tersedia—mengirim input dan proyeksi sanitized ke endpoint internal WaspadAI.
 
-[`android-api-contract.md`](android-api-contract.md) adalah source of truth untuk integrasi AI. Dokumentasi yang sudah dirapikan berada di [`waspadai-product-docs/`](waspadai-product-docs/README.md).
+[`android-api-contract.md`](android-api-contract.md) adalah source of truth. Dokumentasi terstruktur berada di [`waspadai-product-docs/`](waspadai-product-docs/README.md).
 
-## Status komponen
+## Status implementasi
 
-| Komponen | Status baseline |
+| Komponen | Status |
 | --- | --- |
-| `frontend/` | Android Compose scaffold; integrasi end-to-end belum selesai |
-| `backend/` | Preview Product Backend future: health/readiness, mock verifikasi teks, dan history owner-only; bukan gateway MVP current |
-| `supabase/` | Migration/tooling awal untuk fitur Product future |
-| `contracts/` | Pin artifact dokumentasi Product |
-| `waspadai-product-docs/` | Dokumentasi aktif, kontrak current/future/reference, dan archive |
+| `frontend/` | Android Compose scaffold; integrasi Product API end-to-end belum selesai |
+| `backend/` | Auth, health/readiness, text verification `MOCK`, idempotency, dan history owner-only tersedia |
+| `supabase/` | Schema identity, verification, consent/assets, community, moderation/outbox, learning, RLS, dan Storage |
+| Remote AI adapter | `TARGET`; backend belum memanggil WaspadAI live |
+| Image/community/moderation API | `TARGET`; schema database bukan bukti endpoint runtime |
+| Community evidence transport | `TARGET`; kontrak ada pada Bagian 11, belum didukung kedua service |
 
-History server-side, Storage, community, voting, ownership, dan moderation membutuhkan Product Backend fase berikutnya. Keberadaan scaffold atau draft OpenAPI bukan bukti fitur tersebut tersedia.
-
-## Mulai development
-
-Baca [`TEAM_SETUP.md`](TEAM_SETUP.md), lalu jalankan quality gate dokumentasi:
+## Quality gate
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\waspadai-product-docs\scripts\verify-docs.ps1
+Set-Location backend
+uv run pytest
 ```
 
 Jangan commit `.env`, keystore, token, screenshot pengguna, database credential, Supabase service-role key, atau `X-Waspadai-API-Key`.

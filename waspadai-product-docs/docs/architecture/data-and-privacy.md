@@ -1,32 +1,20 @@
 # Data, Security, dan Privacy
 
-Status: `CURRENT`, dengan policy backend ditandai future.
+Status: `CURRENT`.
 
-## Data flow current
+## Data flow
 
-Teks atau hasil crop screenshot dikirim dari perangkat ke public WaspadAI API untuk satu pemeriksaan synchronous. API current tidak mengikat hasil dengan akun Supabase dan tidak mengembalikan metadata history pengguna.
+Android mengirim input dan Bearer token ke Product API. Product API memvalidasi pengguna, menyimpan data sesuai policy, dan mengirim input fact-check ke internal WaspadAI. Pada target community-assisted fact-check, Product API membaca database lalu mengirim hanya proyeksi sanitized yang lulus seluruh gate kontrak.
 
-Android harus:
-
-- mengirim hanya input yang diperlukan untuk pemeriksaan;
-- menampilkan preview/crop sebelum upload gambar;
-- menghindari log request body, screenshot, token, dan URL bertanda tangan;
-- tidak menyimpan screenshot lebih lama dari kebutuhan UX kecuali ada consent dan requirement yang jelas;
-- menghapus temporary crop/file sesuai lifecycle aplikasi;
-- memakai HTTPS dan menolak konfigurasi cleartext production.
-
-## Credential boundary
-
-| Credential | Lokasi | Dikirim ke public AI? |
+| Data/credential | Pemilik | Boleh ke WaspadAI? |
 | --- | --- | --- |
-| Supabase access/refresh token | secure client session | Tidak |
-| Supabase publishable key | config client | Tidak diperlukan untuk call AI |
-| Supabase service-role key | server only | Tidak pernah |
-| `X-Waspadai-API-Key` | Product Backend future only | Tidak pernah dari Android |
+| Supabase access/refresh token | Android/Product Auth boundary | Tidak |
+| `user_id`, owner/moderator/voter identity | Product | Tidak |
+| Database URL/service-role key | Server/operator | Tidak |
+| `X-Waspadai-API-Key` | Product Backend | Ya, hanya sebagai header internal |
+| Input fact-check | Pengguna/Product | Ya, sesuai consent/policy |
+| Community evidence sanitized | Product | Ya, hanya jika eligible dan `RAG_REUSE` aktif |
+| Screenshot/path Storage privat | Product | Tidak sebagai community evidence |
 
-## Future persistence
-
-History/Storage/community membutuhkan Product Backend. Sebelum aktif, tim wajib menetapkan consent version, data classification, retention, deletion, redaction, signed URL TTL, audit policy, RLS/authorization, incident response, dan test pemisahan user A/user B.
-
-Kasus baru harus privat secara default. Publikasi komunitas memerlukan preview hasil redaksi server-side dan consent eksplisit; vote tidak boleh mengubah verdict faktual secara otomatis.
+Kasus baru privat. `COMMUNITY_PUBLICATION` tidak sama dengan `RAG_REUSE`; keduanya harus diperiksa terpisah. Withdrawal, revocation, expiry, deletion, retraction, dan revision baru membatalkan pemakaian record lama.
 

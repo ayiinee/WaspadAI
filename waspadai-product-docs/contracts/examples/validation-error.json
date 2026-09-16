@@ -1,12 +1,9 @@
 {
-  "detail": [
-    {
-      "type": "string_too_short",
-      "loc": [
-        "body",
-        "text"
-      ],
-      "msg": "String should have at least 10 characters"
-    }
-  ]
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Input request tidak valid.",
+    "request_id": "c9602d76-69a1-45ee-85f4-da42f9c9f08f",
+    "retryable": false,
+    "retry_after_seconds": null
+  }
 }

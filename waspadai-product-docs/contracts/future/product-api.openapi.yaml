@@ -883,16 +883,19 @@ components:
     PublishRequest:
       additionalProperties: false
       properties:
-        consent:
+        publication_consent:
           enum:
           - true
+          type: boolean
+        rag_reuse_consent:
           type: boolean
         preview_id:
           format: uuid
           type: string
       required:
       - preview_id
-      - consent
+      - publication_consent
+      - rag_reuse_consent
       type: object
     Quiz:
       additionalProperties: false
