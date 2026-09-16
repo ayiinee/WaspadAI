@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,17 +32,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Article
-import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.MenuBook
-import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Verified
@@ -82,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
+import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
@@ -138,7 +133,8 @@ fun CommunityScreen(
         containerColor = WaspadAIBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            CommunityBottomNavigation(
+            WaspadAIBottomNavigation(
+                selectedDestination = "Koneksi",
                 onDestinationSelected = onDestinationSelected,
                 modifier = Modifier.navigationBarsPadding(),
             )
@@ -654,119 +650,6 @@ private fun EmptyCommunityResult(modifier: Modifier = Modifier) {
             text = "Coba kata kunci atau filter lain.",
             color = WaspadAIMuted,
             fontSize = 13.sp,
-        )
-    }
-}
-
-@Composable
-private fun CommunityBottomNavigation(
-    onDestinationSelected: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(92.dp),
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(74.dp)
-                .align(Alignment.BottomCenter),
-            color = Color.White,
-            shadowElevation = 5.dp,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BottomDestination(
-                    label = "Beranda",
-                    icon = Icons.Rounded.Home,
-                    onClick = { onDestinationSelected("Beranda") },
-                    modifier = Modifier.weight(1f),
-                )
-                BottomDestination(
-                    label = "Pelajari",
-                    icon = Icons.Rounded.MenuBook,
-                    onClick = { onDestinationSelected("Pelajari") },
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.weight(1f))
-                BottomDestination(
-                    label = "Koneksi",
-                    icon = Icons.Rounded.People,
-                    selected = true,
-                    onClick = { onDestinationSelected("Koneksi") },
-                    modifier = Modifier.weight(1f),
-                )
-                BottomDestination(
-                    label = "Progres",
-                    icon = Icons.Rounded.BarChart,
-                    onClick = { onDestinationSelected("Progres") },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .size(72.dp)
-                .shadow(6.dp, CircleShape)
-                .background(WaspadAIBlue, CircleShape)
-                .border(4.dp, Color.White, CircleShape)
-                .clickable { onDestinationSelected("Periksa") },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.CenterFocusStrong,
-                contentDescription = "Periksa informasi",
-                tint = Color.White,
-                modifier = Modifier.size(42.dp),
-            )
-            Icon(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier
-                    .size(23.dp)
-                    .offset(x = 6.dp, y = 6.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun BottomDestination(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    selected: Boolean = false,
-) {
-    val color = if (selected) WaspadAIBlue else WaspadAILightBlue
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .clickable(onClick = onClick)
-            .padding(top = 12.dp, bottom = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color,
-            modifier = Modifier.size(if (selected) 28.dp else 25.dp),
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = label,
-            color = color,
-            fontSize = 9.sp,
-            lineHeight = 10.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            textAlign = TextAlign.Center,
         )
     }
 }

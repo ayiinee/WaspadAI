@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,12 +24,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.waspadai.app.feature.verification.presentation.component.AnalysisCard
-import id.waspadai.app.feature.verification.presentation.component.BottomNavigation
 import id.waspadai.app.feature.verification.presentation.component.FailureNotice
 import id.waspadai.app.feature.verification.presentation.component.ThinkingBubble
 import id.waspadai.app.feature.verification.presentation.component.UserMessage
 import id.waspadai.app.feature.verification.presentation.component.VerificationComposer
 import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeader
+import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.ui.theme.WaspadAITheme
 
 @Composable
@@ -96,10 +97,14 @@ fun VerificationScreen(
             onSubmit = { onAction(VerificationAction.SubmitText) },
             onRequestImageCapture = { onAction(VerificationAction.RequestImageCapture) }
         )
-        BottomNavigation(activeTab = activeTab) {
-            activeTab = it
-            onDestinationSelected(it)
-        }
+        WaspadAIBottomNavigation(
+            selectedDestination = activeTab,
+            onDestinationSelected = {
+                activeTab = it
+                onDestinationSelected(it)
+            },
+            modifier = Modifier.navigationBarsPadding(),
+        )
     }
 }
 
