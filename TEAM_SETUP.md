@@ -1,3 +1,5 @@
+
+
 # Setup dan Handoff Tim WaspadAI
 
 Source of truth integrasi adalah [`android-api-contract.md`](android-api-contract.md). Keputusan topology saat ini adalah Android→Product API→internal WaspadAI. Status implementasi tidak boleh disimpulkan hanya dari contract atau migration.
