@@ -3,5 +3,5 @@
   "question": "Apakah pesan ini aman?",
   "source_url": null,
   "sender_context": "UNKNOWN_NUMBER",
-  "output_mode": "BOTH"
+  "page_context": null
 }

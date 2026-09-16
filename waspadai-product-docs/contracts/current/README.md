@@ -2,9 +2,8 @@
 
 Status: `CURRENT`.
 
-- [`android-api-contract.md`](android-api-contract.md): wire contract Android Kotlin dengan public WaspadAI API.
-- Checksum SHA-256 baseline: `52df0459942ee565a4b5322fec27ca266d0b41384a351fe7f00266e5cd5bb3f2`.
-- Source baseline: `android-api-contract.md` di root workspace, 15 September 2026.
+- [`android-api-contract.md`](android-api-contract.md): kontrak Android–Product API–internal WaspadAI.
+- Checksum SHA-256: `55968929b32d2d7f4fe40f12861464d3218d562ddb283aa6e771ddf5bf13f051`.
+- Source: `android-api-contract.md` di root repository, diperbarui 16 September 2026.
 
-Berkas kontrak disimpan byte-identik. Penjelasan turunan berada di [`docs/api/`](../../docs/api/README.md); jika berbeda, kontrak di folder ini menang.
-
+File kontrak disimpan byte-identik. Product Backend adalah gateway yang berlaku; capability target tetap harus dibedakan dari endpoint runtime.

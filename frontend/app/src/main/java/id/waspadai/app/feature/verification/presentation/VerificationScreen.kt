@@ -32,15 +32,23 @@ import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeade
 import id.waspadai.app.ui.theme.WaspadAITheme
 
 @Composable
-fun VerificationRoute(viewModel: VerificationViewModel) {
+fun VerificationRoute(
+    viewModel: VerificationViewModel,
+    onDestinationSelected: (String) -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    VerificationScreen(state = state, onAction = viewModel::onAction)
+    VerificationScreen(
+        state = state,
+        onAction = viewModel::onAction,
+        onDestinationSelected = onDestinationSelected,
+    )
 }
 
 @Composable
 fun VerificationScreen(
     state: VerificationUiState,
-    onAction: (VerificationAction) -> Unit
+    onAction: (VerificationAction) -> Unit,
+    onDestinationSelected: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     var activeTab by rememberSaveable { mutableStateOf("Periksa") }
@@ -88,14 +96,17 @@ fun VerificationScreen(
             onSubmit = { onAction(VerificationAction.SubmitText) },
             onRequestImageCapture = { onAction(VerificationAction.RequestImageCapture) }
         )
-        BottomNavigation(activeTab = activeTab) { activeTab = it }
+        BottomNavigation(activeTab = activeTab) {
+            activeTab = it
+            onDestinationSelected(it)
+        }
     }
 }
 
 @Preview(showBackground = true, heightDp = 900, widthDp = 412)
 @Composable
 private fun VerificationScreenPreview() {
-    WaspadAITheme(dynamicColor = false) {
+    WaspadAITheme {
         VerificationScreen(VerificationUiState(), onAction = {})
     }
 }

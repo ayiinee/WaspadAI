@@ -2,7 +2,7 @@
 
 Status: `FUTURE` — non-runtime.
 
-`product-api.openapi.yaml` dan fixture di `examples/` adalah rancangan Product Backend dari baseline dokumentasi 3.0.1. Path `/api/v1/verifications/*`, Bearer auth pada Product API, wrapper `result/history`, serta endpoint history/community/vote di dalamnya **belum berlaku untuk MVP direct Android–AI**.
+[`product-api.openapi.yaml`](product-api.openapi.yaml) dan fixture di [`examples/`](examples/) adalah draft Product Backend dari baseline lama. Keputusan Product Backend sebagai gateway sudah berlaku, tetapi file OpenAPI ini tetap non-runtime karena memuat endpoint yang belum diimplementasikan dan beberapa keputusan lama yang belum dibekukan.
 
-File dipertahankan agar pekerjaan fase berikutnya tidak hilang. Sebelum dipromosikan menjadi `current`, kontrak harus direview, diselaraskan dengan keputusan terbaru, diekspor dari implementasi yang berjalan, dan lulus integration test.
+Kontrak community evidence yang berlaku berada langsung pada Bagian 11 [`contracts/current/android-api-contract.md`](../current/android-api-contract.md); tidak ada kontrak database–AI terpisah. Draft ini hanya boleh dipromosikan setelah schema diekspor dari implementasi, diselaraskan dengan kontrak kanonik, dan lulus integration test.
 

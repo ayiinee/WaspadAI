@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)]
     [string]$OutputDirectory,
-    [string]$Version = '2026.09.15'
+    [string]$Version = '2026.09.16'
 )
 
 $ErrorActionPreference = 'Stop'

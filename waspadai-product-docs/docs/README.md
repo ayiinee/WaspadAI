@@ -17,7 +17,7 @@ Dokumen di bawah ini adalah dokumentasi aktif. Materi lama berada di [`archive/`
 | --- | --- | --- |
 | Product/PM | [Product overview](product/overview.md) | [User flows](product/user-flows.md) |
 | Android engineer | [Android client](architecture/android-client.md) | [Request dan response](api/request-response.md) |
-| Backend engineer | [Future Product Backend](architecture/future-product-backend.md) | [Future API](api/future-product-api.md) |
+| Backend engineer | [Product Backend](architecture/future-product-backend.md) | [API status](api/future-product-api.md) |
 | QA engineer | [Testing strategy](development/testing.md) | [Release checklist](development/release-checklist.md) |
 | Security/reviewer | [Data dan privacy](architecture/data-and-privacy.md) | [Errors dan resilience](api/errors-and-resilience.md) |
 | Tech lead | [ADR index](adr/README.md) | [Ownership](governance/ownership.md) |
@@ -26,10 +26,9 @@ Dokumen di bawah ini adalah dokumentasi aktif. Materi lama berada di [`archive/`
 
 | Label | Arti |
 | --- | --- |
-| `CURRENT` | Berlaku untuk implementasi MVP sekarang |
-| `FUTURE` | Rancangan fase berikutnya; belum boleh diasumsikan tersedia |
-| `REFERENCE` | Snapshot atau informasi pendukung eksternal |
-| `ARCHIVED` | Riwayat; tidak boleh menjadi dasar implementasi baru |
-
-Setiap dokumen arsitektur/API harus menyatakan labelnya di bagian awal.
+| `CURRENT` | Keputusan/kontrak yang berlaku; status implementasi tetap harus disebut |
+| `TARGET` | Bentuk tujuan yang belum tersedia di runtime |
+| `FUTURE` | Draft yang belum dibekukan |
+| `REFERENCE` | Snapshot pendukung eksternal |
+| `ARCHIVED` | Riwayat; tidak menjadi dasar implementasi baru |
 

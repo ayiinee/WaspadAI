@@ -1,21 +1,21 @@
 {
   "format_version": 2,
   "artifact_name": "waspadai-product-docs",
-  "version": "2026.09.15",
+  "version": "2026.09.16",
   "distribution": "CI-built release asset",
   "release_asset_url": null,
   "archive_sha256": null,
   "status": "AWAITING_CI_PUBLISH",
-  "instructions": "Publish immutable tag docs-v2026.09.15, then set the release asset URL and ZIP SHA-256 before enabling automatic retrieval.",
+  "instructions": "Publish immutable tag docs-v2026.09.16, then set the release asset URL and ZIP SHA-256 before enabling automatic retrieval.",
   "contract_authority": "contracts/current/android-api-contract.md",
   "required_files": {
-    "contracts/current/android-api-contract.md": "52df0459942ee565a4b5322fec27ca266d0b41384a351fe7f00266e5cd5bb3f2",
-    "contracts/examples/text-request.json": "7d07624266ed91c2d2122e8cc6ef9caa34f803892f92f3dc0eb5cd66d1b4c708",
-    "contracts/examples/verification-response.json": "3d95c856004e8365247fbe839b0e8d63f85b9e23d4cc5de214ae1d2782846d91",
-    "contracts/examples/validation-error.json": "26621631c50d8b99dfcfadcfbc634283a500e134a362a8170ac4976d23108df3",
-    "docs/README.md": "0e333bc9944899b31f29211c9645d3d487770155dbcdc6178c00922014a7a8a3",
-    "manifest.json": "433bb9ba7c98db76a3844295022155bdbfe83a756816548ba298f0a1ea1bb2ea",
-    "scripts/verify-docs.ps1": "bed1418eac262e3d31aca518c4526e438efb3863858aedb9e1c2c1f1cc3fc748",
-    "validation-report.json": "bf5de0b20f12272a189f5763871f41e6802240502d2f9fffcd4b3e545c678b01"
+    "contracts/current/android-api-contract.md": "55968929b32d2d7f4fe40f12861464d3218d562ddb283aa6e771ddf5bf13f051",
+    "contracts/examples/text-request.json": "9ca877efd13be9c7ebfa46feb7d1f5bee64a7cc5706e31448074c0a5e1cd39e8",
+    "contracts/examples/verification-response.json": "f054b4119c00029ba99ce8030b68010b128c06a479de729e61ff364324ae60ce",
+    "contracts/examples/validation-error.json": "0c5dfdf993d1a6fb74e8de76e70cabb2462c6a351004ac616d0fa1c494dd58ba",
+    "docs/README.md": "4c70ddfc9f7e390f4c05064884ea79482548524588786efcf69c85537862c600",
+    "manifest.json": "fb83279b062d844f798be29ae90e712d88eb5463259e77c061d039bcbd7cf8ec",
+    "scripts/verify-docs.ps1": "fa60fc248311cbb9571cdfc14f65c4fc7baad74be1f6a82119f18add3dbbf23c",
+    "validation-report.json": "e52853037f7289644f87b2237b2e9c4201b73321429069942d1612e78dbb8220"
   }
 }

@@ -2,35 +2,26 @@
 
 Status: `CURRENT`.
 
-## Source of truth
+[`contracts/current/android-api-contract.md`](../../contracts/current/android-api-contract.md) adalah sumber kebenaran integrasi Android–Product–AI.
 
-[`contracts/current/android-api-contract.md`](../../contracts/current/android-api-contract.md) adalah sumber kebenaran untuk integrasi Android–AI. Halaman di folder ini merangkum cara implementasi tanpa menggantikan kontrak tersebut.
+## Product API
 
-## Current endpoints
-
-Base URL: `https://waspadai.shafwan.digital`
-
-| Method | Path | Consumer | Auth |
+| Method | Path | Status | Auth |
 | --- | --- | --- | --- |
-| `GET` | `/api/health` | Android/monitoring | Tidak ada |
-| `POST` | `/api/v1/verify/text` | Android | Tidak ada Bearer/API key |
-| `POST` | `/api/v1/verify/image` | Android | Tidak ada Bearer/API key |
+| `GET` | `/api/health` | Implemented | Tidak ada |
+| `GET` | `/api/ready` | Implemented | Tidak ada |
+| `POST` | `/api/v1/verifications/text` | Implemented, `MOCK` | Bearer + `Idempotency-Key` |
+| `POST` | `/api/v1/verifications/image` | `TARGET` | Bearer + `Idempotency-Key` |
+| `GET` | `/api/v1/history` | Implemented | Bearer |
+| `GET` | `/api/v1/history/{case_id}` | Implemented | Bearer |
 
-Endpoint `/api/internal/v1/verify/*` bukan API Android. Endpoint tersebut hanya untuk Product Backend future dan membutuhkan `X-Waspadai-API-Key` server-side.
+Android tidak memakai public/internal WaspadAI secara langsung. Product Backend menambahkan `output_mode=BOTH` dan, setelah didukung kedua repository, `community_evidence` pada request internal.
 
-## Dokumen implementasi
+## Anti-drift
 
-- [Request dan response](request-response.md)
-- [Errors dan resilience](errors-and-resilience.md)
-- [Future Product API](future-product-api.md)
-- [Contract registry](../../contracts/README.md)
-
-## Aturan anti-drift
-
-- Jangan memakai plural path `/api/v1/verifications/*` pada MVP current.
-- Jangan mengirim `Authorization: Bearer` ke public WaspadAI API.
-- Jangan membaca response dari `result.*`; response current tidak dibungkus.
-- Jangan menganggap `history.*` atau `execution_mode` tersedia.
-- Jangan menambahkan `page_context` atau field lain yang tidak ada di kontrak current.
-- Gunakan `output_mode=BOTH` agar narrative dan structured data tersedia.
+- Product path menggunakan plural `/verifications/`.
+- `Idempotency-Key` wajib untuk verification.
+- Android text request tidak memiliki `output_mode` dan boleh memiliki `page_context`.
+- Product response memakai wrapper `history`, `result`, `execution_mode`.
+- Community evidence harus mengikuti gate Bagian 11 kontrak kanonik; tidak ada kontrak database terpisah.
 
