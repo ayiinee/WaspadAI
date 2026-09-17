@@ -262,6 +262,35 @@ class CommunityStateResponse(BaseModel):
     revision: int = Field(ge=1)
 
 
+class CommunityEvidenceSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=300)
+    publisher: str = Field(min_length=1, max_length=200)
+    published_at: str | None = None
+
+
+class CommunityEvidenceRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["1.0"] = "1.0"
+    record_type: Literal["COMMUNITY_VERIFIED_EVIDENCE"] = "COMMUNITY_VERIFIED_EVIDENCE"
+    community_post_id: UUID
+    case_id: UUID
+    revision: int = Field(ge=1)
+    content_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    status: Literal["VERIFIED_EVIDENCE"] = "VERIFIED_EVIDENCE"
+    title: str = Field(min_length=1, max_length=200)
+    verified_claim: str = Field(min_length=1, max_length=500)
+    stance: Literal["SUPPORTS", "REFUTES", "CONTEXT"]
+    evidence_summary: str = Field(min_length=1, max_length=800)
+    redacted_text: str = Field(min_length=1, max_length=4_000)
+    published_at: str
+    verified_at: str
+    sources: list[CommunityEvidenceSource] = Field(min_length=1, max_length=3)
+
+
 class LearningModuleItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

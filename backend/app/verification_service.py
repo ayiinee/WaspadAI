@@ -11,6 +11,10 @@ import httpx
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from app.community_evidence_service import (
+    build_image_community_evidence,
+    build_text_community_evidence,
+)
 from app.config import Settings
 from app.database import user_transaction
 from app.errors import ProductAPIError
@@ -46,12 +50,15 @@ def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
     }
 
 
-def remote_text_payload(request: TextVerificationRequest) -> dict[str, object]:
+def remote_text_payload(
+    request: TextVerificationRequest,
+    community_evidence: list[dict[str, Any]] | None = None,
+) -> dict[str, object]:
     payload = canonical_payload(request)
     if payload["question"] is None:
         payload["question"] = DEFAULT_TEXT_QUESTION
     payload["output_mode"] = "BOTH"
-    payload["community_evidence"] = []
+    payload["community_evidence"] = community_evidence or []
     return payload
 
 
@@ -108,7 +115,15 @@ async def verify_text(
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
                 raise error
             try:
-                result = await verify_remote_text(http_client, settings, request)
+                community_evidence = await build_text_community_evidence(
+                    pool, settings, user_id, request
+                )
+                result = await verify_remote_text(
+                    http_client,
+                    settings,
+                    request,
+                    community_evidence=community_evidence,
+                )
             except ProductAPIError as error:
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
                 raise
@@ -186,8 +201,16 @@ async def verify_image(
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
                 raise error
             try:
+                community_evidence = await build_image_community_evidence(
+                    pool, settings, user_id, request.question
+                )
                 result = await verify_remote_image(
-                    http_client, settings, image_bytes, content_type, request
+                    http_client,
+                    settings,
+                    image_bytes,
+                    content_type,
+                    request,
+                    community_evidence=community_evidence,
                 )
             except ProductAPIError as error:
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
@@ -566,6 +589,7 @@ async def verify_remote_text(
     http_client: httpx.AsyncClient,
     settings: Settings,
     request: TextVerificationRequest | None,
+    community_evidence: list[dict[str, Any]] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
         raise ProductAPIError(
@@ -581,7 +605,7 @@ async def verify_remote_text(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                 },
-                json=remote_text_payload(request),
+                json=remote_text_payload(request, community_evidence),
             )
 
     try:
@@ -625,6 +649,7 @@ async def verify_remote_image(
     image_bytes: bytes,
     content_type: str,
     request: ImageVerificationRequest,
+    community_evidence: list[dict[str, Any]] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
         raise ProductAPIError(
@@ -643,7 +668,11 @@ async def verify_remote_image(
                 data={
                     "question": request.question or "",
                     "output_mode": "BOTH",
-                    "community_evidence_json": "[]",
+                    "community_evidence_json": json.dumps(
+                        community_evidence or [],
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
                 },
             )
 
