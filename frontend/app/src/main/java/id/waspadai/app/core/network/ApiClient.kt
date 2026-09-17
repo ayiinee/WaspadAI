@@ -21,6 +21,8 @@ object ApiClient {
             connectTimeoutMillis = 20_000
             requestTimeoutMillis = 120_000
             socketTimeoutMillis = 120_000
+            requestTimeoutMillis = 150_000   // contract §4: Android AI timeout = 150 s
+            socketTimeoutMillis = 150_000
         }
     }
 }

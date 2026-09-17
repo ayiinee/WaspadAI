@@ -55,14 +55,30 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
             VerificationRoute(
                 viewModel = viewModel,
                 onDestinationSelected = { destination ->
-                    if (destination == "Koneksi" && currentRoute != CommunityRouteName) {
-                        navController.navigate(CommunityRouteName)
+                    when {
+                        destination == "Koneksi" && currentRoute != CommunityRouteName ->
+                            navController.navigate(CommunityRouteName)
+                        destination == "Periksa" && currentRoute != VerificationRouteName ->
+                            navController.navigate(VerificationRouteName) {
+                                popUpTo(VerificationRouteName) { inclusive = false }
+                                launchSingleTop = true
+                            }
                     }
                 },
             )
         }
         composable(CommunityRouteName) {
-            CommunityRoute(onBack = { navController.popBackStack() })
+            CommunityRoute(
+                onBack = { navController.popBackStack() },
+                onDestinationSelected = { destination ->
+                    if (destination == "Periksa" && currentRoute != VerificationRouteName) {
+                        navController.navigate(VerificationRouteName) {
+                            popUpTo(VerificationRouteName) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                },
+            )
         }
     }
 }

@@ -15,7 +15,8 @@ class VerificationRepositoryImpl(
     private val mapper: VerificationMapper
 ) : VerificationRepository {
     override suspend fun submitText(text: String): AppResult<VerificationResult> = try {
-        AppResult.Success(mapper.map(remoteDataSource.submitText(text)))
+        val envelope = remoteDataSource.submitText(text)
+        AppResult.Success(mapper.map(envelope.result))
     } catch (error: CancellationException) {
         throw error
     } catch (error: VerificationApiException) {

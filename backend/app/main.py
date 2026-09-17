@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import struct
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -57,6 +58,11 @@ from app.verification_service import (
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+# Contract §5.2: image dimension limits
+_IMAGE_MIN_DIM = 64
+_IMAGE_MAX_DIM = 6_000
+_IMAGE_MAX_PIXELS = 30_000_000
 
 
 @asynccontextmanager
@@ -192,6 +198,8 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 415, "UNSUPPORTED_MEDIA_TYPE", "Isi file tidak cocok dengan format gambar."
             )
+        # GAP-7: validate pixel dimensions per contract §5.2
+        _validate_image_dimensions(image_bytes, image.content_type)
         pool = app.state.db_pool
         if pool is None:
             raise ProductAPIError(
@@ -382,3 +390,99 @@ def _matches_image_signature(image_bytes: bytes, content_type: str | None) -> bo
             and image_bytes[8:12] == b"WEBP"
         )
     return False
+
+
+def _parse_image_dimensions(image_bytes: bytes, content_type: str | None) -> tuple[int, int] | None:
+    """Parse (width, height) from raw bytes without external libraries.
+
+    Returns None if the format cannot be parsed safely.
+    Supports JPEG (SOF0/SOF2 markers), PNG (IHDR), and WEBP (VP8/VP8L/VP8X chunks).
+    """
+    try:
+        if content_type == "image/png":
+            # PNG IHDR: bytes 16-23 are width (big-endian u32) and height (big-endian u32)
+            if len(image_bytes) < 24:
+                return None
+            width, height = struct.unpack(">II", image_bytes[16:24])
+            return width, height
+
+        if content_type == "image/jpeg":
+            # Scan for SOF0 (0xFFC0) or SOF2 (0xFFC2) markers
+            i = 2  # skip initial 0xFFD8
+            while i + 3 < len(image_bytes):
+                if image_bytes[i] != 0xFF:
+                    break
+                marker = image_bytes[i + 1]
+                if marker in (0xC0, 0xC2):
+                    # SOF: 1 byte precision, 2 bytes height, 2 bytes width
+                    if i + 9 < len(image_bytes):
+                        height, width = struct.unpack(">HH", image_bytes[i + 5 : i + 9])
+                        return width, height
+                    break
+                # Advance past this segment
+                if i + 3 >= len(image_bytes):
+                    break
+                seg_len = struct.unpack(">H", image_bytes[i + 2 : i + 4])[0]
+                i += 2 + seg_len
+            return None
+
+        if content_type == "image/webp":
+            # WEBP: check VP8L (lossless) or VP8X (extended) or VP8 (lossy)
+            if len(image_bytes) < 30:
+                return None
+            chunk_id = image_bytes[12:16]
+            if chunk_id == b"VP8L":
+                # Lossless: 1 bit unused + 14 bits width-1 + 14 bits height-1
+                if len(image_bytes) < 25:
+                    return None
+                bits = struct.unpack("<I", image_bytes[21:25])[0]
+                width = (bits & 0x3FFF) + 1
+                height = ((bits >> 14) & 0x3FFF) + 1
+                return width, height
+            if chunk_id == b"VP8X":
+                # Extended: canvas width-1 (3 bytes LE) at offset 24, height-1 at offset 27
+                if len(image_bytes) < 30:
+                    return None
+                width = struct.unpack("<I", image_bytes[24:27] + b"\x00")[0] + 1
+                height = struct.unpack("<I", image_bytes[27:30] + b"\x00")[0] + 1
+                return width, height
+            if chunk_id == b"VP8 ":
+                # Lossy: frame tag 3 bytes, start code 3 bytes, then 16-bit w/h with scaling
+                if len(image_bytes) < 30:
+                    return None
+                raw_w, raw_h = struct.unpack("<HH", image_bytes[26:30])
+                width = raw_w & 0x3FFF
+                height = raw_h & 0x3FFF
+                return width, height
+    except Exception:
+        pass
+    return None
+
+
+def _validate_image_dimensions(image_bytes: bytes, content_type: str | None) -> None:
+    """Raise ProductAPIError if image dimensions are outside contract §5.2 bounds.
+
+    Skips validation silently if dimensions cannot be parsed (fail-open for forward compat).
+    """
+    dims = _parse_image_dimensions(image_bytes, content_type)
+    if dims is None:
+        return  # cannot parse — let upstream AI service reject if truly invalid
+    width, height = dims
+    if width < _IMAGE_MIN_DIM or height < _IMAGE_MIN_DIM:
+        raise ProductAPIError(
+            422,
+            "VALIDATION_ERROR",
+            f"Dimensi gambar terlalu kecil. Minimal {_IMAGE_MIN_DIM}×{_IMAGE_MIN_DIM} piksel.",
+        )
+    if width > _IMAGE_MAX_DIM or height > _IMAGE_MAX_DIM:
+        raise ProductAPIError(
+            422,
+            "VALIDATION_ERROR",
+            f"Dimensi gambar terlalu besar. Maksimal {_IMAGE_MAX_DIM}×{_IMAGE_MAX_DIM} piksel.",
+        )
+    if width * height > _IMAGE_MAX_PIXELS:
+        raise ProductAPIError(
+            422,
+            "VALIDATION_ERROR",
+            "Jumlah piksel gambar melebihi batas yang diizinkan (30 juta piksel).",
+        )

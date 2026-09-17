@@ -6,8 +6,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TextVerificationRequestDto(
     val text: String,
-    @SerialName("output_mode") val outputMode: String = "BOTH",
-    @SerialName("sender_context") val senderContext: String = "UNKNOWN_NUMBER"
+    @SerialName("sender_context") val senderContext: String = "UNKNOWN",
+    @SerialName("source_url") val sourceUrl: String? = null,
+    val question: String? = null,
 )
 
 @Serializable
@@ -32,4 +33,22 @@ data class PresentationDto(
 @Serializable
 data class NarrativeDto(
     val text: String? = null
+)
+
+@Serializable
+data class HistoryMetaDto(
+    val saved: Boolean = false,
+    @SerialName("case_id") val caseId: String? = null,
+    @SerialName("save_reason") val saveReason: String = "",
+    @SerialName("community_eligible") val communityEligible: Boolean = false,
+    @SerialName("community_state") val communityState: String = "",
+)
+
+@Serializable
+data class VerificationEnvelopeDto(
+    @SerialName("request_id") val requestId: String = "",
+    val status: String = "",
+    @SerialName("execution_mode") val executionMode: String = "",
+    val history: HistoryMetaDto = HistoryMetaDto(),
+    val result: VerificationResponseDto = VerificationResponseDto(),
 )

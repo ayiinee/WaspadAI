@@ -91,6 +91,7 @@ import id.waspadai.app.ui.theme.WaspadAIValid
 @Composable
 fun CommunityRoute(
     onBack: () -> Unit,
+    onDestinationSelected: (String) -> Unit = {},
     viewModel: CommunityViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -108,7 +109,9 @@ fun CommunityRoute(
             context.startActivity(Intent.createChooser(sendIntent, "Bagikan kasus"))
         },
         onDestinationSelected = { label ->
-            if (label != "Koneksi") {
+            if (label == "Periksa") {
+                onDestinationSelected(label)
+            } else if (label != "Koneksi") {
                 Toast.makeText(
                     context,
                     "$label belum tersedia pada slicing ini",

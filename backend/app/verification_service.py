@@ -358,7 +358,7 @@ async def _persist_terminal_result(
     settings: Settings,
     user_id: UUID,
     operation_id: UUID,
-    request: TextVerificationRequest,
+    request: TextVerificationRequest | None,
     digest: str,
     result: AIResult,
     execution_mode: str,
