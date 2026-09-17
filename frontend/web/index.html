@@ -91,6 +91,35 @@
         </nav>
       </section>
     </main>
+
+    <main id="community-screen" class="page-shell" hidden>
+      <section class="community-frame" aria-label="Halaman Koneksi">
+        <section class="community-content">
+          <header class="community-hero">
+            <button id="community-back" class="community-back" type="button" aria-label="Kembali ke pemeriksaan">←</button>
+            <h1>Koneksi</h1>
+            <section class="contribution-card" aria-label="Kontribusi Saya">
+              <div class="contribution-title"><strong>Kontribusi Saya</strong><span>›</span></div>
+              <div class="contribution-metrics">
+                <p><b>12</b><small>Penilaian</small></p>
+                <p><b>5</b><small>Bukti Ditambahkan</small></p>
+                <p><b>21</b><small>Kasus Selesai</small></p>
+              </div>
+            </section>
+          </header>
+          <section class="community-tools" aria-label="Cari dan filter kasus">
+            <label class="community-search"><span class="sr-only">Cari kasus</span><input id="community-search-input" type="search" placeholder="Cari kasus, materi, atau informasi..." /><span aria-hidden="true">⌕</span></label>
+            <select id="community-filter" aria-label="Filter kasus">
+              <option value="all">Semua kasus</option>
+              <option value="unrated">Belum dinilai</option>
+              <option value="rated">Sudah dinilai</option>
+            </select>
+          </section>
+          <section id="community-feed" class="community-feed" aria-live="polite"></section>
+        </section>
+        <nav id="community-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -22,6 +22,10 @@ const authFormTitle = document.querySelector("#auth-form-title");
 const authSubmit = document.querySelector("#auth-submit");
 const signInTab = document.querySelector("#sign-in-tab");
 const signUpTab = document.querySelector("#sign-up-tab");
+const communityScreen = document.querySelector("#community-screen");
+const communityFeed = document.querySelector("#community-feed");
+const communitySearchInput = document.querySelector("#community-search-input");
+const communityFilter = document.querySelector("#community-filter");
 
 let isSignUp = false;
 
@@ -50,6 +54,29 @@ const state = {
     },
   ],
 };
+
+const communityPosts = [
+  {
+    id: "prabowo-video",
+    author: "Putu Alvin Mahendra",
+    timestamp: "10 Agustus 2026 | 10.17 WITA",
+    body: "Beredar potongan video yang mengatasnamakan Presiden Prabowo di media sosial. Komunitas sedang melakukan pengecekan terhadap sumber asli dan konteks informasi untuk memastikan apakah informasi tersebut benar atau menyesatkan.",
+    supportCount: 10,
+    commentCount: 5,
+    supported: false,
+    verdict: null,
+  },
+  {
+    id: "gibran-position",
+    author: "Rifqi Aditya Nugroho",
+    timestamp: "10 Agustus 2026 | 10.17 WITA",
+    body: "Beredar unggahan yang menyebutkan adanya pencopotan Gibran dari jabatannya sebagai Wakil Presiden. Informasi ini masih perlu diperiksa dengan membandingkan sumber resmi dan konteks pemberitaan untuk memastikan kebenarannya.",
+    supportCount: 10,
+    commentCount: 5,
+    supported: false,
+    verdict: null,
+  },
+];
 
 function setAuthMode(signUp) {
   isSignUp = signUp;
@@ -92,6 +119,92 @@ authForm.addEventListener("submit", (event) => {
   appShell.hidden = false;
   input.focus();
 });
+
+function renderCommunity() {
+  const query = communitySearchInput.value.trim().toLowerCase();
+  const filter = communityFilter.value;
+  const posts = communityPosts.filter((post) => {
+    const matchesQuery = !query || `${post.author} ${post.timestamp} ${post.body}`.toLowerCase().includes(query);
+    const matchesFilter = filter === "all" || (filter === "rated" ? post.verdict : !post.verdict);
+    return matchesQuery && matchesFilter;
+  });
+  if (!posts.length) {
+    communityFeed.innerHTML = '<p class="community-empty">Kasus tidak ditemukan.<br /><small>Coba kata kunci atau filter lain.</small></p>';
+    return;
+  }
+  communityFeed.replaceChildren(...posts.map((post) => makeCommunityPost(post)));
+}
+
+function makeCommunityPost(post) {
+  const card = createElement("article", "community-post");
+  const profile = createElement("div", "community-profile");
+  profile.append(createElement("span", "community-avatar", post.author.split(" ").map((name) => name[0]).slice(0, 2).join("")));
+  const byline = createElement("div", "");
+  byline.append(createElement("strong", "", post.author), createElement("small", "", post.timestamp));
+  profile.append(byline);
+  card.append(profile, createElement("p", "community-post-copy", post.body));
+  card.append(createElement("div", "community-evidence", "Bukti visual sedang diperiksa"));
+
+  const assessment = createElement("section", `community-assessment${post.assessmentOpen ? " open" : ""}`);
+  const assessmentTrigger = createElement(
+    "button",
+    "assessment-trigger",
+    post.verdict ? `Penilaian: ${post.verdict}` : "Beri penilaian",
+  );
+  assessmentTrigger.type = "button";
+  assessmentTrigger.setAttribute("aria-expanded", String(Boolean(post.assessmentOpen)));
+  assessmentTrigger.addEventListener("click", () => { post.assessmentOpen = !post.assessmentOpen; renderCommunity(); });
+  assessment.append(assessmentTrigger);
+
+  const panel = createElement("div", "assessment-panel");
+  panel.append(createElement("p", "assessment-label", "Pilih penilaian"));
+  const choices = createElement("div", "assessment-choices");
+  [["Hoaks", "hoaks"], ["Waspada", "waspada"], ["Valid", "valid"]].forEach(([label, style]) => {
+    const button = createElement("button", `verdict-button ${style}${post.verdict === label ? " selected" : ""}`, post.verdict === label ? `✓ ${label}` : label);
+    button.type = "button";
+    button.addEventListener("click", () => { post.verdict = label; renderCommunity(); });
+    choices.append(button);
+  });
+  const reasonLabel = createElement("label", "assessment-reason-label", "Alasan penilaian");
+  const reason = document.createElement("textarea");
+  reason.className = "assessment-reason";
+  reason.placeholder = "Jelaskan alasan atau temuan Anda...";
+  reason.value = post.reason || "";
+  reason.addEventListener("input", () => { post.reason = reason.value; });
+  reasonLabel.append(reason);
+  const evidenceLabel = createElement("label", "evidence-upload");
+  evidenceLabel.append(createElement("span", "", "＋ Tambahkan gambar atau bukti"));
+  const evidenceInput = document.createElement("input");
+  evidenceInput.type = "file";
+  evidenceInput.accept = "image/jpeg,image/png,image/webp";
+  evidenceInput.addEventListener("change", () => {
+    evidenceLabel.querySelector("span").textContent = evidenceInput.files?.[0]?.name || "＋ Tambahkan gambar atau bukti";
+  });
+  evidenceLabel.append(evidenceInput);
+  const submitAssessment = createElement("button", "assessment-submit", "Kirim penilaian");
+  submitAssessment.type = "button";
+  submitAssessment.addEventListener("click", () => {
+    post.assessmentOpen = false;
+    renderCommunity();
+  });
+  panel.append(choices, reasonLabel, evidenceLabel, submitAssessment);
+  assessment.append(panel);
+  const actions = createElement("div", "community-actions");
+  const support = createElement("button", post.supported ? "supported" : "", `${post.supported ? "♥" : "♡"} ${post.supportCount}`);
+  support.type = "button";
+  support.addEventListener("click", () => { post.supported = !post.supported; post.supportCount += post.supported ? 1 : -1; renderCommunity(); });
+  const comments = createElement("span", "", `◌ ${post.commentCount}`);
+  const share = createElement("button", "", "↗ Share");
+  share.type = "button";
+  share.addEventListener("click", async () => {
+    const text = `${post.body}\n\nDibagikan dari WaspadAI`;
+    if (navigator.share) await navigator.share({ title: "Kasus WaspadAI", text });
+    else await navigator.clipboard?.writeText(text);
+  });
+  actions.append(support, comments, share);
+  card.append(assessment, actions);
+  return card;
+}
 
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -307,15 +420,46 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
-const tabs = [...document.querySelectorAll("[data-tab]")];
-tabs.forEach((tab) => {
+const primaryNav = appShell.querySelector(".bottom-nav");
+const communityNav = primaryNav.cloneNode(true);
+communityNav.id = "community-nav";
+document.querySelector("#community-nav").replaceWith(communityNav);
+
+function setSelectedTab(container, destination) {
+  container.querySelectorAll("[data-tab]").forEach((button) => {
+    const selected = button.dataset.tab === destination;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
+function showVerification() {
+  communityScreen.hidden = true;
+  appShell.hidden = false;
+  setSelectedTab(primaryNav, "Periksa");
+}
+
+function showCommunity() {
+  appShell.hidden = true;
+  communityScreen.hidden = false;
+  setSelectedTab(communityNav, "Koneksi");
+  renderCommunity();
+}
+
+document.querySelectorAll("[data-tab]").forEach((tab) => {
   tab.addEventListener("click", () => {
-    tabs.forEach((button) => {
-      const selected = button === tab;
-      button.classList.toggle("active", selected);
-      button.setAttribute("aria-pressed", String(selected));
-    });
+    const destination = tab.dataset.tab;
+    if (destination === "Koneksi") showCommunity();
+    else if (destination === "Periksa") showVerification();
+    else {
+      state.messages.push({ kind: "status", text: `${destination} belum tersedia pada slicing ini.` });
+      render();
+    }
   });
 });
+
+document.querySelector("#community-back").addEventListener("click", showVerification);
+communitySearchInput.addEventListener("input", renderCommunity);
+communityFilter.addEventListener("change", renderCommunity);
 
 render();
