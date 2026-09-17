@@ -15,7 +15,6 @@ data class VerificationUiState(
     companion object {
         fun initial(isRemoteEnabled: Boolean): VerificationUiState {
             return VerificationUiState(
-                conversation = if (isRemoteEnabled) emptyList() else previewConversation(),
                 conversation = emptyList(),
                 isRemoteEnabled = isRemoteEnabled,
             )
