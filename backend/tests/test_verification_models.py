@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import anyio
 import pytest
 from pydantic import ValidationError
 
@@ -9,7 +10,13 @@ from app.config import Settings
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_not_required_result, build_review_required_result
 from app.models import TextVerificationRequest
-from app.verification_service import canonical_payload, payload_hash, requires_history, save_reason
+from app.verification_service import (
+    canonical_payload,
+    payload_hash,
+    requires_history,
+    save_reason,
+    _persist_terminal_result,
+)
 
 
 def request_payload(**overrides: object) -> dict[str, object]:
@@ -86,3 +93,52 @@ def test_history_cursor_is_signed_and_user_scoped() -> None:
         decode_cursor(encoded, "test-secret", uuid4())
     with pytest.raises(Exception):
         decode_cursor(encoded + "x", "test-secret", user_a)
+
+
+def test_persist_terminal_result_stores_trimmed_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeTransaction:
+        def __init__(self, connection: object) -> None:
+            self.connection = connection
+
+        async def __aenter__(self) -> object:
+            return self.connection
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    class FakeConnection:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, tuple[object, ...]]] = []
+
+        async def execute(self, sql: str, params: tuple[object, ...]) -> None:
+            self.calls.append((sql, params))
+
+    async def check() -> None:
+        request = TextVerificationRequest.model_validate(request_payload())
+        result = build_review_required_result(request, payload_hash(request))
+        settings = Settings(_env_file=None, history_cursor_signing_key="test-secret")
+        connection = FakeConnection()
+
+        monkeypatch.setattr(
+            "app.verification_service.user_transaction",
+            lambda *_args: FakeTransaction(connection),
+        )
+
+        await _persist_terminal_result(
+            pool=object(),
+            settings=settings,
+            user_id=uuid4(),
+            operation_id=uuid4(),
+            request=request,
+            digest=payload_hash(request),
+            result=result,
+            execution_mode="MOCK",
+            input_type="TEXT",
+        )
+
+        case_insert = next(
+            params for sql, params in connection.calls if "insert into public.verification_cases" in sql
+        )
+        assert case_insert[5] == "Pesan mengaku bank dan meminta kode OTP segera."
+
+    anyio.run(check)

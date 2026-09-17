@@ -51,4 +51,22 @@ data class VerificationEnvelopeDto(
     @SerialName("execution_mode") val executionMode: String = "",
     val history: HistoryMetaDto = HistoryMetaDto(),
     val result: VerificationResponseDto = VerificationResponseDto(),
+    @SerialName("input_text") val inputText: String? = null,
+)
+
+@Serializable
+data class HistoryItemDto(
+    @SerialName("case_id") val caseId: String,
+    @SerialName("input_type") val inputType: String,
+    val headline: String,
+    val verdict: String,
+    @SerialName("requires_human_review") val requiresHumanReview: Boolean,
+    @SerialName("community_state") val communityState: String,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+data class HistoryPageDto(
+    val items: List<HistoryItemDto> = emptyList(),
+    @SerialName("next_cursor") val nextCursor: String? = null,
 )

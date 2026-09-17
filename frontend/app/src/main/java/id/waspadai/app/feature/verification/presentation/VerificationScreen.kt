@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.waspadai.app.feature.verification.presentation.component.AnalysisCard
 import id.waspadai.app.feature.verification.presentation.component.FailureNotice
+import id.waspadai.app.feature.verification.presentation.component.HistoryPanel
 import id.waspadai.app.feature.verification.presentation.component.ThinkingBubble
 import id.waspadai.app.feature.verification.presentation.component.UserMessage
 import id.waspadai.app.feature.verification.presentation.component.VerificationComposer
@@ -67,13 +68,23 @@ fun VerificationScreen(
             .background(Color.White)
             .imePadding()
     ) {
-        WaspadAiHeader()
+        WaspadAiHeader(onHistoryClick = { onAction(VerificationAction.ToggleHistory) })
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (state.isHistoryVisible) {
+                item {
+                    HistoryPanel(
+                        items = state.history,
+                        isLoading = state.isHistoryLoading,
+                        onRefresh = { onAction(VerificationAction.RefreshHistory) },
+                        onOpen = { onAction(VerificationAction.OpenHistory(it)) }
+                    )
+                }
+            }
             items(state.conversation) { item ->
                 when (item) {
                     is VerificationConversationItem.UserMessage -> UserMessage(item.text, item.hasAttachment)

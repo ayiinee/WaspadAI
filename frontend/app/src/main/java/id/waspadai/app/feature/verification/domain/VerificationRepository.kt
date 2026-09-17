@@ -5,4 +5,8 @@ import id.waspadai.app.core.model.VerificationResult
 
 interface VerificationRepository {
     suspend fun submitText(text: String): AppResult<VerificationResult>
+
+    suspend fun listHistory(): AppResult<List<VerificationHistoryItem>>
+
+    suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail>
 }

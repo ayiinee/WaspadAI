@@ -24,6 +24,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,9 +57,10 @@ import id.waspadai.app.core.ui.DeepBlue
 import id.waspadai.app.core.ui.Ink
 import id.waspadai.app.core.ui.RiskRed
 import id.waspadai.app.core.ui.SoftBlue
+import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 
 @Composable
-fun WaspadAiHeader() {
+fun WaspadAiHeader(onHistoryClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -73,6 +79,88 @@ fun WaspadAiHeader() {
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 32.dp)
+        )
+        IconButton(
+            onClick = onHistoryClick,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 20.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.History,
+                contentDescription = "History verifikasi",
+                tint = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+fun HistoryPanel(
+    items: List<VerificationHistoryItem>,
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SoftBlue)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "History Verifikasi",
+                    color = Ink,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onRefresh, enabled = !isLoading) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "Muat ulang history",
+                        tint = BrandBlue
+                    )
+                }
+            }
+            when {
+                isLoading -> Text("Memuat history...", color = Color(0xFF557383), fontSize = 13.sp)
+                items.isEmpty() -> Text("Belum ada history tersimpan.", color = Color(0xFF557383), fontSize = 13.sp)
+                else -> items.forEach { item ->
+                    HistoryRow(item = item, onOpen = onOpen)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(item: VerificationHistoryItem, onOpen: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .clickable { onOpen(item.caseId) }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(
+            item.headline,
+            color = Ink,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            "${item.verdict} • ${item.createdAt}",
+            color = Color(0xFF557383),
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

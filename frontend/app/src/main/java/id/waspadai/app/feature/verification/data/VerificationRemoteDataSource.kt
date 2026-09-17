@@ -1,11 +1,13 @@
 package id.waspadai.app.feature.verification.data
 
 import id.waspadai.app.core.network.WaspadAiApiConfig
+import id.waspadai.app.feature.verification.data.dto.HistoryPageDto
 import id.waspadai.app.feature.verification.data.dto.TextVerificationRequestDto
 import id.waspadai.app.feature.verification.data.dto.VerificationEnvelopeDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.accept
+import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -21,14 +23,12 @@ class VerificationRemoteDataSource(
     private val tokenProvider: () -> String? = { null },
 ) {
     suspend fun submitText(text: String): VerificationEnvelopeDto {
-        val accessToken = tokenProvider()
+        val accessToken = requireAccessToken()
         val idempotencyKey = UUID.randomUUID().toString()
         val response = client.post(config.textVerificationUrl) {
             headers {
                 append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                if (accessToken != null) {
-                    append(HttpHeaders.Authorization, "Bearer $accessToken")
-                }
+                append(HttpHeaders.Authorization, "Bearer $accessToken")
                 append("Idempotency-Key", idempotencyKey)
             }
             accept(ContentType.Application.Json)
@@ -39,6 +39,40 @@ class VerificationRemoteDataSource(
         }
         return response.body()
     }
+
+    suspend fun listHistory(): HistoryPageDto {
+        val accessToken = requireAccessToken()
+        val response = client.get(config.historyUrl) {
+            headers {
+                append(HttpHeaders.Authorization, "Bearer $accessToken")
+            }
+            accept(ContentType.Application.Json)
+        }
+        if (!response.status.isSuccess()) {
+            throw VerificationApiException(response.status)
+        }
+        return response.body()
+    }
+
+    suspend fun getHistoryDetail(caseId: String): VerificationEnvelopeDto {
+        val accessToken = requireAccessToken()
+        val response = client.get(config.historyDetailUrl(caseId)) {
+            headers {
+                append(HttpHeaders.Authorization, "Bearer $accessToken")
+            }
+            accept(ContentType.Application.Json)
+        }
+        if (!response.status.isSuccess()) {
+            throw VerificationApiException(response.status)
+        }
+        return response.body()
+    }
+
+    private fun requireAccessToken(): String = tokenProvider()
+        ?.takeIf(String::isNotBlank)
+        ?: throw MissingAuthTokenException()
 }
 
 class VerificationApiException(val status: HttpStatusCode) : RuntimeException()
+
+class MissingAuthTokenException : RuntimeException()

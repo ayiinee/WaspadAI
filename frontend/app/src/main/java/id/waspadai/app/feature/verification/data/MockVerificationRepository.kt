@@ -3,6 +3,8 @@ package id.waspadai.app.feature.verification.data
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
+import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import kotlinx.coroutines.delay
 
@@ -56,4 +58,10 @@ class MockVerificationRepository : VerificationRepository {
         }
         return AppResult.Success(result)
     }
+
+    override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> =
+        AppResult.Success(emptyList())
+
+    override suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail> =
+        AppResult.Failure("History hanya tersedia saat backend aktif.")
 }

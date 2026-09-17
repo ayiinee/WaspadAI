@@ -251,6 +251,7 @@ async def get_history_detail(
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
             """select c.id, c.product_request_id, c.save_reason, c.community_state,
+                      c.sanitized_text,
                       r.result_json, r.execution_mode
                  from public.verification_cases c
                  join public.verification_results r on r.case_id = c.id
@@ -268,6 +269,7 @@ async def get_history_detail(
         community_state=row["community_state"],
         result=result,
         execution_mode=row["execution_mode"],
+        input_text=row["sanitized_text"],
     )
 
 
@@ -383,7 +385,7 @@ async def _persist_terminal_result(
                        (id, user_id, operation_id, product_request_id, input_type, input_source,
                         sanitized_text, input_hash, headline, verdict, risk_level,
                         requires_human_review, save_reason, community_state, retention_expires_at)
-                   values (%s, %s, %s, %s, %s, 'MANUAL', null, %s, %s, %s, %s,
+                   values (%s, %s, %s, %s, %s, 'MANUAL', %s, %s, %s, %s, %s,
                            %s, %s, %s, now() + make_interval(days => %s))""",
                 (
                     case_id,
@@ -391,6 +393,7 @@ async def _persist_terminal_result(
                     operation_id,
                     operation_id,
                     input_type,
+                    request.text if request is not None else None,
                     digest,
                     result.headline,
                     result.verdict,
@@ -493,6 +496,7 @@ def _envelope(
     community_state: str,
     result: AIResult,
     execution_mode: str,
+    input_text: str | None = None,
 ) -> VerificationEnvelope:
     return VerificationEnvelope(
         request_id=request_id,
@@ -507,6 +511,7 @@ def _envelope(
         ),
         result=result,
         execution_mode=execution_mode,
+        input_text=input_text,
     )
 
 
