@@ -20,6 +20,7 @@ from app.models import (
     CommunityPreviewResponse,
     CommunityPublishRequest,
     CommunityStateResponse,
+    CommunityUserSummary,
     CommunityVoteCounts,
     CommunityVoteRequest,
     CommunityVoteResult,
@@ -43,8 +44,11 @@ async def list_community(
             select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
                    coalesce(counts.hoaks, 0)::int as hoaks,
                    coalesce(counts.waspada, 0)::int as waspada,
-                   coalesce(counts.valid, 0)::int as valid
+                   coalesce(counts.valid, 0)::int as valid,
+                   own.vote as user_vote
               from public.community_posts p
+              left join public.community_votes own
+                on own.post_id = p.id and own.user_id = %s
               left join lateral (
                   select
                       count(*) filter (where v.vote = 'HOAKS') as hoaks,
@@ -70,6 +74,7 @@ async def list_community(
              limit %s
             """,
             (
+                user_id,
                 cursor.created_at if cursor else None,
                 cursor.created_at if cursor else None,
                 cursor.case_id if cursor else None,
@@ -93,6 +98,45 @@ async def list_community(
             secret,
         )
     return CommunityPage(items=items, next_cursor=next_cursor)
+
+
+async def get_community_user_summary(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+) -> CommunityUserSummary:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select
+                coalesce((
+                    select count(*)
+                      from public.community_votes v
+                     where v.user_id = %s
+                ), 0)::int as assessments_count,
+                coalesce((
+                    select count(*)
+                      from public.contributions c
+                     where c.user_id = %s
+                       and c.status <> 'RETRACTED'
+                       and c.retracted_at is null
+                ), 0)::int as evidence_added_count,
+                coalesce((
+                    select count(*)
+                      from public.contributions c
+                     where c.user_id = %s
+                       and c.status = 'VERIFIED'
+                       and c.retracted_at is null
+                ), 0)::int as resolved_cases_count
+            """,
+            (user_id, user_id, user_id),
+        )
+        row = await query.fetchone()
+    return CommunityUserSummary(
+        assessments_count=row["assessments_count"],
+        evidence_added_count=row["evidence_added_count"],
+        resolved_cases_count=row["resolved_cases_count"],
+    )
 
 
 async def get_community_detail(
@@ -506,6 +550,7 @@ def _community_item(row: DictRow) -> CommunityItem:
         status=row["status"],
         published_at=_iso8601(row["published_at"]),
         counts=_counts(row),
+        user_vote=row["user_vote"],
     )
 
 

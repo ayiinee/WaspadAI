@@ -69,6 +69,9 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
         }
         composable(CommunityRouteName) {
             CommunityRoute(
+                repository = app.communityRepository,
+                defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+                defaultAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
                 onBack = { navController.popBackStack() },
                 onDestinationSelected = { destination ->
                     if (destination == "Periksa" && currentRoute != VerificationRouteName) {

@@ -1,9 +1,26 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
+}
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { input -> load(input) }
+    }
+}
+
+fun publicConfig(name: String, defaultValue: String = ""): String {
+    return (localProperties.getProperty(name) ?: System.getenv(name) ?: defaultValue).trim()
+}
+
+fun buildConfigString(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }
 
 android {
@@ -21,9 +38,14 @@ android {
         buildConfigField(
             "String",
             "WASPADAI_API_BASE_URL",
-            "\"https://waspadai.shafwan.digital\""
+            buildConfigString(publicConfig("WASPADAI_API_BASE_URL", "http://127.0.0.1:8001"))
         )
-        buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", "false")
+        buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", publicConfig("WASPADAI_REMOTE_ENABLED", "true"))
+        buildConfigField(
+            "String",
+            "WASPADAI_SUPABASE_ACCESS_TOKEN",
+            buildConfigString(publicConfig("WASPADAI_SUPABASE_ACCESS_TOKEN"))
+        )
     }
 
     buildTypes {

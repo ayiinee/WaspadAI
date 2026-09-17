@@ -43,11 +43,14 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -77,6 +80,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
@@ -90,9 +94,18 @@ import id.waspadai.app.ui.theme.WaspadAIValid
 
 @Composable
 fun CommunityRoute(
+    repository: CommunityRepository,
+    defaultBaseUrl: String,
+    defaultAccessToken: String,
     onBack: () -> Unit,
     onDestinationSelected: (String) -> Unit = {},
-    viewModel: CommunityViewModel = viewModel(),
+    viewModel: CommunityViewModel = viewModel(
+        factory = CommunityViewModel.Factory(
+            repository = repository,
+            defaultBaseUrl = defaultBaseUrl,
+            defaultAccessToken = defaultAccessToken,
+        ),
+    ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -152,7 +165,14 @@ fun CommunityScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                CommunityHeader(onBack = onBack)
+                CommunityHeader(onBack = onBack, summary = uiState.summary)
+            }
+            item {
+                BackendConnectionPanel(
+                    uiState = uiState,
+                    onAction = onAction,
+                    modifier = Modifier.padding(horizontal = 22.dp),
+                )
             }
             item {
                 CommunitySearchBar(
@@ -193,6 +213,7 @@ fun CommunityScreen(
 @Composable
 private fun CommunityHeader(
     onBack: () -> Unit,
+    summary: CommunitySummary,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -234,6 +255,7 @@ private fun CommunityHeader(
             )
         }
         ContributionCard(
+            summary = summary,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 24.dp, vertical = 25.dp),
@@ -242,7 +264,10 @@ private fun CommunityHeader(
 }
 
 @Composable
-private fun ContributionCard(modifier: Modifier = Modifier) {
+private fun ContributionCard(
+    summary: CommunitySummary,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -276,21 +301,21 @@ private fun ContributionCard(modifier: Modifier = Modifier) {
             ) {
                 ContributionMetric(
                     icon = Icons.Rounded.Groups,
-                    value = "12",
+                    value = summary.assessmentsCount.toString(),
                     label = "Penilaian",
                     modifier = Modifier.weight(1f),
                 )
                 ContributionDivider()
                 ContributionMetric(
                     icon = Icons.Rounded.Article,
-                    value = "5",
+                    value = summary.evidenceAddedCount.toString(),
                     label = "Bukti Ditambahkan",
                     modifier = Modifier.weight(1.25f),
                 )
                 ContributionDivider()
                 ContributionMetric(
                     icon = Icons.Rounded.Verified,
-                    value = "21",
+                    value = summary.resolvedCasesCount.toString(),
                     label = "Kasus Selesai",
                     modifier = Modifier.weight(1.15f),
                 )
@@ -352,6 +377,131 @@ private fun ContributionDivider() {
             .height(44.dp)
             .background(Color.Black.copy(alpha = 0.2f)),
     )
+}
+
+@Composable
+private fun BackendConnectionPanel(
+    uiState: CommunityUiState,
+    onAction: (CommunityAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(6.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, WaspadAILightBlue),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Backend Koneksi",
+                        color = WaspadAIDarkBlue,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = uiState.backendMessage,
+                        color = when (uiState.backendPhase) {
+                            CommunityBackendPhase.Connected -> WaspadAIValid
+                            CommunityBackendPhase.Failure -> WaspadAIHoax
+                            else -> WaspadAIMuted
+                        },
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                    )
+                }
+                if (uiState.backendPhase == CommunityBackendPhase.Loading || uiState.isVoteSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = WaspadAIBlue,
+                    )
+                }
+            }
+            BackendInputField(
+                label = "Base URL Product API",
+                value = uiState.baseUrlDraft,
+                onValueChange = { onAction(CommunityAction.BaseUrlChanged(it)) },
+            )
+            BackendInputField(
+                label = "Bearer token Supabase",
+                value = uiState.accessTokenDraft,
+                onValueChange = { onAction(CommunityAction.AccessTokenChanged(it)) },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = { onAction(CommunityAction.RefreshBackend) },
+                    enabled = uiState.backendPhase != CommunityBackendPhase.Loading,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Refresh feed", maxLines = 1)
+                }
+                OutlinedButton(
+                    onClick = { onAction(CommunityAction.BaseUrlChanged("http://10.0.2.2:8001")) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Emulator local", maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackendInputField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = WaspadAIMuted,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(color = Color.Black, fontSize = 12.sp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .border(1.dp, WaspadAILightBlue, RoundedCornerShape(4.dp)),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (value.isBlank()) {
+                        Text(
+                            text = if (label.startsWith("Base")) "http://10.0.2.2:8001" else "Supabase access token",
+                            color = Color.Black.copy(alpha = 0.22f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    innerTextField()
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -493,6 +643,31 @@ private fun CommunityPostCard(
                 }
             }
             Spacer(Modifier.height(9.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = post.title,
+                    color = WaspadAIDarkBlue,
+                    fontSize = 14.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = post.statusLabel,
+                    color = if (post.statusLabel.contains("terverifikasi", ignoreCase = true)) {
+                        WaspadAIValid
+                    } else {
+                        WaspadAICaution
+                    },
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.height(7.dp))
             Text(
                 text = post.body,
                 color = Color.Black,
@@ -518,12 +693,24 @@ private fun CommunityPostCard(
                 CommunityVerdict.entries.forEach { verdict ->
                     VerdictButton(
                         verdict = verdict,
+                        count = when (verdict) {
+                            CommunityVerdict.Hoaks -> post.hoaksCount
+                            CommunityVerdict.Waspada -> post.waspadaCount
+                            CommunityVerdict.Valid -> post.validCount
+                        },
                         selected = post.selectedVerdict == verdict,
                         onClick = { onVerdictClick(verdict) },
                         modifier = Modifier.weight(1f),
                     )
                 }
             }
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = "Agregat: Hoaks ${post.hoaksCount} - Waspada ${post.waspadaCount} - Valid ${post.validCount}",
+                color = WaspadAIMuted,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+            )
             Spacer(Modifier.height(7.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -535,17 +722,10 @@ private fun CommunityPostCard(
                     } else {
                         Icons.Rounded.FavoriteBorder
                     },
-                    label = post.supportCount.toString(),
-                    contentDescription = "Dukung kasus",
+                    label = if (post.isSupported) "Ditandai" else "Tandai",
+                    contentDescription = "Tandai kasus",
                     tint = if (post.isSupported) WaspadAIHoax else Color.Black,
                     onClick = onSupportClick,
-                )
-                Spacer(Modifier.width(9.dp))
-                InlineAction(
-                    icon = Icons.Rounded.ChatBubble,
-                    label = post.commentCount.toString(),
-                    contentDescription = "Komentar",
-                    onClick = {},
                 )
                 Spacer(Modifier.weight(1f))
                 InlineAction(
@@ -562,6 +742,7 @@ private fun CommunityPostCard(
 @Composable
 private fun VerdictButton(
     verdict: CommunityVerdict,
+    count: Int,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -627,6 +808,12 @@ private fun InlineAction(
             fontWeight = FontWeight.Medium,
         )
     }
+}
+
+private fun CommunityPost.countFor(verdict: CommunityVerdict): Int = when (verdict) {
+    CommunityVerdict.Hoaks -> hoaksCount
+    CommunityVerdict.Waspada -> waspadaCount
+    CommunityVerdict.Valid -> validCount
 }
 
 @Composable

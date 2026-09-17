@@ -15,7 +15,7 @@ class VerificationViewModel(
     private val submitTextVerification: SubmitTextVerificationUseCase,
     isRemoteEnabled: Boolean
 ) : ViewModel() {
-    private val _state = MutableStateFlow(VerificationUiState(isRemoteEnabled = isRemoteEnabled))
+    private val _state = MutableStateFlow(VerificationUiState.initial(isRemoteEnabled))
     val state: StateFlow<VerificationUiState> = _state.asStateFlow()
 
     fun onAction(action: VerificationAction) {

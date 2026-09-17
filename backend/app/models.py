@@ -194,6 +194,7 @@ class CommunityItem(BaseModel):
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
     published_at: str
     counts: CommunityVoteCounts
+    user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None = None
 
 
 class CommunityPage(BaseModel):
@@ -201,6 +202,14 @@ class CommunityPage(BaseModel):
 
     items: list[CommunityItem]
     next_cursor: str | None
+
+
+class CommunityUserSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assessments_count: int = Field(ge=0)
+    evidence_added_count: int = Field(ge=0)
+    resolved_cases_count: int = Field(ge=0)
 
 
 class CommunityDetail(BaseModel):

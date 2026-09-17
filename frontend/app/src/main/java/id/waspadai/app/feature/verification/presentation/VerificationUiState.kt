@@ -8,7 +8,16 @@ data class VerificationUiState(
     val conversation: List<VerificationConversationItem> = previewConversation(),
     val phase: VerificationPhase = VerificationPhase.Idle,
     val isRemoteEnabled: Boolean = false
-)
+) {
+    companion object {
+        fun initial(isRemoteEnabled: Boolean): VerificationUiState {
+            return VerificationUiState(
+                conversation = if (isRemoteEnabled) emptyList() else previewConversation(),
+                isRemoteEnabled = isRemoteEnabled,
+            )
+        }
+    }
+}
 
 sealed interface VerificationPhase {
     data object Idle : VerificationPhase

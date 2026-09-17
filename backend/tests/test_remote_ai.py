@@ -60,6 +60,7 @@ def test_remote_text_sends_server_auth_and_forces_both() -> None:
             assert request.headers["X-Waspadai-API-Key"] == "server-key"
             body = request.read().decode()
             assert '"output_mode":"BOTH"' in body
+            assert '"community_evidence":[]' in body
             return httpx.Response(200, json=_result())
 
         settings = Settings(
@@ -83,6 +84,7 @@ def test_remote_image_sends_multipart_and_forces_both() -> None:
             assert request.headers["X-Waspadai-API-Key"] == "server-key"
             assert b"name=\"image\"" in body
             assert b"output_mode" in body
+            assert b"community_evidence_json" in body
             return httpx.Response(200, json=_result())
 
         settings = Settings(
