@@ -323,6 +323,85 @@ async def publish_community_case(
     )
 
 
+async def withdraw_community_case(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    case_id: UUID,
+) -> CommunityStateResponse:
+    """Withdraw an unverified community post and revoke its publication consents."""
+
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select p.id as post_id, p.status as post_status, p.publication_consent_id,
+                   p.rag_consent_id, c.community_state, c.revision
+              from public.community_posts p
+              join public.verification_cases c on c.id = p.case_id
+             where p.case_id = %s and p.owner_id = %s and c.user_id = %s
+               and c.deleted_at is null
+             for update of p, c
+            """,
+            (case_id, user_id, user_id),
+        )
+        post = await query.fetchone()
+        if post is None:
+            raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+        if (
+            post["post_status"] == "VERIFIED_EVIDENCE"
+            or post["community_state"] == "VERIFIED_EVIDENCE"
+        ):
+            raise ProductAPIError(
+                409,
+                "COMMUNITY_WITHDRAWAL_FORBIDDEN",
+                "Kasus community yang sudah menjadi evidence terverifikasi tidak dapat ditarik.",
+            )
+        if post["post_status"] == "WITHDRAWN":
+            return CommunityStateResponse(
+                case_id=case_id,
+                community_state="WITHDRAWN",
+                revision=post["revision"],
+            )
+        if post["post_status"] != "PUBLISHED_UNVERIFIED":
+            raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+
+        await connection.execute(
+            """
+            update public.community_posts
+               set status = 'WITHDRAWN', withdrawn_at = now(), revision = revision + 1
+             where id = %s
+            """,
+            (post["post_id"],),
+        )
+        updated = await connection.execute(
+            """
+            update public.verification_cases
+               set community_state = 'WITHDRAWN', revision = revision + 1
+             where id = %s
+             returning revision
+            """,
+            (case_id,),
+        )
+        updated_case = await updated.fetchone()
+        await connection.execute(
+            """
+            update private.consent_records
+               set revoked_at = now()
+             where user_id = %s
+               and id in (%s, %s)
+               and scope in ('COMMUNITY_PUBLICATION', 'RAG_REUSE')
+               and revoked_at is null
+            """,
+            (user_id, post["publication_consent_id"], post["rag_consent_id"]),
+        )
+
+    return CommunityStateResponse(
+        case_id=case_id,
+        community_state="WITHDRAWN",
+        revision=updated_case["revision"],
+    )
+
+
 async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """

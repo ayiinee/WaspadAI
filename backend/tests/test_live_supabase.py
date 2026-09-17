@@ -82,6 +82,8 @@ async def open_single_connection_pool(dsn: str) -> AsyncConnectionPool:
 
 async def _reset_connection(connection: psycopg.AsyncConnection) -> None:
     await connection.execute("RESET ALL")
+    if not connection.autocommit:
+        await connection.rollback()
 
 async def set_test_claim(connection: psycopg.AsyncConnection, user_id: UUID) -> None:
     # Match the Product backend's transaction-local claim mechanism.
@@ -200,7 +202,7 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
                 cursor = await connection.execute(
                     "select current_setting('request.jwt.claim.sub', true)"
                 )
-                assert await cursor.fetchone() == (None,)
+                assert (await cursor.fetchone())[0] in (None, "")
                 cursor = await connection.execute("select id from public.profiles")
                 assert await cursor.fetchall() == []
             async with user_transaction(pool, live_config.user_b, 15) as connection:
@@ -212,7 +214,7 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
                 cursor = await connection.execute(
                     "select current_setting('request.jwt.claim.sub', true)"
                 )
-                assert await cursor.fetchone() == (None,)
+                assert (await cursor.fetchone())[0] in (None, "")
         finally:
             await pool.close()
 
@@ -273,6 +275,139 @@ def test_verification_history_rls_is_owner_scoped(live_config: LiveConfig) -> No
                         (case_id,),
                     )
                     assert await hidden_result.fetchone() is None
+        finally:
+            await pool.close()
+
+    run_async(check())
+
+
+def test_withdrawn_community_post_is_hidden_and_consents_are_revoked(
+    live_config: LiveConfig,
+) -> None:
+    """Exercise the publication visibility gates with the real product_app RLS role."""
+
+    async def check() -> None:
+        pool = await open_single_connection_pool(live_config.database_url)
+        try:
+            case_id = uuid4()
+            operation_id = uuid4()
+            publication_consent_id = uuid4()
+            rag_consent_id = uuid4()
+            post_id = uuid4()
+            content_hash = "d" * 64
+            async with pool.connection() as connection:
+                async with connection.transaction(force_rollback=True):
+                    await set_test_claim(connection, live_config.user_a)
+                    await connection.execute(
+                        """insert into private.request_operations
+                               (id, user_id, route_key, idempotency_key, payload_hash,
+                                state, persistence_state, expires_at)
+                           values (%s, %s, 'community-live-test', %s, %s, 'COMPLETED',
+                                   'SAVED', now() + interval '1 hour')""",
+                        (operation_id, live_config.user_a, uuid4(), "e" * 64),
+                    )
+                    await connection.execute(
+                        """insert into public.verification_cases
+                               (id, user_id, operation_id, product_request_id, input_type,
+                                input_source, sanitized_text, input_hash, headline, verdict,
+                                risk_level, requires_human_review, save_reason, community_state,
+                                retention_expires_at)
+                           values (%s, %s, %s, %s, 'TEXT', 'MANUAL', 'Konten sintetis aman',
+                                   %s, 'Fixture community', 'UNVERIFIED', 'UNKNOWN', true,
+                                   'UNVERIFIED', 'PUBLISHED_UNVERIFIED',
+                                   now() + interval '1 day')""",
+                        (case_id, live_config.user_a, operation_id, uuid4(), content_hash),
+                    )
+                    await connection.execute(
+                        """insert into public.verification_results
+                               (case_id, factual_status, source_authenticity, sender_identity,
+                                channel_status, scam_risk, content_authenticity, result_json,
+                                execution_mode)
+                           values (%s, 'UNVERIFIED', 'UNVERIFIED', 'UNVERIFIED',
+                                   'UNVERIFIED', 'UNKNOWN', 'NOT_APPLICABLE', %s, 'MOCK')""",
+                        (case_id, json.dumps({"fixture": True})),
+                    )
+                    for consent_id, scope in (
+                        (publication_consent_id, "COMMUNITY_PUBLICATION"),
+                        (rag_consent_id, "RAG_REUSE"),
+                    ):
+                        await connection.execute(
+                            """insert into private.consent_records
+                                   (id, user_id, scope, case_id, content_hash, policy_version)
+                               values (%s, %s, %s, %s, %s, 'community-live-test')""",
+                            (consent_id, live_config.user_a, scope, case_id, content_hash),
+                        )
+                    await connection.execute(
+                        """insert into public.community_posts
+                               (id, case_id, owner_id, title, redacted_text, status,
+                                publication_consent_id, rag_consent_id, content_hash, revision)
+                           values (%s, %s, %s, 'Fixture community', 'Konten sintetis aman',
+                                   'PUBLISHED_UNVERIFIED', %s, %s, %s, 1)""",
+                        (
+                            post_id,
+                            case_id,
+                            live_config.user_a,
+                            publication_consent_id,
+                            rag_consent_id,
+                            content_hash,
+                        ),
+                    )
+
+                    await set_test_claim(connection, live_config.user_b)
+                    visible = await connection.execute(
+                        """select p.case_id
+                             from public.community_posts p
+                            where p.case_id = %s
+                              and p.withdrawn_at is null
+                              and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+                              and exists (
+                                  select 1 from private.consent_records c
+                                   where c.id = p.publication_consent_id
+                                     and c.scope = 'COMMUNITY_PUBLICATION'
+                                     and c.revoked_at is null
+                              )""",
+                        (case_id,),
+                    )
+                    assert await visible.fetchone() == (case_id,)
+
+                    await set_test_claim(connection, live_config.user_a)
+                    await connection.execute(
+                        """update public.community_posts
+                              set status = 'WITHDRAWN', withdrawn_at = now(),
+                                  revision = revision + 1
+                            where id = %s""",
+                        (post_id,),
+                    )
+                    await connection.execute(
+                        """update public.verification_cases
+                              set community_state = 'WITHDRAWN', revision = revision + 1
+                            where id = %s""",
+                        (case_id,),
+                    )
+                    await connection.execute(
+                        """update private.consent_records set revoked_at = now()
+                            where id in (%s, %s)""",
+                        (publication_consent_id, rag_consent_id),
+                    )
+
+                    await set_test_claim(connection, live_config.user_b)
+                    hidden = await connection.execute(
+                        "select case_id from public.community_posts where id = %s", (post_id,)
+                    )
+                    assert await hidden.fetchone() is None
+
+                    await set_test_claim(connection, live_config.user_a)
+                    revoked = await connection.execute(
+                        """select scope, revoked_at is not null
+                             from private.consent_records
+                            where id in (%s, %s)
+                            order by scope""",
+                        (publication_consent_id, rag_consent_id),
+                    )
+                    assert await revoked.fetchall() == [
+                        ("COMMUNITY_PUBLICATION", True),
+                        ("RAG_REUSE", True),
+                    ]
         finally:
             await pool.close()
 

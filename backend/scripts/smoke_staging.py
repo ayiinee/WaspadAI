@@ -96,6 +96,96 @@ def main() -> None:
         )
         require_status(non_owner, 404, "non-owner history detail")
 
+        preview = require_status(
+            client.post(f"/api/v1/history/{case_id}/community-preview", headers=headers),
+            200,
+            "community preview",
+        )
+        preview_id = preview.get("preview_id")
+        if not isinstance(preview_id, str):
+            raise RuntimeError("community preview did not return preview_id")
+
+        published = require_status(
+            client.post(
+                f"/api/v1/history/{case_id}/community",
+                headers={"Authorization": f"Bearer {owner_token}"},
+                json={
+                    "preview_id": preview_id,
+                    "publication_consent": True,
+                    "rag_reuse_consent": True,
+                },
+            ),
+            200,
+            "community publish",
+        )
+        if published.get("community_state") != "PUBLISHED_UNVERIFIED":
+            raise RuntimeError("community publish did not return PUBLISHED_UNVERIFIED")
+
+        other_headers = {"Authorization": f"Bearer {other_token}"}
+        community_feed = require_status(
+            client.get("/api/v1/community", headers=other_headers), 200, "community feed"
+        )
+        community_items = community_feed.get("items")
+        if not isinstance(community_items, list) or case_id not in [
+            item.get("case_id") for item in community_items if isinstance(item, dict)
+        ]:
+            raise RuntimeError("published community case is missing from feed")
+
+        require_status(
+            client.get(f"/api/v1/community/{case_id}", headers=other_headers),
+            200,
+            "community detail",
+        )
+        vote = require_status(
+            client.post(
+                f"/api/v1/community/{case_id}/vote",
+                headers=other_headers,
+                json={"vote": "WASPADA"},
+            ),
+            200,
+            "community vote",
+        )
+        if vote.get("user_vote") != "WASPADA":
+            raise RuntimeError("community vote was not persisted")
+
+        withdrawal = require_status(
+            client.delete(f"/api/v1/history/{case_id}/community", headers=headers),
+            200,
+            "community withdrawal",
+        )
+        if withdrawal.get("community_state") != "WITHDRAWN":
+            raise RuntimeError("community withdrawal did not return WITHDRAWN")
+        repeated_withdrawal = require_status(
+            client.delete(f"/api/v1/history/{case_id}/community", headers=headers),
+            200,
+            "repeated community withdrawal",
+        )
+        if repeated_withdrawal != withdrawal:
+            raise RuntimeError("repeated community withdrawal did not return the original state")
+
+        withdrawn_feed = require_status(
+            client.get("/api/v1/community", headers=other_headers), 200, "withdrawn community feed"
+        )
+        withdrawn_items = withdrawn_feed.get("items")
+        if not isinstance(withdrawn_items, list) or case_id in [
+            item.get("case_id") for item in withdrawn_items if isinstance(item, dict)
+        ]:
+            raise RuntimeError("withdrawn community case is still visible in feed")
+        require_status(
+            client.get(f"/api/v1/community/{case_id}", headers=other_headers),
+            404,
+            "withdrawn community detail",
+        )
+        require_status(
+            client.post(
+                f"/api/v1/community/{case_id}/vote",
+                headers=other_headers,
+                json={"vote": "VALID"},
+            ),
+            404,
+            "withdrawn community vote",
+        )
+
     duration_ms = round((time.monotonic() - started) * 1000)
     print(
         "PASS staging smoke "

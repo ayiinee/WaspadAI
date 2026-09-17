@@ -30,6 +30,7 @@ from app.community_service import (
     list_community,
     publish_community_case,
     remove_community_vote,
+    withdraw_community_case,
 )
 from app.config import get_settings
 from app.database import create_pool
@@ -295,6 +296,22 @@ def create_app() -> FastAPI:
         return await publish_community_case(
             pool, app.state.settings, user.id, case_id, payload
         )
+
+    @app.delete(
+        "/api/v1/history/{case_id}/community",
+        tags=["Community"],
+        response_model=CommunityStateResponse,
+    )
+    async def withdraw_community_case_endpoint(
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunityStateResponse:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await withdraw_community_case(pool, app.state.settings, user.id, case_id)
 
     @app.post(
         "/api/v1/community/{case_id}/vote",
