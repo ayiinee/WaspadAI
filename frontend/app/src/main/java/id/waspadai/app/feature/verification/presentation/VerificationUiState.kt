@@ -10,6 +10,7 @@ data class VerificationUiState(
     val isHistoryVisible: Boolean = false,
     val isHistoryLoading: Boolean = false,
     val phase: VerificationPhase = VerificationPhase.Idle,
+    val isOverlayModeEnabled: Boolean = false,
     val isRemoteEnabled: Boolean = false
 ) {
     companion object {

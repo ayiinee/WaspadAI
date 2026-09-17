@@ -59,6 +59,35 @@ class MockVerificationRepository : VerificationRepository {
         return AppResult.Success(result)
     }
 
+    override suspend fun submitImage(
+        imageBytes: ByteArray,
+        contentType: String,
+        fileName: String,
+        question: String?,
+        overlayModeEnabled: Boolean,
+    ): AppResult<VerificationResult> {
+        delay(700)
+        val modeText = if (overlayModeEnabled) {
+            " Mode overlay aktif untuk menandai bagian visual yang perlu diperhatikan."
+        } else {
+            ""
+        }
+        return AppResult.Success(
+            VerificationResult(
+                narrative = "Gambar \"$fileName\" dianalisis dalam mode simulasi.$modeText Periksa sumber asli gambar dan jangan mengikuti instruksi pembayaran, tautan, atau kode yang terlihat mencurigakan.",
+                riskLevel = RiskLevel.MEDIUM,
+                reasons = listOf(
+                    "Validasi gambar live belum aktif pada mode simulasi.",
+                    "Konteks visual perlu dibandingkan dengan kanal resmi."
+                ),
+                recommendedActions = listOf(
+                    "Pastikan gambar berasal dari sumber tepercaya.",
+                    "Jangan memindai QR atau membuka tautan dari gambar yang belum diverifikasi."
+                )
+            )
+        )
+    }
+
     override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> =
         AppResult.Success(emptyList())
 

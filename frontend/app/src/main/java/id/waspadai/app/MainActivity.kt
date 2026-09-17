@@ -17,6 +17,7 @@ import id.waspadai.app.feature.community.presentation.CommunityRoute
 import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
+import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import id.waspadai.app.feature.verification.presentation.VerificationRoute
 import id.waspadai.app.feature.verification.presentation.VerificationViewModel
@@ -64,6 +65,7 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
             val viewModel: VerificationViewModel = viewModel(
                 factory = VerificationViewModel.Factory(
                     submitTextVerification = SubmitTextVerificationUseCase(app.verificationRepository),
+                    submitImageVerification = SubmitImageVerificationUseCase(app.verificationRepository),
                     loadHistory = LoadVerificationHistoryUseCase(app.verificationRepository),
                     loadHistoryDetail = LoadVerificationHistoryDetailUseCase(app.verificationRepository),
                     isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED,

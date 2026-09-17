@@ -1,5 +1,10 @@
 package id.waspadai.app.feature.verification.presentation
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,8 +59,28 @@ fun VerificationScreen(
     onDestinationSelected: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
+    val context = LocalContext.current
     var activeTab by rememberSaveable { mutableStateOf("Periksa") }
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val selection = runCatching { context.readImageSelection(uri) }.getOrNull()
+        if (selection == null) {
+            onAction(
+                VerificationAction.ImageSelectionFailed(
+                    "Gambar belum dapat dibaca. Pilih file JPG, PNG, atau WEBP lain."
+                )
+            )
+        } else {
+            onAction(
+                VerificationAction.SubmitImage(
+                    imageBytes = selection.bytes,
+                    contentType = selection.contentType,
+                    fileName = selection.fileName,
+                )
+            )
+        }
+    }
 
     LaunchedEffect(state.conversation.size, state.phase) {
         if (state.conversation.isNotEmpty()) {
@@ -104,9 +130,14 @@ fun VerificationScreen(
         VerificationComposer(
             value = state.draft,
             enabled = !isSubmitting,
+            overlayModeEnabled = state.isOverlayModeEnabled,
             onValueChange = { onAction(VerificationAction.InputChanged(it)) },
             onSubmit = { onAction(VerificationAction.SubmitText) },
-            onRequestImageCapture = { onAction(VerificationAction.RequestImageCapture) }
+            onToggleOverlayMode = { onAction(VerificationAction.ToggleOverlayMode) },
+            onRequestImageCapture = {
+                onAction(VerificationAction.RequestImageCapture)
+                imagePicker.launch("image/*")
+            }
         )
         WaspadAIBottomNavigation(
             selectedDestination = activeTab,
@@ -118,6 +149,47 @@ fun VerificationScreen(
         )
     }
 }
+
+private data class ImageSelection(
+    val bytes: ByteArray,
+    val contentType: String,
+    val fileName: String,
+)
+
+private fun Context.readImageSelection(uri: Uri): ImageSelection? {
+    val contentType = contentResolver.getType(uri)?.lowercase()
+        ?.takeIf { it in supportedImageContentTypes }
+        ?: return null
+    val bytes = contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+        ?.takeIf { it.isNotEmpty() }
+        ?: return null
+    return ImageSelection(
+        bytes = bytes,
+        contentType = contentType,
+        fileName = queryDisplayName(uri) ?: defaultFileName(contentType),
+    )
+}
+
+private fun Context.queryDisplayName(uri: Uri): String? {
+    return contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index < 0) null else cursor.getString(index)
+        }
+        ?.takeIf(String::isNotBlank)
+}
+
+private fun defaultFileName(contentType: String): String {
+    val extension = when (contentType) {
+        "image/png" -> "png"
+        "image/webp" -> "webp"
+        else -> "jpg"
+    }
+    return "verification-image.$extension"
+}
+
+private val supportedImageContentTypes = setOf("image/jpeg", "image/png", "image/webp")
 
 @Preview(showBackground = true, heightDp = 900, widthDp = 412)
 @Composable

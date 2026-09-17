@@ -5,6 +5,7 @@ import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
+import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
@@ -87,6 +88,7 @@ class VerificationViewModelTest {
     private fun viewModel(repository: VerificationRepository): VerificationViewModel =
         VerificationViewModel(
             submitTextVerification = SubmitTextVerificationUseCase(repository),
+            submitImageVerification = SubmitImageVerificationUseCase(repository),
             loadHistory = LoadVerificationHistoryUseCase(repository),
             loadHistoryDetail = LoadVerificationHistoryDetailUseCase(repository),
             isRemoteEnabled = true
@@ -102,6 +104,14 @@ class VerificationViewModelTest {
 
         override suspend fun submitText(text: String): AppResult<VerificationResult> =
             AppResult.Success(result)
+
+        override suspend fun submitImage(
+            imageBytes: ByteArray,
+            contentType: String,
+            fileName: String,
+            question: String?,
+            overlayModeEnabled: Boolean,
+        ): AppResult<VerificationResult> = AppResult.Success(result)
 
         override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> =
             AppResult.Success(

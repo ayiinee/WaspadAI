@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
+import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 
 class VerificationViewModel(
     private val submitTextVerification: SubmitTextVerificationUseCase,
+    private val submitImageVerification: SubmitImageVerificationUseCase,
     private val loadHistory: LoadVerificationHistoryUseCase,
     private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
     isRemoteEnabled: Boolean
@@ -26,7 +28,10 @@ class VerificationViewModel(
         when (action) {
             is VerificationAction.InputChanged -> updateInput(action.value)
             VerificationAction.SubmitText -> submitText()
-            VerificationAction.RequestImageCapture -> showImageUnavailable()
+            VerificationAction.RequestImageCapture -> Unit
+            is VerificationAction.SubmitImage -> submitImage(action)
+            is VerificationAction.ImageSelectionFailed -> showImageSelectionFailure(action.message)
+            VerificationAction.ToggleOverlayMode -> toggleOverlayMode()
             VerificationAction.DismissFailure -> dismissFailure()
             VerificationAction.ToggleHistory -> toggleHistory()
             VerificationAction.RefreshHistory -> refreshHistory()
@@ -69,12 +74,57 @@ class VerificationViewModel(
         }
     }
 
-    private fun showImageUnavailable() {
+    private fun submitImage(action: VerificationAction.SubmitImage) {
+        val question = state.value.draft.trim().takeIf(String::isNotBlank)
+        val overlayModeEnabled = state.value.isOverlayModeEnabled
+        val userMessage = question ?: if (overlayModeEnabled) {
+            "Periksa gambar ini dengan mode overlay."
+        } else {
+            "Periksa gambar ini."
+        }
+        _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
+        viewModelScope.launch {
+            _state.update { current ->
+                current.copy(
+                    conversation = current.conversation + VerificationConversationItem.UserMessage(
+                        text = userMessage,
+                        hasAttachment = true
+                    ),
+                    phase = VerificationPhase.Submitting
+                )
+            }
+            when (
+                val result = submitImageVerification(
+                    imageBytes = action.imageBytes,
+                    contentType = action.contentType,
+                    fileName = action.fileName,
+                    question = question,
+                    overlayModeEnabled = overlayModeEnabled,
+                )
+            ) {
+                is AppResult.Success -> _state.update { current ->
+                    current.copy(
+                        draft = "",
+                        conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
+                        phase = VerificationPhase.Success(result.value)
+                    )
+                }
+                is AppResult.Failure -> _state.update { current ->
+                    current.copy(phase = VerificationPhase.Failure(result.message))
+                }
+            }
+        }
+    }
+
+    private fun showImageSelectionFailure(message: String) {
+        _state.update { current -> current.copy(phase = VerificationPhase.Failure(message)) }
+    }
+
+    private fun toggleOverlayMode() {
         _state.update { current ->
             current.copy(
-                phase = VerificationPhase.Failure(
-                    "Pemeriksaan gambar belum diimplementasikan pada scaffold ini. Gunakan teks terlebih dahulu."
-                )
+                isOverlayModeEnabled = !current.isOverlayModeEnabled,
+                phase = VerificationPhase.Idle,
             )
         }
     }
@@ -136,6 +186,7 @@ class VerificationViewModel(
 
     class Factory(
         private val submitTextVerification: SubmitTextVerificationUseCase,
+        private val submitImageVerification: SubmitImageVerificationUseCase,
         private val loadHistory: LoadVerificationHistoryUseCase,
         private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
         private val isRemoteEnabled: Boolean
@@ -145,6 +196,7 @@ class VerificationViewModel(
             check(modelClass.isAssignableFrom(VerificationViewModel::class.java))
             return VerificationViewModel(
                 submitTextVerification,
+                submitImageVerification,
                 loadHistory,
                 loadHistoryDetail,
                 isRemoteEnabled

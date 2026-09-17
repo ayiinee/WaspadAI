@@ -34,6 +34,37 @@ class VerificationRepositoryImpl(
         AppResult.Failure("Pemeriksaan belum berhasil. Coba lagi nanti.")
     }
 
+    override suspend fun submitImage(
+        imageBytes: ByteArray,
+        contentType: String,
+        fileName: String,
+        question: String?,
+        overlayModeEnabled: Boolean,
+    ): AppResult<VerificationResult> = try {
+        val enrichedQuestion = buildImageQuestion(question, overlayModeEnabled)
+        val envelope = remoteDataSource.submitImage(
+            imageBytes = imageBytes,
+            contentType = contentType,
+            fileName = fileName,
+            question = enrichedQuestion,
+        )
+        AppResult.Success(mapper.map(envelope.result))
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: MissingAccessTokenException) {
+        AppResult.Failure("Sesi Supabase belum tersedia. Login terlebih dahulu sebelum memakai pemeriksaan gambar.")
+    } catch (error: VerificationApiException) {
+        AppResult.Failure(error.toSafeMessage())
+    } catch (error: HttpRequestTimeoutException) {
+        AppResult.Failure("Pemeriksaan gambar memerlukan waktu terlalu lama. Coba lagi nanti.")
+    } catch (error: IOException) {
+        AppResult.Failure("Koneksi belum tersedia. Periksa internet lalu coba lagi.")
+    } catch (error: MissingNarrativeException) {
+        AppResult.Failure("Hasil pemeriksaan gambar belum dapat ditampilkan dengan aman. Coba lagi.")
+    } catch (error: Exception) {
+        AppResult.Failure("Pemeriksaan gambar belum berhasil. Coba lagi nanti.")
+    }
+
     override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> = try {
         AppResult.Success(
             remoteDataSource.listHistory().items.map { item ->
@@ -82,6 +113,18 @@ class VerificationRepositoryImpl(
         AppResult.Failure("History belum dapat ditampilkan dengan aman. Coba lagi.")
     } catch (error: Exception) {
         AppResult.Failure("Detail history belum dapat dimuat. Coba lagi nanti.")
+    }
+}
+
+private fun buildImageQuestion(question: String?, overlayModeEnabled: Boolean): String? {
+    val trimmedQuestion = question?.trim().orEmpty()
+    return when {
+        overlayModeEnabled && trimmedQuestion.isNotBlank() ->
+            "Mode overlay aktif. Sorot area atau elemen visual yang mencurigakan. $trimmedQuestion"
+        overlayModeEnabled ->
+            "Mode overlay aktif. Sorot area atau elemen visual yang mencurigakan pada gambar ini."
+        trimmedQuestion.isNotBlank() -> trimmedQuestion
+        else -> null
     }
 }
 

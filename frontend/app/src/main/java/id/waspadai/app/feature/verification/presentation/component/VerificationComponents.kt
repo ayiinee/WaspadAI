@@ -357,8 +357,10 @@ fun FailureNotice(message: String, onDismiss: () -> Unit) {
 fun VerificationComposer(
     value: String,
     enabled: Boolean,
+    overlayModeEnabled: Boolean,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
+    onToggleOverlayMode: () -> Unit,
     onRequestImageCapture: () -> Unit
 ) {
     Row(
@@ -372,11 +374,16 @@ fun VerificationComposer(
                 .width(42.dp)
                 .height(28.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .background(BrandBlue)
+                .background(if (overlayModeEnabled) BrandBlue else Color(0xFFD8E3EA))
+                .clickable(enabled = enabled, onClick = onToggleOverlayMode)
                 .padding(4.dp),
-            contentAlignment = Alignment.CenterEnd
+            contentAlignment = if (overlayModeEnabled) Alignment.CenterEnd else Alignment.CenterStart
         ) {
-            Box(Modifier.size(20.dp).background(Color.White, CircleShape))
+            Box(
+                Modifier
+                    .size(20.dp)
+                    .background(Color.White, CircleShape)
+            )
         }
         Spacer(Modifier.width(9.dp))
         Box(
