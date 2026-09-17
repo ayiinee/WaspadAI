@@ -6,6 +6,15 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+val waspadaiAuthToken: String = providers.gradleProperty("WASPADAI_AUTH_TOKEN")
+    .orElse(providers.environmentVariable("WASPADAI_AUTH_TOKEN"))
+    .orElse("")
+    .get()
+val waspadaiRemoteEnabled: String = providers.gradleProperty("WASPADAI_REMOTE_ENABLED")
+    .orElse(providers.environmentVariable("WASPADAI_REMOTE_ENABLED"))
+    .orElse("false")
+    .get()
+
 android {
     namespace = "id.waspadai.app"
     compileSdk = 36
@@ -23,7 +32,8 @@ android {
             "WASPADAI_API_BASE_URL",
             "\"https://waspadai.shafwan.digital\""
         )
-        buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", "false")
+        buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", waspadaiRemoteEnabled)
+        buildConfigField("String", "WASPADAI_AUTH_TOKEN", "\"$waspadaiAuthToken\"")
     }
 
     buildTypes {

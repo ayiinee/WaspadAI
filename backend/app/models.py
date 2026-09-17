@@ -154,6 +154,7 @@ class VerificationEnvelope(BaseModel):
     history: HistoryMeta
     result: AIResult
     execution_mode: Literal["MOCK", "REMOTE"]
+    input_text: str | None = None
 
 
 class HistoryItem(BaseModel):

@@ -17,7 +17,10 @@ class WaspadAIApplication : Application() {
             VerificationRepositoryImpl(
                 remoteDataSource = VerificationRemoteDataSource(
                     client = apiClient,
-                    config = WaspadAiApiConfig(BuildConfig.WASPADAI_API_BASE_URL)
+                    config = WaspadAiApiConfig(BuildConfig.WASPADAI_API_BASE_URL),
+                    tokenProvider = {
+                        BuildConfig.WASPADAI_AUTH_TOKEN.takeIf(String::isNotBlank)
+                    }
                 ),
                 mapper = VerificationMapper()
             )

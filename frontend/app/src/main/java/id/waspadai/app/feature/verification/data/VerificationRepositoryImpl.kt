@@ -4,6 +4,8 @@ import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.verification.data.mapper.MissingNarrativeException
 import id.waspadai.app.feature.verification.data.mapper.VerificationMapper
+import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
+import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.http.HttpStatusCode
@@ -21,6 +23,8 @@ class VerificationRepositoryImpl(
         throw error
     } catch (error: VerificationApiException) {
         AppResult.Failure(error.status.toSafeMessage())
+    } catch (error: MissingAuthTokenException) {
+        AppResult.Failure("Sesi login belum tersedia. Masuk dengan akun Supabase terlebih dahulu.")
     } catch (error: HttpRequestTimeoutException) {
         AppResult.Failure("Pemeriksaan memerlukan waktu terlalu lama. Coba lagi nanti.")
     } catch (error: IOException) {
@@ -29,6 +33,56 @@ class VerificationRepositoryImpl(
         AppResult.Failure("Hasil pemeriksaan belum dapat ditampilkan dengan aman. Coba lagi.")
     } catch (error: Exception) {
         AppResult.Failure("Pemeriksaan belum berhasil. Coba lagi nanti.")
+    }
+
+    override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> = try {
+        AppResult.Success(
+            remoteDataSource.listHistory().items.map { item ->
+                VerificationHistoryItem(
+                    caseId = item.caseId,
+                    headline = item.headline,
+                    verdict = item.verdict,
+                    createdAt = item.createdAt
+                )
+            }
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: VerificationApiException) {
+        AppResult.Failure(error.status.toSafeMessage())
+    } catch (error: MissingAuthTokenException) {
+        AppResult.Failure("Sesi login belum tersedia. Masuk dengan akun Supabase terlebih dahulu.")
+    } catch (error: HttpRequestTimeoutException) {
+        AppResult.Failure("Memuat history terlalu lama. Coba lagi nanti.")
+    } catch (error: IOException) {
+        AppResult.Failure("Koneksi belum tersedia. Periksa internet lalu coba lagi.")
+    } catch (error: Exception) {
+        AppResult.Failure("History belum dapat dimuat. Coba lagi nanti.")
+    }
+
+    override suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail> = try {
+        val envelope = remoteDataSource.getHistoryDetail(caseId)
+        AppResult.Success(
+            VerificationHistoryDetail(
+                caseId = envelope.history.caseId,
+                inputText = envelope.inputText,
+                result = mapper.map(envelope.result)
+            )
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: VerificationApiException) {
+        AppResult.Failure(error.status.toSafeMessage())
+    } catch (error: MissingAuthTokenException) {
+        AppResult.Failure("Sesi login belum tersedia. Masuk dengan akun Supabase terlebih dahulu.")
+    } catch (error: HttpRequestTimeoutException) {
+        AppResult.Failure("Memuat detail history terlalu lama. Coba lagi nanti.")
+    } catch (error: IOException) {
+        AppResult.Failure("Koneksi belum tersedia. Periksa internet lalu coba lagi.")
+    } catch (error: MissingNarrativeException) {
+        AppResult.Failure("History belum dapat ditampilkan dengan aman. Coba lagi.")
+    } catch (error: Exception) {
+        AppResult.Failure("Detail history belum dapat dimuat. Coba lagi nanti.")
     }
 }
 
