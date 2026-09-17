@@ -612,7 +612,7 @@ async def verify_remote_text(
         response = await asyncio.wait_for(
             post_to_ai(), timeout=settings.ai_service_deadline_seconds
         )
-    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
+    except (TimeoutError, httpx.TimeoutException) as error:
         raise ProductAPIError(
             504, "FACT_CHECK_UPSTREAM_TIMEOUT", "Pemeriksaan AI melewati batas waktu.", True
         ) from error
@@ -680,7 +680,7 @@ async def verify_remote_image(
         response = await asyncio.wait_for(
             post_to_ai(), timeout=settings.ai_service_deadline_seconds
         )
-    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
+    except (TimeoutError, httpx.TimeoutException) as error:
         raise ProductAPIError(
             504, "FACT_CHECK_UPSTREAM_TIMEOUT", "Pemeriksaan AI melewati batas waktu.", True
         ) from error

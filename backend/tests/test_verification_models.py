@@ -11,11 +11,11 @@ from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_not_required_result, build_review_required_result
 from app.models import TextVerificationRequest
 from app.verification_service import (
+    _persist_terminal_result,
     canonical_payload,
     payload_hash,
     requires_history,
     save_reason,
-    _persist_terminal_result,
 )
 
 
@@ -138,6 +138,9 @@ def test_persist_terminal_result_stores_trimmed_text(monkeypatch: pytest.MonkeyP
 
         case_insert = next(
             params for sql, params in connection.calls if "insert into public.verification_cases" in sql
+            params
+            for sql, params in connection.calls
+            if "insert into public.verification_cases" in sql
         )
         assert case_insert[5] == "Pesan mengaku bank dan meminta kode OTP segera."
 

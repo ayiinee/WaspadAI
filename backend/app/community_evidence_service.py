@@ -93,6 +93,10 @@ async def _build_community_evidence(
                and publication_consent.content_hash = p.content_hash
                and publication_consent.revoked_at is null
                and (publication_consent.expires_at is null or publication_consent.expires_at > now())
+               and (
+                   publication_consent.expires_at is null
+                   or publication_consent.expires_at > now()
+               )
               join private.consent_records rag_consent
                 on rag_consent.id = p.rag_consent_id
                and rag_consent.scope = 'RAG_REUSE'
