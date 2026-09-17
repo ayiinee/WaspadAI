@@ -22,6 +22,12 @@ const authFormTitle = document.querySelector("#auth-form-title");
 const authSubmit = document.querySelector("#auth-submit");
 const signInTab = document.querySelector("#sign-in-tab");
 const signUpTab = document.querySelector("#sign-up-tab");
+const communityScreen = document.querySelector("#community-screen");
+const communityDetailScreen = document.querySelector("#community-detail-screen");
+const communityDetailContent = document.querySelector("#community-detail-content");
+const communityFeed = document.querySelector("#community-feed");
+const communitySearchInput = document.querySelector("#community-search-input");
+const communityFilter = document.querySelector("#community-filter");
 
 let isSignUp = false;
 
@@ -50,6 +56,35 @@ const state = {
     },
   ],
 };
+
+const communityPosts = [
+  {
+    id: "prabowo-video",
+    author: "Putu Alvin Mahendra",
+    timestamp: "10 Agustus 2026 | 10.17 WITA",
+    body: "Beredar potongan video yang mengatasnamakan Presiden Prabowo di media sosial. Komunitas sedang melakukan pengecekan terhadap sumber asli dan konteks informasi untuk memastikan apakah informasi tersebut benar atau menyesatkan.",
+    supportCount: 10,
+    commentCount: 5,
+    hoaxCount: 8,
+    cautionCount: 14,
+    validCount: 3,
+    supported: false,
+    verdict: null,
+  },
+  {
+    id: "gibran-position",
+    author: "Rifqi Aditya Nugroho",
+    timestamp: "10 Agustus 2026 | 10.17 WITA",
+    body: "Beredar unggahan yang menyebutkan adanya pencopotan Gibran dari jabatannya sebagai Wakil Presiden. Informasi ini masih perlu diperiksa dengan membandingkan sumber resmi dan konteks pemberitaan untuk memastikan kebenarannya.",
+    supportCount: 10,
+    commentCount: 5,
+    hoaxCount: 6,
+    cautionCount: 11,
+    validCount: 4,
+    supported: false,
+    verdict: null,
+  },
+];
 
 function setAuthMode(signUp) {
   isSignUp = signUp;
@@ -92,6 +127,108 @@ authForm.addEventListener("submit", (event) => {
   appShell.hidden = false;
   input.focus();
 });
+
+function renderCommunity() {
+  const query = communitySearchInput.value.trim().toLowerCase();
+  const filter = communityFilter.value;
+  const posts = communityPosts.filter((post) => {
+    const matchesQuery = !query || `${post.author} ${post.timestamp} ${post.body}`.toLowerCase().includes(query);
+    const matchesFilter = filter === "all" || (filter === "rated" ? post.verdict : !post.verdict);
+    return matchesQuery && matchesFilter;
+  });
+  if (!posts.length) {
+    communityFeed.innerHTML = '<p class="community-empty">Kasus tidak ditemukan.<br /><small>Coba kata kunci atau filter lain.</small></p>';
+    return;
+  }
+  communityFeed.replaceChildren(...posts.map((post) => makeCommunityPost(post)));
+}
+
+function showCommunityDetail(post) {
+  appShell.hidden = true;
+  communityScreen.hidden = true;
+  communityDetailScreen.hidden = false;
+  setSelectedTab(communityDetailNav, "Koneksi");
+  renderCommunityDetail(post);
+}
+
+function renderCommunityDetail(post) {
+  communityDetailContent.innerHTML = `
+    <header class="detail-header"><button id="detail-back" type="button" aria-label="Kembali">←</button><h1>Detail Kasus</h1></header>
+    <article class="detail-body">
+      <section class="detail-profile"><span class="community-avatar">${post.author.split(" ").map((name) => name[0]).slice(0, 2).join("")}</span><div><strong>${post.author}</strong><small>${post.timestamp}</small></div><button type="button" class="connect-button">Terhubung</button></section>
+      <p class="detail-caption">${post.body}</p>
+      <div class="detail-image">Bukti visual dari komunitas</div>
+      <section class="detail-info"><h2>Informasi unggahan</h2><p>Diunggah oleh: ${post.author}</p><p>Tanggal unggah: ${post.timestamp}</p><p>Status: Sedang ditinjau komunitas</p></section>
+      <section class="detail-insight"><h2>Insight komunitas</h2><div><p class="insight-hoaks"><b>${post.hoaxCount}</b><span>Hoaks</span></p><p class="insight-waspada"><b>${post.cautionCount}</b><span>Waspada</span></p><p class="insight-valid"><b>${post.validCount}</b><span>Valid</span></p></div></section>
+      <section class="detail-assessment"><button id="detail-assessment-toggle" class="assessment-trigger" type="button">${post.verdict ? `Penilaian: ${post.verdict}` : "Beri penilaian"}</button><div id="detail-assessment-panel" class="assessment-panel${post.detailAssessmentOpen ? " open" : ""}"><p class="assessment-label">Pilih penilaian</p><div class="assessment-choices"><button class="verdict-button hoaks${post.verdict === "Hoaks" ? " selected" : ""}" type="button">${post.verdict === "Hoaks" ? "✓ " : ""}Hoaks</button><button class="verdict-button waspada${post.verdict === "Waspada" ? " selected" : ""}" type="button">${post.verdict === "Waspada" ? "✓ " : ""}Waspada</button><button class="verdict-button valid${post.verdict === "Valid" ? " selected" : ""}" type="button">${post.verdict === "Valid" ? "✓ " : ""}Valid</button></div><label class="assessment-reason-label">Alasan penilaian<textarea class="assessment-reason" placeholder="Jelaskan alasan atau temuan Anda...">${post.reason || ""}</textarea></label><label class="evidence-upload"><span>＋ Tambahkan gambar atau bukti</span><input type="file" accept="image/jpeg,image/png,image/webp" /></label><button id="detail-submit" class="assessment-submit" type="button">Kirim penilaian</button><p id="detail-notice" class="detail-notice" hidden></p></div></section>
+      <section class="detail-actions"><button id="detail-support" type="button" class="${post.supported ? "supported" : ""}">${post.supported ? "♥" : "♡"} ${post.supportCount}</button><span>◌ ${post.commentCount} komentar</span><span>↗ Bagikan</span></section>
+    </article>`;
+
+  communityDetailContent.querySelector("#detail-back").addEventListener("click", showCommunity);
+  communityDetailContent.querySelector("#detail-assessment-toggle").addEventListener("click", () => {
+    post.detailAssessmentOpen = !post.detailAssessmentOpen;
+    renderCommunityDetail(post);
+  });
+  communityDetailContent.querySelectorAll(".verdict-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      post.verdict = button.textContent.replace("✓", "").trim();
+      post.detailAssessmentOpen = true;
+      renderCommunityDetail(post);
+    });
+  });
+  const reason = communityDetailContent.querySelector(".assessment-reason");
+  reason.addEventListener("input", () => { post.reason = reason.value; });
+  const evidence = communityDetailContent.querySelector(".evidence-upload input");
+  evidence.addEventListener("change", () => {
+    evidence.closest("label").querySelector("span").textContent = evidence.files?.[0]?.name || "＋ Tambahkan gambar atau bukti";
+  });
+  communityDetailContent.querySelector("#detail-submit").addEventListener("click", () => {
+    const notice = communityDetailContent.querySelector("#detail-notice");
+    notice.textContent = "Desain penilaian tersimpan secara lokal.";
+    notice.hidden = false;
+  });
+  communityDetailContent.querySelector("#detail-support").addEventListener("click", () => {
+    post.supported = !post.supported;
+    post.supportCount += post.supported ? 1 : -1;
+    renderCommunityDetail(post);
+  });
+}
+
+function makeCommunityPost(post) {
+  const card = createElement("article", "community-post");
+  const profile = createElement("div", "community-profile");
+  profile.append(createElement("span", "community-avatar", post.author.split(" ").map((name) => name[0]).slice(0, 2).join("")));
+  const byline = createElement("div", "");
+  byline.append(createElement("strong", "", post.author), createElement("small", "", post.timestamp));
+  profile.append(byline);
+  card.append(profile, createElement("p", "community-post-copy", post.body));
+  card.append(createElement("div", "community-evidence", "Bukti visual sedang diperiksa"));
+
+  const assessment = createElement("section", "community-assessment");
+  const assessmentTrigger = createElement(
+    "button",
+    "assessment-trigger",
+    "Beri penilaian",
+  );
+  assessmentTrigger.type = "button";
+  assessmentTrigger.addEventListener("click", () => showCommunityDetail(post));
+  assessment.append(assessmentTrigger);
+  const actions = createElement("div", "community-actions");
+  const support = createElement("button", post.supported ? "supported" : "", `${post.supported ? "♥" : "♡"} ${post.supportCount}`);
+  support.type = "button";
+  support.addEventListener("click", () => { post.supported = !post.supported; post.supportCount += post.supported ? 1 : -1; renderCommunity(); });
+  const comments = createElement("span", "", `◌ ${post.commentCount}`);
+  const share = createElement("button", "", "↗ Share");
+  share.type = "button";
+  share.addEventListener("click", async () => {
+    const text = `${post.body}\n\nDibagikan dari WaspadAI`;
+    if (navigator.share) await navigator.share({ title: "Kasus WaspadAI", text });
+    else await navigator.clipboard?.writeText(text);
+  });
+  actions.append(support, comments, share);
+  card.append(assessment, actions);
+  return card;
+}
 
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -307,15 +444,51 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
-const tabs = [...document.querySelectorAll("[data-tab]")];
-tabs.forEach((tab) => {
+const primaryNav = appShell.querySelector(".bottom-nav");
+const communityNav = primaryNav.cloneNode(true);
+communityNav.id = "community-nav";
+document.querySelector("#community-nav").replaceWith(communityNav);
+const communityDetailNav = primaryNav.cloneNode(true);
+communityDetailNav.id = "community-detail-nav";
+document.querySelector("#community-detail-nav").replaceWith(communityDetailNav);
+
+function setSelectedTab(container, destination) {
+  container.querySelectorAll("[data-tab]").forEach((button) => {
+    const selected = button.dataset.tab === destination;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
+function showVerification() {
+  communityScreen.hidden = true;
+  communityDetailScreen.hidden = true;
+  appShell.hidden = false;
+  setSelectedTab(primaryNav, "Periksa");
+}
+
+function showCommunity() {
+  appShell.hidden = true;
+  communityDetailScreen.hidden = true;
+  communityScreen.hidden = false;
+  setSelectedTab(communityNav, "Koneksi");
+  renderCommunity();
+}
+
+document.querySelectorAll("[data-tab]").forEach((tab) => {
   tab.addEventListener("click", () => {
-    tabs.forEach((button) => {
-      const selected = button === tab;
-      button.classList.toggle("active", selected);
-      button.setAttribute("aria-pressed", String(selected));
-    });
+    const destination = tab.dataset.tab;
+    if (destination === "Koneksi") showCommunity();
+    else if (destination === "Periksa") showVerification();
+    else {
+      state.messages.push({ kind: "status", text: `${destination} belum tersedia pada slicing ini.` });
+      render();
+    }
   });
 });
+
+document.querySelector("#community-back").addEventListener("click", showVerification);
+communitySearchInput.addEventListener("input", renderCommunity);
+communityFilter.addEventListener("change", renderCommunity);
 
 render();

@@ -31,7 +31,13 @@ data class CommunityPost(
     val commentCount: Int = 0,
     val isSupported: Boolean = false,
     val selectedVerdict: CommunityVerdict? = null,
-)
+) {
+    val hoaxCount: Int
+        get() = hoaksCount
+
+    val cautionCount: Int
+        get() = waspadaCount
+}
 
 data class CommunitySummary(
     val assessmentsCount: Int = 0,
