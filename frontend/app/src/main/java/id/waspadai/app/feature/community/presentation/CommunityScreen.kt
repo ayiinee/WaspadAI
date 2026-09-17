@@ -2,6 +2,8 @@ package id.waspadai.app.feature.community.presentation
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +47,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +59,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +104,19 @@ fun CommunityRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var selectedPostId by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
+
+    if (selectedPost != null) {
+        CommunityDetailScreen(
+            post = selectedPost,
+            onBack = { selectedPostId = null },
+            onSupportClick = { viewModel.onAction(CommunityAction.SupportClicked(selectedPost.id)) },
+            onVerdictClick = { verdict -> viewModel.onAction(CommunityAction.VerdictSelected(selectedPost.id, verdict)) },
+            onDestinationSelected = onDestinationSelected,
+        )
+        return
+    }
 
     CommunityScreen(
         uiState = uiState,
@@ -108,6 +129,7 @@ fun CommunityRoute(
             }
             context.startActivity(Intent.createChooser(sendIntent, "Bagikan kasus"))
         },
+        onOpenPost = { selectedPostId = it.id },
         onDestinationSelected = { label ->
             if (label == "Periksa") {
                 onDestinationSelected(label)
@@ -128,6 +150,7 @@ fun CommunityScreen(
     onAction: (CommunityAction) -> Unit,
     onBack: () -> Unit,
     onSharePost: (CommunityPost) -> Unit,
+    onOpenPost: (CommunityPost) -> Unit,
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -180,6 +203,7 @@ fun CommunityScreen(
                             onAction(CommunityAction.VerdictSelected(post.id, verdict))
                         },
                         onShareClick = { onSharePost(post) },
+                        onOpenDetails = { onOpenPost(post) },
                         modifier = Modifier
                             .padding(horizontal = 23.dp)
                             .animateItem(),
@@ -456,6 +480,7 @@ private fun CommunityPostCard(
     onSupportClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
     onShareClick: () -> Unit,
+    onOpenDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -500,29 +525,21 @@ private fun CommunityPostCard(
                 lineHeight = 15.sp,
             )
             Spacer(Modifier.height(7.dp))
-            Image(
-                painter = painterResource(post.evidenceRes),
-                contentDescription = "Bukti visual dari ${post.author}",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .widthIn(max = 148.dp)
-                    .width(148.dp)
-                    .height(84.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+            CommunityEvidenceImage(
+                evidenceRes = post.evidenceRes,
+                author = post.author,
             )
             Spacer(Modifier.height(9.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(WaspadAIBlue)
+                    .clickable(onClick = onOpenDetails),
+                contentAlignment = Alignment.Center,
             ) {
-                CommunityVerdict.entries.forEach { verdict ->
-                    VerdictButton(
-                        verdict = verdict,
-                        selected = post.selectedVerdict == verdict,
-                        onClick = { onVerdictClick(verdict) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                Text("Beri penilaian", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(7.dp))
             Row(
@@ -555,6 +572,101 @@ private fun CommunityPostCard(
                     onClick = onShareClick,
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun CommunityAssessmentPanel(
+    post: CommunityPost,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onVerdictClick: (CommunityVerdict) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    var reason by rememberSaveable(post.id) { mutableStateOf("") }
+    var evidenceName by rememberSaveable(post.id) { mutableStateOf<String?>(null) }
+    val evidencePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        evidenceName = uri?.lastPathSegment
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(WaspadAIBlue)
+            .clickable(onClick = onToggle),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = post.selectedVerdict?.let { "Penilaian: ${it.label}" } ?: "Beri penilaian",
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+    if (!expanded) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF7FBFE))
+            .border(1.dp, WaspadAILightBlue, RoundedCornerShape(8.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Pilih penilaian", color = Color(0xFF15212A), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CommunityVerdict.entries.forEach { verdict ->
+                VerdictButton(
+                    verdict = verdict,
+                    selected = post.selectedVerdict == verdict,
+                    onClick = { onVerdictClick(verdict) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Text("Alasan penilaian", color = Color(0xFF15212A), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = reason,
+            onValueChange = { reason = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Jelaskan alasan atau temuan Anda...", fontSize = 12.sp) },
+            minLines = 3,
+            maxLines = 4,
+            shape = RoundedCornerShape(6.dp),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .border(1.dp, WaspadAIDarkBlue, RoundedCornerShape(6.dp))
+                .clickable { evidencePicker.launch("image/*") },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = evidenceName ?: "+ Tambahkan gambar atau bukti",
+                color = WaspadAIBlue,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Button(
+            onClick = onSubmit,
+            modifier = Modifier.fillMaxWidth().height(40.dp),
+            shape = RoundedCornerShape(5.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
+        ) {
+            Text("Kirim penilaian", fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -666,6 +778,7 @@ private fun CommunityScreenPreview() {
             onAction = {},
             onBack = {},
             onSharePost = {},
+            onOpenPost = {},
             onDestinationSelected = {},
         )
     }

@@ -24,6 +24,9 @@ data class CommunityPost(
     @DrawableRes val evidenceRes: Int,
     val supportCount: Int,
     val commentCount: Int,
+    val hoaxCount: Int,
+    val cautionCount: Int,
+    val validCount: Int,
     val isSupported: Boolean = false,
     val selectedVerdict: CommunityVerdict? = null,
 )
@@ -75,6 +78,9 @@ private val sampleCommunityPosts = listOf(
         evidenceRes = R.drawable.community_post_prabowo,
         supportCount = 10,
         commentCount = 5,
+        hoaxCount = 8,
+        cautionCount = 14,
+        validCount = 3,
     ),
     CommunityPost(
         id = "gibran-position",
@@ -87,5 +93,8 @@ private val sampleCommunityPosts = listOf(
         evidenceRes = R.drawable.community_post_gibran,
         supportCount = 10,
         commentCount = 5,
+        hoaxCount = 6,
+        cautionCount = 11,
+        validCount = 4,
     ),
 )
