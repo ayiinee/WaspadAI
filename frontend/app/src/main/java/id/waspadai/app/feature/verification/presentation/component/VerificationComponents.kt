@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +58,9 @@ fun WaspadAiHeader() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            // Add the real system inset before the header content. This keeps the
+            // title below the clock/notch on devices with different status-bar heights.
+            .statusBarsPadding()
             .height(72.dp)
             .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
             .background(Brush.linearGradient(listOf(DeepBlue, BrandBlue, Color(0xFF0078BF))))
@@ -347,7 +351,7 @@ fun BottomNavigation(activeTab: String, onTabSelected: (String) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                modifier = Modifier.size(56.dp).border(4.dp, Color.White, CircleShape).clip(CircleShape).background(BrandBlue).shadow(4.dp, CircleShape),
+                modifier = Modifier.size(56.dp).border(4.dp, Color.White, CircleShape).clip(CircleShape).background(BrandBlue),
                 contentAlignment = Alignment.Center
             ) { }
         }

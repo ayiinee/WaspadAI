@@ -26,7 +26,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(Color.WHITE, Color.WHITE),
+            // The verification header is edge-to-edge, so its system bar must use
+            // the same dark blue and light status icons on every Android device.
+            statusBarStyle = SystemBarStyle.dark(Color.rgb(0, 92, 158)),
             navigationBarStyle = SystemBarStyle.light(Color.WHITE, Color.WHITE),
         )
         val app = application as WaspadAIApplication

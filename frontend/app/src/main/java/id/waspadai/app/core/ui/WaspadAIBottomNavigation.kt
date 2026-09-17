@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -54,7 +53,7 @@ fun WaspadAIBottomNavigation(
                 .height(74.dp)
                 .align(Alignment.BottomCenter),
             color = Color.White,
-            shadowElevation = 5.dp,
+            shadowElevation = 0.dp,
         ) {
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -95,7 +94,6 @@ fun WaspadAIBottomNavigation(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .size(72.dp)
-                .shadow(6.dp, CircleShape)
                 .background(WaspadAIBlue, CircleShape)
                 .border(4.dp, Color.White, CircleShape)
                 .clickable { onDestinationSelected("Periksa") },
