@@ -70,6 +70,7 @@ for select to product_app using (
         select 1
           from public.community_posts p
          where p.publication_consent_id = id
+         where p.publication_consent_id = consent_records.id
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
     )

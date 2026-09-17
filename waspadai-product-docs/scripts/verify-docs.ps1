@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $packageRoot = Split-Path -Parent $PSScriptRoot
 $workspaceRoot = Split-Path -Parent $packageRoot
 $errors = [System.Collections.Generic.List[string]]::new()
-$expectedContractHash = '042a0ac1232095d5e0d3806546018775d6b81792d1a7ae50e4f1591a0a412bbf'
+$expectedContractHash = '039df73adeef6960f12368caafd358e167273d19174c1472656f98b4a7df49a2'
 
 function Add-Error([string]$message) { $script:errors.Add($message) }
 

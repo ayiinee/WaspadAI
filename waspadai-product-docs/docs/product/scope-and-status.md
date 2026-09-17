@@ -9,7 +9,7 @@ Status: `CURRENT`.
 | Verifikasi screenshot | `POST /api/v1/verifications/image` | `PARTIAL_RUNTIME`: multipart, batas ukuran, signature, MOCK, dan adapter remote tersedia; dimensi penuh/live deployment belum diuji |
 | Response Product | Wrapper `history`, `result`, `execution_mode` | Tersedia pada text slice |
 | History list/detail | Product API + database owner-only | Tersedia |
-| Community preview/feed/vote | Product API + database/Storage | `PARTIAL_RUNTIME`: preview, publication, feed, detail, dan vote klasifikasi tersedia; integration Supabase masih perlu dijalankan |
+| Community preview/feed/vote/withdrawal | Product API + database/Storage | `PARTIAL_RUNTIME`: preview, publication, feed, detail, vote klasifikasi, dan withdrawal tersedia; integration Supabase masih perlu dijalankan |
 | Contribution/moderation | Product API + moderator authorization | `TARGET`, schema database tersedia |
 | Community evidence ke AI | Product memilih data eligible dan mengirim ke internal AI | `TARGET`, kedua sisi belum mendukung field |
 

@@ -7,7 +7,7 @@
   "language": "id-ID",
   "current_contract": {
     "path": "contracts/current/android-api-contract.md",
-    "sha256": "042a0ac1232095d5e0d3806546018775d6b81792d1a7ae50e4f1591a0a412bbf"
+    "sha256": "039df73adeef6960f12368caafd358e167273d19174c1472656f98b4a7df49a2"
   },
   "topology": "ANDROID_PRODUCT_API_INTERNAL_AI",
   "implementation_status": {

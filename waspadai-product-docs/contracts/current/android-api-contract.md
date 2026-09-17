@@ -445,6 +445,9 @@ DELETE /api/v1/history/{case_id}/community
 ```
 
 Pemilik dapat menarik kasus selama belum berstatus `VERIFIED_EVIDENCE`.
+Response `200` mengembalikan `CommunityStateResponse` dengan `community_state`
+`WITHDRAWN`. Pengulangan request withdrawal mengembalikan state dan revision yang
+sama. Withdrawal mencabut consent `COMMUNITY_PUBLICATION` dan `RAG_REUSE` terkait.
 
 ## 9. Community Feed Dan Voting
 

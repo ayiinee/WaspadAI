@@ -22,7 +22,8 @@ Android tidak memanggil WaspadAI secara langsung. Product API memvalidasi identi
 | `backend/` | Auth, health/readiness, text verification `MOCK`, idempotency, dan history owner-only tersedia |
 | `supabase/` | Schema identity, verification, consent/assets, community, moderation/outbox, learning, RLS, dan Storage |
 | Remote AI adapter | `TARGET`; backend belum memanggil WaspadAI live |
-| Image/community/moderation API | `TARGET`; schema database bukan bukti endpoint runtime |
+| Community publication/feed/vote/withdrawal API | `PARTIAL_RUNTIME`; integration Supabase dan staging smoke masih menjadi gate rilis |
+| Moderation API | `TARGET`; schema database bukan bukti endpoint runtime |
 | Community evidence transport | `TARGET`; kontrak ada pada Bagian 11, belum didukung kedua service |
 
 ## Quality gate
