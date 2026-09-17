@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -38,16 +39,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import id.waspadai.app.core.ui.BrandBlue
-import id.waspadai.app.core.ui.DeepBlue
 import id.waspadai.app.core.ui.Ink
+import kotlinx.coroutines.launch
 
 @Composable
-fun AuthLandingScreen(onAuthenticated: () -> Unit) {
+fun AuthLandingScreen(
+    onAuthenticate: suspend (email: String, password: String, isSignUp: Boolean) -> Result<Unit>,
+    onAuthenticated: () -> Unit,
+) {
     var isSignUp by rememberSaveable { mutableStateOf(false) }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmation by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var isSubmitting by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     fun submit() {
         error = when {
@@ -56,7 +62,15 @@ fun AuthLandingScreen(onAuthenticated: () -> Unit) {
             isSignUp && password != confirmation -> "Konfirmasi kata sandi belum sama."
             else -> null
         }
-        if (error == null) onAuthenticated()
+        if (error != null || isSubmitting) return
+        scope.launch {
+            isSubmitting = true
+            val result = onAuthenticate(email.trim(), password, isSignUp)
+            isSubmitting = false
+            result
+                .onSuccess { onAuthenticated() }
+                .onFailure { error = it.message ?: "Autentikasi belum berhasil. Coba lagi." }
+        }
     }
 
     Column(
@@ -101,13 +115,13 @@ fun AuthLandingScreen(onAuthenticated: () -> Unit) {
                         AuthModeButton(
                             text = "Masuk",
                             selected = !isSignUp,
-                            onClick = { isSignUp = false; error = null },
+                            onClick = { if (!isSubmitting) { isSignUp = false; error = null } },
                             modifier = Modifier.weight(1f),
                         )
                         AuthModeButton(
                             text = "Daftar",
                             selected = isSignUp,
-                            onClick = { isSignUp = true; error = null },
+                            onClick = { if (!isSubmitting) { isSignUp = true; error = null } },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -119,14 +133,14 @@ fun AuthLandingScreen(onAuthenticated: () -> Unit) {
                     )
                     AuthField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { if (!isSubmitting) email = it },
                         label = "Email",
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Next,
                     )
                     AuthField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { if (!isSubmitting) password = it },
                         label = "Kata sandi",
                         imeAction = if (isSignUp) ImeAction.Next else ImeAction.Done,
                         isPassword = true,
@@ -134,7 +148,7 @@ fun AuthLandingScreen(onAuthenticated: () -> Unit) {
                     if (isSignUp) {
                         AuthField(
                             value = confirmation,
-                            onValueChange = { confirmation = it },
+                            onValueChange = { if (!isSubmitting) confirmation = it },
                             label = "Konfirmasi kata sandi",
                             imeAction = ImeAction.Done,
                             isPassword = true,
@@ -145,13 +159,21 @@ fun AuthLandingScreen(onAuthenticated: () -> Unit) {
                     }
                     Button(
                         onClick = ::submit,
+                        enabled = !isSubmitting,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(25.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
                     ) {
-                        Text(if (isSignUp) "Buat akun" else "Masuk", fontWeight = FontWeight.Bold)
+                        Text(
+                            when {
+                                isSubmitting -> "Menghubungkan..."
+                                isSignUp -> "Buat akun"
+                                else -> "Masuk"
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }

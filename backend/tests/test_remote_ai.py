@@ -7,7 +7,7 @@ import pytest
 from app.config import Settings
 from app.errors import ProductAPIError
 from app.models import ImageVerificationRequest, TextVerificationRequest
-from app.verification_service import verify_remote_image, verify_remote_text
+from app.verification_service import DEFAULT_TEXT_QUESTION, verify_remote_image, verify_remote_text
 
 
 def _request() -> TextVerificationRequest:
@@ -58,9 +58,12 @@ def test_remote_text_sends_server_auth_and_forces_both() -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             assert str(request.url) == "https://ai.example/api/internal/v1/verify/text"
             assert request.headers["X-Waspadai-API-Key"] == "server-key"
+            assert request.headers["Accept"] == "application/json"
+            assert request.headers["Content-Type"] == "application/json"
             body = request.read().decode()
             assert '"output_mode":"BOTH"' in body
             assert '"community_evidence":[]' in body
+            assert f'"question":"{DEFAULT_TEXT_QUESTION}"' in body
             return httpx.Response(200, json=_result())
 
         settings = Settings(

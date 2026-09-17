@@ -9,9 +9,13 @@ plugins {
 }
 
 val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) {
-        file.inputStream().use { input -> load(input) }
+    listOf(
+        rootProject.file("../.env"),
+        rootProject.file("local.properties"),
+    ).forEach { file ->
+        if (file.exists()) {
+            file.inputStream().use { input -> load(input) }
+        }
     }
 }
 
@@ -45,6 +49,21 @@ android {
             "String",
             "WASPADAI_SUPABASE_ACCESS_TOKEN",
             buildConfigString(publicConfig("WASPADAI_SUPABASE_ACCESS_TOKEN"))
+        )
+        buildConfigField(
+            "String",
+            "WASPADAI_SUPABASE_URL",
+            buildConfigString(publicConfig("WASPADAI_SUPABASE_URL", publicConfig("SUPABASE_URL")))
+        )
+        buildConfigField(
+            "String",
+            "WASPADAI_SUPABASE_PUBLISHABLE_KEY",
+            buildConfigString(
+                publicConfig(
+                    "WASPADAI_SUPABASE_PUBLISHABLE_KEY",
+                    publicConfig("SUPABASE_PUBLISHABLE_KEY")
+                )
+            )
         )
     }
 

@@ -7,7 +7,11 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -53,6 +57,15 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
     NavHost(navController = navController, startDestination = WelcomeRouteName) {
         composable(WelcomeRouteName) {
             AuthLandingScreen(
+                onAuthenticate = { email, password, isSignUp ->
+                    runCatching {
+                        if (isSignUp) {
+                            app.authRepository.signUp(email, password)
+                        } else {
+                            app.authRepository.signIn(email, password)
+                        }
+                    }
+                },
                 onAuthenticated = {
                     navController.navigate(VerificationRouteName) {
                         popUpTo(WelcomeRouteName) { inclusive = true }
@@ -85,10 +98,14 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
             )
         }
         composable(CommunityRouteName) {
+            var accessToken by remember { mutableStateOf(BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN) }
+            LaunchedEffect(Unit) {
+                accessToken = app.authRepository.currentAccessToken().orEmpty()
+            }
             CommunityRoute(
                 repository = app.communityRepository,
                 defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
-                defaultAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
+                defaultAccessToken = accessToken,
                 onBack = { navController.popBackStack() },
                 onDestinationSelected = { destination ->
                     if (destination == "Periksa" && currentRoute != VerificationRouteName) {
