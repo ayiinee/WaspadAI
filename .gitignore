@@ -28,3 +28,4 @@ screenshots/
 temporary-uploads/
 model-weights/
 *.log
+.idea/

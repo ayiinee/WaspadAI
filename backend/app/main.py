@@ -28,6 +28,7 @@ from app.community_service import (
     cast_community_vote,
     create_community_preview,
     get_community_detail,
+    get_community_user_summary,
     list_community,
     publish_community_case,
     remove_community_vote,
@@ -42,6 +43,7 @@ from app.models import (
     CommunityPreviewResponse,
     CommunityPublishRequest,
     CommunityStateResponse,
+    CommunityUserSummary,
     CommunityVoteRequest,
     CommunityVoteResult,
     HistoryPage,
@@ -152,6 +154,13 @@ def create_app() -> FastAPI:
         response_model=VerificationEnvelope,
         status_code=status.HTTP_200_OK,
     )
+    @app.post(
+        "/api/v1/verify/text",
+        tags=["Verification"],
+        response_model=VerificationEnvelope,
+        status_code=status.HTTP_200_OK,
+        include_in_schema=False,
+    )
     async def verify_text_endpoint(
         payload: TextVerificationRequest,
         idempotency_key: UUID = Header(alias="Idempotency-Key"),
@@ -176,6 +185,13 @@ def create_app() -> FastAPI:
         tags=["Verification"],
         response_model=VerificationEnvelope,
         status_code=status.HTTP_200_OK,
+    )
+    @app.post(
+        "/api/v1/verify/image",
+        tags=["Verification"],
+        response_model=VerificationEnvelope,
+        status_code=status.HTTP_200_OK,
+        include_in_schema=False,
     )
     async def verify_image_endpoint(
         image: UploadFile = File(...),
@@ -253,6 +269,21 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         return await list_community(pool, app.state.settings, user.id, limit, cursor)
+
+    @app.get(
+        "/api/v1/community/me/summary",
+        tags=["Community"],
+        response_model=CommunityUserSummary,
+    )
+    async def get_community_user_summary_endpoint(
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunityUserSummary:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await get_community_user_summary(pool, app.state.settings, user.id)
 
     @app.get(
         "/api/v1/community/{case_id}",

@@ -70,3 +70,17 @@ data class HistoryPageDto(
     val items: List<HistoryItemDto> = emptyList(),
     @SerialName("next_cursor") val nextCursor: String? = null,
 )
+
+@Serializable
+data class ErrorEnvelopeDto(
+    val error: ProductErrorDto? = null,
+)
+
+@Serializable
+data class ProductErrorDto(
+    val code: String = "",
+    val message: String = "",
+    @SerialName("request_id") val requestId: String? = null,
+    val retryable: Boolean = false,
+    @SerialName("retry_after_seconds") val retryAfterSeconds: Int? = null,
+)

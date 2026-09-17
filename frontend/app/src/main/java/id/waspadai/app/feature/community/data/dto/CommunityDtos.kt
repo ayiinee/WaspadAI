@@ -1,0 +1,47 @@
+package id.waspadai.app.feature.community.data.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CommunityPageDto(
+    val items: List<CommunityItemDto> = emptyList(),
+    @SerialName("next_cursor") val nextCursor: String? = null,
+)
+
+@Serializable
+data class CommunityItemDto(
+    @SerialName("case_id") val caseId: String = "",
+    val title: String = "",
+    @SerialName("redacted_text") val redactedText: String = "",
+    val status: String = "",
+    @SerialName("published_at") val publishedAt: String = "",
+    val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
+    @SerialName("user_vote") val userVote: String? = null,
+)
+
+@Serializable
+data class CommunityVoteCountsDto(
+    @SerialName("HOAKS") val hoaks: Int = 0,
+    @SerialName("WASPADA") val waspada: Int = 0,
+    @SerialName("VALID") val valid: Int = 0,
+)
+
+@Serializable
+data class CommunityVoteRequestDto(
+    val vote: String,
+)
+
+@Serializable
+data class CommunityVoteResultDto(
+    @SerialName("case_id") val caseId: String = "",
+    @SerialName("user_vote") val userVote: String? = null,
+    val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
+)
+
+@Serializable
+data class CommunityUserSummaryDto(
+    @SerialName("assessments_count") val assessmentsCount: Int = 0,
+    @SerialName("evidence_added_count") val evidenceAddedCount: Int = 0,
+    @SerialName("resolved_cases_count") val resolvedCasesCount: Int = 0,
+)

@@ -18,7 +18,10 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert "/api/v1/history" in specification["paths"]
     assert "/api/v1/history/{case_id}" in specification["paths"]
     assert "/api/v1/verifications/image" in specification["paths"]
+    assert "/api/v1/verify/text" not in specification["paths"]
+    assert "/api/v1/verify/image" not in specification["paths"]
     assert "/api/v1/community" in specification["paths"]
+    assert "/api/v1/community/me/summary" in specification["paths"]
     assert "/api/v1/community/{case_id}" in specification["paths"]
     assert "/api/v1/history/{case_id}/community-preview" in specification["paths"]
     assert "/api/v1/history/{case_id}/community" in specification["paths"]
@@ -33,6 +36,17 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
 def test_community_feed_requires_supabase_bearer() -> None:
     with TestClient(create_app()) as client:
         response = client.get("/api/v1/community")
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "INVALID_ACCESS_TOKEN"
+
+
+def test_legacy_android_verification_route_requires_same_supabase_bearer() -> None:
+    with TestClient(create_app()) as client:
+        response = client.post(
+            "/api/v1/verify/text",
+            headers={"Idempotency-Key": str(uuid4())},
+            json={"text": "Pesan uji cukup panjang untuk validasi."},
+        )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "INVALID_ACCESS_TOKEN"
 

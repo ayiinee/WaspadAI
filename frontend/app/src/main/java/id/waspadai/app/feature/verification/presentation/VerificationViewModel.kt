@@ -19,7 +19,7 @@ class VerificationViewModel(
     private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
     isRemoteEnabled: Boolean
 ) : ViewModel() {
-    private val _state = MutableStateFlow(VerificationUiState(isRemoteEnabled = isRemoteEnabled))
+    private val _state = MutableStateFlow(VerificationUiState.initial(isRemoteEnabled))
     val state: StateFlow<VerificationUiState> = _state.asStateFlow()
 
     fun onAction(action: VerificationAction) {

@@ -93,7 +93,7 @@ class VerificationRepositoryImplTest {
             remoteDataSource = VerificationRemoteDataSource(
                 client = client,
                 config = WaspadAiApiConfig("https://api.example.test"),
-                tokenProvider = { "test-token" }
+                tokenProvider = StaticAccessTokenProvider("test-token")
             ),
             mapper = VerificationMapper()
         )

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,14 +8,20 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
-val waspadaiAuthToken: String = providers.gradleProperty("WASPADAI_AUTH_TOKEN")
-    .orElse(providers.environmentVariable("WASPADAI_AUTH_TOKEN"))
-    .orElse("")
-    .get()
-val waspadaiRemoteEnabled: String = providers.gradleProperty("WASPADAI_REMOTE_ENABLED")
-    .orElse(providers.environmentVariable("WASPADAI_REMOTE_ENABLED"))
-    .orElse("false")
-    .get()
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { input -> load(input) }
+    }
+}
+
+fun publicConfig(name: String, defaultValue: String = ""): String {
+    return (localProperties.getProperty(name) ?: System.getenv(name) ?: defaultValue).trim()
+}
+
+fun buildConfigString(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
 
 android {
     namespace = "id.waspadai.app"
@@ -30,10 +38,14 @@ android {
         buildConfigField(
             "String",
             "WASPADAI_API_BASE_URL",
-            "\"https://waspadai.shafwan.digital\""
+            buildConfigString(publicConfig("WASPADAI_API_BASE_URL", "http://127.0.0.1:8001"))
         )
-        buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", waspadaiRemoteEnabled)
-        buildConfigField("String", "WASPADAI_AUTH_TOKEN", "\"$waspadaiAuthToken\"")
+        buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", publicConfig("WASPADAI_REMOTE_ENABLED", "true"))
+        buildConfigField(
+            "String",
+            "WASPADAI_SUPABASE_ACCESS_TOKEN",
+            buildConfigString(publicConfig("WASPADAI_SUPABASE_ACCESS_TOKEN"))
+        )
     }
 
     buildTypes {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -27,6 +28,7 @@ from app.models import (
 
 VERIFY_TEXT_ROUTE = "POST /api/v1/verifications/text"
 VERIFY_IMAGE_ROUTE = "POST /api/v1/verifications/image"
+_ai_semaphores: dict[int, asyncio.Semaphore] = {}
 
 
 def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
@@ -543,16 +545,27 @@ async def verify_remote_text(
         raise ProductAPIError(
             503, "SERVICE_UNAVAILABLE", "Layanan AI belum dikonfigurasi.", True
         )
+
+    async def post_to_ai() -> httpx.Response:
+        async with _ai_concurrency_limit(settings):
+            return await http_client.post(
+                f"{settings.ai_service_base_url.rstrip('/')}/api/internal/v1/verify/text",
+                headers={
+                    "X-Waspadai-API-Key": settings.ai_service_api_key.get_secret_value(),
+                    "Accept": "application/json",
+                },
+                json={
+                    **canonical_payload(request),
+                    "output_mode": "BOTH",
+                    "community_evidence": [],
+                },
+            )
+
     try:
-        response = await http_client.post(
-            f"{settings.ai_service_base_url.rstrip('/')}/api/internal/v1/verify/text",
-            headers={
-                "X-Waspadai-API-Key": settings.ai_service_api_key.get_secret_value(),
-                "Accept": "application/json",
-            },
-            json={**canonical_payload(request), "output_mode": "BOTH"},
+        response = await asyncio.wait_for(
+            post_to_ai(), timeout=settings.ai_service_deadline_seconds
         )
-    except httpx.TimeoutException as error:
+    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
         raise ProductAPIError(
             504, "FACT_CHECK_UPSTREAM_TIMEOUT", "Pemeriksaan AI melewati batas waktu.", True
         ) from error
@@ -594,17 +607,28 @@ async def verify_remote_image(
         raise ProductAPIError(
             503, "SERVICE_UNAVAILABLE", "Layanan AI belum dikonfigurasi.", True
         )
+
+    async def post_to_ai() -> httpx.Response:
+        async with _ai_concurrency_limit(settings):
+            return await http_client.post(
+                f"{settings.ai_service_base_url.rstrip('/')}/api/internal/v1/verify/image",
+                headers={
+                    "X-Waspadai-API-Key": settings.ai_service_api_key.get_secret_value(),
+                    "Accept": "application/json",
+                },
+                files={"image": ("verification-image", image_bytes, content_type)},
+                data={
+                    "question": request.question or "",
+                    "output_mode": "BOTH",
+                    "community_evidence_json": "[]",
+                },
+            )
+
     try:
-        response = await http_client.post(
-            f"{settings.ai_service_base_url.rstrip('/')}/api/internal/v1/verify/image",
-            headers={
-                "X-Waspadai-API-Key": settings.ai_service_api_key.get_secret_value(),
-                "Accept": "application/json",
-            },
-            files={"image": ("verification-image", image_bytes, content_type)},
-            data={"question": request.question or "", "output_mode": "BOTH"},
+        response = await asyncio.wait_for(
+            post_to_ai(), timeout=settings.ai_service_deadline_seconds
         )
-    except httpx.TimeoutException as error:
+    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
         raise ProductAPIError(
             504, "FACT_CHECK_UPSTREAM_TIMEOUT", "Pemeriksaan AI melewati batas waktu.", True
         ) from error
@@ -633,3 +657,12 @@ async def verify_remote_image(
         raise ProductAPIError(
             502, "FACT_CHECK_UPSTREAM_INVALID", "Respons layanan AI tidak valid.", True
         ) from error
+
+
+def _ai_concurrency_limit(settings: Settings) -> asyncio.Semaphore:
+    limit = max(1, settings.ai_service_max_concurrency)
+    semaphore = _ai_semaphores.get(limit)
+    if semaphore is None:
+        semaphore = asyncio.Semaphore(limit)
+        _ai_semaphores[limit] = semaphore
+    return semaphore
