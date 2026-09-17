@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.media.ImageReader
 import android.media.projection.MediaProjection
@@ -20,7 +21,11 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class MediaProjectionController(private val context: Context) {
-    suspend fun capturePng(resultCode: Int, data: Intent): ByteArray = withContext(Dispatchers.Main.immediate) {
+    suspend fun capturePng(
+        resultCode: Int,
+        data: Intent,
+        cropRect: Rect? = null,
+    ): ByteArray = withContext(Dispatchers.Main.immediate) {
         val metrics = context.resources.displayMetrics
         val width = metrics.widthPixels.coerceAtLeast(1)
         val height = metrics.heightPixels.coerceAtLeast(1)
@@ -68,7 +73,7 @@ class MediaProjectionController(private val context: Context) {
                                     CaptureException("Layar tidak dapat ditangkap. Coba aplikasi lain atau gunakan upload gambar manual.")
                                 )
                             } else {
-                                continuation.resume(bitmap.toPngBytes())
+                                continuation.resume(bitmap.cropTo(cropRect).toPngBytes())
                             }
                         } catch (error: Throwable) {
                             continuation.resumeWithException(error)
@@ -106,6 +111,17 @@ class MediaProjectionController(private val context: Context) {
         compress(Bitmap.CompressFormat.PNG, 100, output)
         recycle()
         return output.toByteArray()
+    }
+
+    private fun Bitmap.cropTo(rect: Rect?): Bitmap {
+        if (rect == null) return this
+        val left = rect.left.coerceIn(0, width - 1)
+        val top = rect.top.coerceIn(0, height - 1)
+        val right = rect.right.coerceIn(left + 1, width)
+        val bottom = rect.bottom.coerceIn(top + 1, height)
+        val cropped = Bitmap.createBitmap(this, left, top, right - left, bottom - top)
+        recycle()
+        return cropped
     }
 
     private fun Bitmap.isBlankFrame(): Boolean {
