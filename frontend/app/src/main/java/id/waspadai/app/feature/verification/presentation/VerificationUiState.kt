@@ -11,6 +11,8 @@ data class VerificationUiState(
     val isHistoryLoading: Boolean = false,
     val phase: VerificationPhase = VerificationPhase.Idle,
     val isOverlayModeEnabled: Boolean = false,
+    val isOverlayPrivacyDialogVisible: Boolean = false,
+    val overlayCapturePreview: OverlayCapturePreview? = null,
     val isRemoteEnabled: Boolean = false
 ) {
     companion object {
@@ -36,7 +38,17 @@ sealed interface VerificationPhase {
 }
 
 sealed interface VerificationConversationItem {
-    data class UserMessage(val text: String, val hasAttachment: Boolean = false) : VerificationConversationItem
+    data class UserMessage(
+        val text: String,
+        val hasAttachment: Boolean = false,
+        val attachmentName: String? = null,
+    ) : VerificationConversationItem
 
     data class Analysis(val result: VerificationResult, val isSample: Boolean = false) : VerificationConversationItem
 }
+
+data class OverlayCapturePreview(
+    val imageBytes: ByteArray,
+    val contentType: String,
+    val fileName: String,
+)

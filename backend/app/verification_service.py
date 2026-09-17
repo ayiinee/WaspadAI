@@ -25,6 +25,7 @@ from app.models import (
     TextVerificationRequest,
     VerificationEnvelope,
 )
+from app.supabase_storage import upload_verification_input
 
 VERIFY_TEXT_ROUTE = "POST /api/v1/verifications/text"
 VERIFY_IMAGE_ROUTE = "POST /api/v1/verifications/image"
@@ -157,6 +158,21 @@ async def verify_image(
     cached_response = operation.get("response_json")
     if operation["state"] == "COMPLETED" and cached_response is not None:
         return VerificationEnvelope.model_validate(cached_response)
+
+    if settings.store_screenshots_enabled:
+        if http_client is None:
+            raise ProductAPIError(
+                503, "STORAGE_UNAVAILABLE", "Storage Supabase belum dapat dihubungi.", True
+            )
+        await upload_verification_input(
+            http_client,
+            settings,
+            user_id=user_id,
+            idempotency_key=idempotency_key,
+            digest=digest,
+            image_bytes=image_bytes,
+            content_type=content_type,
+        )
 
     cached_result = operation.get("ai_result_cache")
     result = AIResult.model_validate(cached_result) if cached_result is not None else None

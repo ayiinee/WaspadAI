@@ -188,12 +188,12 @@ fun ModeNotice(isRemoteEnabled: Boolean) {
 }
 
 @Composable
-fun UserMessage(text: String, hasAttachment: Boolean) {
+fun UserMessage(text: String, hasAttachment: Boolean, attachmentName: String? = null) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.End
     ) {
-        if (hasAttachment) AttachmentPlaceholder()
+        if (hasAttachment) AttachmentPreview(attachmentName ?: "Gambar verifikasi")
         Spacer(Modifier.height(8.dp))
         Text(
             text = text,
@@ -210,7 +210,7 @@ fun UserMessage(text: String, hasAttachment: Boolean) {
 }
 
 @Composable
-private fun AttachmentPlaceholder() {
+private fun AttachmentPreview(fileName: String) {
     Card(
         modifier = Modifier.widthIn(max = 350.dp),
         shape = RoundedCornerShape(17.dp),
@@ -223,7 +223,7 @@ private fun AttachmentPlaceholder() {
                     .background(Color(0xFFF8F1E7))
                     .padding(13.dp)
             ) {
-                Text("Contoh lampiran", color = Color(0xFF70808A), fontSize = 12.sp)
+                Text("Lampiran gambar", color = Color(0xFF70808A), fontSize = 12.sp)
                 Spacer(Modifier.height(7.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -240,12 +240,19 @@ private fun AttachmentPlaceholder() {
                             .background(Color(0xFF9FB4BC)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("APK", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("IMG", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.width(9.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Lihat Pesanan", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("5,1 MB · APK", color = Color(0xFF71808A), fontSize = 10.sp)
+                        Text(
+                            fileName,
+                            color = Ink,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text("Gambar verifikasi", color = Color(0xFF71808A), fontSize = 10.sp)
                     }
                 }
             }
