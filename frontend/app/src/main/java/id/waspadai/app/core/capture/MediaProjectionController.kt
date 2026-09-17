@@ -9,6 +9,7 @@ import android.hardware.display.DisplayManager
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
@@ -27,8 +28,7 @@ class MediaProjectionController(private val context: Context) {
         cropRect: Rect? = null,
     ): ByteArray = withContext(Dispatchers.Main.immediate) {
         val metrics = context.resources.displayMetrics
-        val width = metrics.widthPixels.coerceAtLeast(1)
-        val height = metrics.heightPixels.coerceAtLeast(1)
+        val (width, height) = context.captureSize()
         val density = metrics.densityDpi
         val projectionManager = context.getSystemService(MediaProjectionManager::class.java)
         val projection = projectionManager.getMediaProjection(resultCode, data)
@@ -59,6 +59,7 @@ class MediaProjectionController(private val context: Context) {
                     continuation.invokeOnCancellation {
                         virtualDisplay.release()
                     }
+                    var blankFrames = 0
                     imageReader.setOnImageAvailableListener({ reader ->
                         val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
                         try {
@@ -69,18 +70,27 @@ class MediaProjectionController(private val context: Context) {
                             }
                             if (bitmap.isBlankFrame()) {
                                 bitmap.recycle()
-                                continuation.resumeWithException(
-                                    CaptureException("Layar tidak dapat ditangkap. Coba aplikasi lain atau gunakan upload gambar manual.")
-                                )
+                                blankFrames += 1
+                                if (blankFrames >= MAX_BLANK_FRAMES) {
+                                    reader.setOnImageAvailableListener(null, null)
+                                    virtualDisplay.release()
+                                    continuation.resumeWithException(
+                                        CaptureException("Layar tidak dapat ditangkap. Coba aplikasi lain atau gunakan upload gambar manual.")
+                                    )
+                                }
                             } else {
+                                reader.setOnImageAvailableListener(null, null)
+                                virtualDisplay.release()
                                 continuation.resume(bitmap.cropTo(cropRect).toPngBytes())
                             }
                         } catch (error: Throwable) {
-                            continuation.resumeWithException(error)
-                        } finally {
-                            image.close()
                             reader.setOnImageAvailableListener(null, null)
                             virtualDisplay.release()
+                            if (continuation.isActive) {
+                                continuation.resumeWithException(error)
+                            }
+                        } finally {
+                            image.close()
                         }
                     }, Handler(Looper.getMainLooper()))
                 }
@@ -90,6 +100,17 @@ class MediaProjectionController(private val context: Context) {
             projection.unregisterCallback(callback)
             projection.stop()
         }
+    }
+
+    private fun Context.captureSize(): Pair<Int, Int> {
+        val windowManager = getSystemService(WindowManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.currentWindowMetrics.bounds
+            return bounds.width().coerceAtLeast(1) to bounds.height().coerceAtLeast(1)
+        }
+        @Suppress("DEPRECATION")
+        return resources.displayMetrics.widthPixels.coerceAtLeast(1) to
+            resources.displayMetrics.heightPixels.coerceAtLeast(1)
     }
 
     private fun android.media.Image.toBitmap(width: Int, height: Int): Bitmap {
@@ -151,6 +172,7 @@ class MediaProjectionController(private val context: Context) {
 
     private companion object {
         const val CAPTURE_TIMEOUT_MS = 5_000L
+        const val MAX_BLANK_FRAMES = 6
         const val SAMPLE_GRID = 12
         const val BLANK_THRESHOLD = 6
     }

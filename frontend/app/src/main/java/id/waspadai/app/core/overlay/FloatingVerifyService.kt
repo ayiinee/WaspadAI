@@ -248,7 +248,7 @@ class FloatingVerifyService : Service() {
         isCapturing = true
         removeCropSelector()
         scope.launch {
-            delay(180)
+            delay(CAPTURE_START_DELAY_MS)
             runCatching {
                 MediaProjectionController(this@FloatingVerifyService).capturePng(
                     projectionResultCode,
@@ -339,6 +339,7 @@ class FloatingVerifyService : Service() {
     companion object {
         private const val CHANNEL_ID = "waspadai_overlay_capture"
         private const val NOTIFICATION_ID = 401
+        private const val CAPTURE_START_DELAY_MS = 350L
         private const val ACTION_STOP = "id.waspadai.app.overlay.STOP"
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_DATA = "extra_data"
