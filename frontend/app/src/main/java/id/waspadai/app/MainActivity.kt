@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import id.waspadai.app.feature.community.presentation.CommunityRoute
+import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
@@ -23,6 +24,7 @@ import id.waspadai.app.ui.theme.WaspadAITheme
 
 private const val VerificationRouteName = "verification"
 private const val CommunityRouteName = "community"
+private const val WelcomeRouteName = "welcome"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +50,16 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    NavHost(navController = navController, startDestination = VerificationRouteName) {
+    NavHost(navController = navController, startDestination = WelcomeRouteName) {
+        composable(WelcomeRouteName) {
+            AuthLandingScreen(
+                onAuthenticated = {
+                    navController.navigate(VerificationRouteName) {
+                        popUpTo(WelcomeRouteName) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable(VerificationRouteName) {
             val viewModel: VerificationViewModel = viewModel(
                 factory = VerificationViewModel.Factory(

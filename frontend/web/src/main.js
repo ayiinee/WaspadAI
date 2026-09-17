@@ -10,6 +10,20 @@ const input = document.querySelector("#message-input");
 const imageInput = document.querySelector("#image-input");
 const attachmentPreview = document.querySelector("#attachment-preview");
 const sendButton = document.querySelector("#send-button");
+const authScreen = document.querySelector("#auth-screen");
+const appShell = document.querySelector("#app-shell");
+const authForm = document.querySelector("#auth-form");
+const authEmail = document.querySelector("#auth-email");
+const authPassword = document.querySelector("#auth-password");
+const authConfirmation = document.querySelector("#auth-confirm-password");
+const confirmationField = document.querySelector("#confirm-password-field");
+const authError = document.querySelector("#auth-error");
+const authFormTitle = document.querySelector("#auth-form-title");
+const authSubmit = document.querySelector("#auth-submit");
+const signInTab = document.querySelector("#sign-in-tab");
+const signUpTab = document.querySelector("#sign-up-tab");
+
+let isSignUp = false;
 
 const state = {
   busy: false,
@@ -36,6 +50,48 @@ const state = {
     },
   ],
 };
+
+function setAuthMode(signUp) {
+  isSignUp = signUp;
+  signInTab.classList.toggle("active", !signUp);
+  signUpTab.classList.toggle("active", signUp);
+  signInTab.setAttribute("aria-selected", String(!signUp));
+  signUpTab.setAttribute("aria-selected", String(signUp));
+  confirmationField.hidden = !signUp;
+  authConfirmation.required = signUp;
+  authPassword.autocomplete = signUp ? "new-password" : "current-password";
+  authFormTitle.textContent = signUp ? "Buat akun" : "Selamat datang kembali";
+  authSubmit.textContent = signUp ? "Buat akun" : "Masuk";
+  authError.hidden = true;
+}
+
+function showAuthError(message) {
+  authError.textContent = message;
+  authError.hidden = false;
+}
+
+signInTab.addEventListener("click", () => setAuthMode(false));
+signUpTab.addEventListener("click", () => setAuthMode(true));
+authForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showAuthError("Masukkan alamat email yang valid.");
+    return;
+  }
+  if (password.length < 8) {
+    showAuthError("Kata sandi minimal terdiri dari 8 karakter.");
+    return;
+  }
+  if (isSignUp && password !== authConfirmation.value) {
+    showAuthError("Konfirmasi kata sandi belum sama.");
+    return;
+  }
+  authScreen.hidden = true;
+  appShell.hidden = false;
+  input.focus();
+});
 
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
