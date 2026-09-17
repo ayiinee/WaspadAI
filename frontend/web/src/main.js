@@ -32,6 +32,7 @@ const state = {
         "Jangan membuka aplikasi atau memberikan izin tambahan.",
         "Verifikasi pengirim melalui kanal resmi sebelum menindaklanjuti pesan.",
       ],
+      isSample: true,
     },
   ],
 };
@@ -45,11 +46,16 @@ function createElement(tag, className, text) {
 
 function makeAttachment(name) {
   const attachment = createElement("div", "attachment-card");
-  const icon = createElement("span", "attachment-icon", "IMG");
+  const inner = createElement("div", "attachment-inner");
+  inner.append(createElement("p", "attachment-label", "Contoh lampiran"));
+  const file = createElement("div", "attachment-file");
+  const icon = createElement("span", "attachment-icon", "APK");
   const details = createElement("div", "attachment-details");
   details.append(createElement("strong", "", name));
-  details.append(createElement("small", "", "Lampiran untuk diperiksa"));
-  attachment.append(icon, details);
+  details.append(createElement("small", "", "5,1 MB · APK"));
+  file.append(icon, details);
+  inner.append(file);
+  attachment.append(inner);
   return attachment;
 }
 
@@ -72,6 +78,11 @@ function makeList(title, entries) {
 
 function makeAnalysisMessage(message) {
   const card = createElement("article", "message analysis-card");
+  const title = createElement("div", "analysis-title");
+  title.append(createElement("span", "analysis-title-icon", "✦"));
+  title.append(createElement("h2", "", "Hasil Analisis"));
+  card.append(title);
+  if (message.isSample) card.append(createElement("p", "sample-label", "CONTOH TAMPILAN"));
   card.append(createElement("p", "analysis-copy", message.text));
   if (message.reasons?.length) card.append(makeList("Mengapa berisiko", message.reasons));
   if (message.actions?.length) card.append(makeList("Tindakan yang disarankan", message.actions));
@@ -240,10 +251,14 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
-document.querySelectorAll("[data-tab]").forEach((tab) => {
+const tabs = [...document.querySelectorAll("[data-tab]")];
+tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll("[data-tab]").forEach((button) => button.classList.remove("active"));
-    tab.classList.add("active");
+    tabs.forEach((button) => {
+      const selected = button === tab;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
   });
 });
 

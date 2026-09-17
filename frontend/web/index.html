@@ -2,7 +2,7 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="Demo browser WaspadAI untuk pemeriksaan pesan mencurigakan."
@@ -42,11 +42,26 @@
         </section>
 
         <nav class="bottom-nav" aria-label="Navigasi utama">
-          <button type="button" data-tab="Beranda"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-6h6v6"/></svg>Beranda</button>
-          <button type="button" data-tab="Pelajari"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h5.5A2.5 2.5 0 0 1 12 8v12a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 5.5h-5.5A2.5 2.5 0 0 0 12 8v12a2.5 2.5 0 0 1 2.5-2.5H20z"/></svg>Pelajari</button>
-          <button type="button" data-tab="Periksa" class="center-nav active" aria-label="Periksa"></button>
-          <button type="button" data-tab="Koneksi"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3.5 20v-1.2A4.8 4.8 0 0 1 8.3 14h1.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="M15.1 14.5a4 4 0 0 1 5.4 3.8V20"/></svg>Koneksi</button>
-          <button type="button" data-tab="Progres"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a8 8 0 0 1 16 0"/><path d="m12 14 3.5-3.5"/><path d="M7.5 12.5 6 11M16.5 12.5 18 11M12 9v-2"/><path d="M4 20h16"/></svg>Progres</button>
+          <button class="nav-item" type="button" data-tab="Beranda" aria-pressed="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-6h6v6"/></svg>
+            <span>Beranda</span>
+          </button>
+          <button class="nav-item" type="button" data-tab="Pelajari" aria-pressed="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h5.5A2.5 2.5 0 0 1 12 8v12a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 5.5h-5.5A2.5 2.5 0 0 0 12 8v12a2.5 2.5 0 0 1 2.5-2.5H20z"/></svg>
+            <span>Pelajari</span>
+          </button>
+          <button class="center-nav" type="button" data-tab="Periksa" aria-label="Periksa informasi" aria-pressed="true">
+            <svg class="center-focus-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3"/></svg>
+            <svg class="center-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="4.5"/><path d="m14 14 5 5"/></svg>
+          </button>
+          <button class="nav-item" type="button" data-tab="Koneksi" aria-pressed="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3.5 20v-1.2A4.8 4.8 0 0 1 8.3 14h1.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="M15.1 14.5a4 4 0 0 1 5.4 3.8V20"/></svg>
+            <span>Koneksi</span>
+          </button>
+          <button class="nav-item" type="button" data-tab="Progres" aria-pressed="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a8 8 0 0 1 16 0"/><path d="m12 14 3.5-3.5"/><path d="M7.5 12.5 6 11M16.5 12.5 18 11M12 9v-2"/><path d="M4 20h16"/></svg>
+            <span>Progres</span>
+          </button>
         </nav>
       </section>
     </main>

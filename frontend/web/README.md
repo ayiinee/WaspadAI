@@ -10,7 +10,18 @@ npm install
 npm run dev
 ```
 
-Buka URL yang ditampilkan Vite, biasanya `http://127.0.0.1:5173`.
+Buka URL yang ditampilkan Vite, biasanya `http://localhost:5173`. Karena server
+development mendengarkan jaringan lokal, halaman ini juga dapat dibuka dari perangkat
+lain pada Wi-Fi yang sama melalui URL `http://IP-KOMPUTER:5173` (izinkan bila Windows
+Firewall menampilkan permintaan akses).
+
+Untuk membuat berkas statis siap unggah ke hosting, jalankan:
+
+```powershell
+npm run build
+```
+
+Hasilnya berada di folder `dist/`.
 
 ## Mode API publik (opsional)
 
