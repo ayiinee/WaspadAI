@@ -92,7 +92,6 @@ async def _build_community_evidence(
                and publication_consent.preview_id = p.preview_id
                and publication_consent.content_hash = p.content_hash
                and publication_consent.revoked_at is null
-               and (publication_consent.expires_at is null or publication_consent.expires_at > now())
                and (
                    publication_consent.expires_at is null
                    or publication_consent.expires_at > now()

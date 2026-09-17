@@ -137,7 +137,6 @@ def test_persist_terminal_result_stores_trimmed_text(monkeypatch: pytest.MonkeyP
         )
 
         case_insert = next(
-            params for sql, params in connection.calls if "insert into public.verification_cases" in sql
             params
             for sql, params in connection.calls
             if "insert into public.verification_cases" in sql

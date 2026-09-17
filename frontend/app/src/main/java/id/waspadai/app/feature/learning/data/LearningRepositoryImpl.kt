@@ -37,7 +37,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.errors.IOException
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 
 class LearningRepositoryImpl(
