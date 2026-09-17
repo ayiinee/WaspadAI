@@ -28,6 +28,7 @@ from app.models import (
 
 VERIFY_TEXT_ROUTE = "POST /api/v1/verifications/text"
 VERIFY_IMAGE_ROUTE = "POST /api/v1/verifications/image"
+DEFAULT_TEXT_QUESTION = "Apakah isi teks ini benar dan aman ditindaklanjuti?"
 _ai_semaphores: dict[int, asyncio.Semaphore] = {}
 
 
@@ -42,6 +43,15 @@ def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
         else None,
         "output_mode": "BOTH",
     }
+
+
+def remote_text_payload(request: TextVerificationRequest) -> dict[str, object]:
+    payload = canonical_payload(request)
+    if payload["question"] is None:
+        payload["question"] = DEFAULT_TEXT_QUESTION
+    payload["output_mode"] = "BOTH"
+    payload["community_evidence"] = []
+    return payload
 
 
 def payload_hash(request: TextVerificationRequest) -> str:
@@ -553,12 +563,9 @@ async def verify_remote_text(
                 headers={
                     "X-Waspadai-API-Key": settings.ai_service_api_key.get_secret_value(),
                     "Accept": "application/json",
+                    "Content-Type": "application/json",
                 },
-                json={
-                    **canonical_payload(request),
-                    "output_mode": "BOTH",
-                    "community_evidence": [],
-                },
+                json=remote_text_payload(request),
             )
 
     try:
