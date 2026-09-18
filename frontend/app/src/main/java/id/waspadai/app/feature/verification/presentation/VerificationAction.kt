@@ -7,11 +7,16 @@ sealed interface VerificationAction {
 
     data object RequestImageCapture : VerificationAction
 
-    data class SubmitImage(
+    data class ImageSelected(
         val imageBytes: ByteArray,
         val contentType: String,
         val fileName: String,
+        val overlayModeEnabled: Boolean = false,
     ) : VerificationAction
+
+    data object SubmitPendingImage : VerificationAction
+
+    data object DismissImagePreview : VerificationAction
 
     data class ImageSelectionFailed(val message: String) : VerificationAction
 
@@ -32,10 +37,6 @@ sealed interface VerificationAction {
     ) : VerificationAction
 
     data object OverlayStopped : VerificationAction
-
-    data object SubmitOverlayCapture : VerificationAction
-
-    data object DismissOverlayCapturePreview : VerificationAction
 
     data object DismissFailure : VerificationAction
 

@@ -9,9 +9,12 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
+import io.ktor.http.content.TextContent
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,6 +61,12 @@ class CommunityRepositoryImplTest {
                 request.url.toString(),
             )
             assertEquals("Bearer token", request.headers[HttpHeaders.Authorization])
+            val requestBody = Json.parseToJsonElement(
+                (request.body as TextContent).text
+            ).jsonObject
+            assertEquals("preview-1", requestBody["preview_id"]?.jsonPrimitive?.content)
+            assertEquals("true", requestBody["publication_consent"]?.jsonPrimitive?.content)
+            assertEquals("true", requestBody["rag_reuse_consent"]?.jsonPrimitive?.content)
             respond(
                 """
                 {

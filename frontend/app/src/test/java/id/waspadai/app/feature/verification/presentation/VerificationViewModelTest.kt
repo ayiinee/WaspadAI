@@ -66,6 +66,31 @@ class VerificationViewModelTest {
     }
 
     @Test
+    fun `image waits for custom message before submitting`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(repository)
+
+        viewModel.onAction(
+            VerificationAction.ImageSelected(
+                imageBytes = byteArrayOf(1, 2, 3),
+                contentType = "image/png",
+                fileName = "screenshot.png",
+            )
+        )
+
+        assertTrue(viewModel.state.value.pendingImagePreview != null)
+        assertEquals(0, viewModel.state.value.conversation.size)
+
+        viewModel.onAction(VerificationAction.InputChanged("Tolong cek klaim pada gambar ini"))
+        viewModel.onAction(VerificationAction.SubmitPendingImage)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Tolong cek klaim pada gambar ini", repository.lastImageQuestion)
+        assertEquals(null, viewModel.state.value.pendingImagePreview)
+        assertEquals(2, viewModel.state.value.conversation.size)
+    }
+
+    @Test
     fun `loading history does not replace active conversation`() = runTest {
         val viewModel = viewModel(FakeRepository())
 
@@ -133,6 +158,8 @@ class VerificationViewModelTest {
         )
 
     private class FakeRepository : VerificationRepository {
+        var lastImageQuestion: String? = null
+
         private val result = VerificationResult(
             narrative = "Jangan bagikan kode OTP.",
             riskLevel = RiskLevel.HIGH,
@@ -152,7 +179,10 @@ class VerificationViewModelTest {
             fileName: String,
             question: String?,
             overlayModeEnabled: Boolean,
-        ): AppResult<VerificationResult> = AppResult.Success(result)
+        ): AppResult<VerificationResult> {
+            lastImageQuestion = question
+            return AppResult.Success(result)
+        }
 
         override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> =
             AppResult.Success(

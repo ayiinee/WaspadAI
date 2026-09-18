@@ -235,7 +235,7 @@ fun VerificationScreen(
             )
         } else {
             onAction(
-                VerificationAction.SubmitImage(
+                VerificationAction.ImageSelected(
                     imageBytes = selection.bytes,
                     contentType = selection.contentType,
                     fileName = selection.fileName,
@@ -273,12 +273,11 @@ fun VerificationScreen(
                     )
                 }
             }
-            state.overlayCapturePreview?.let { preview ->
+            state.pendingImagePreview?.let { preview ->
                 item {
-                    OverlayCapturePreviewCard(
+                    ImageVerificationPreviewCard(
                         preview = preview,
-                        onSubmit = { onAction(VerificationAction.SubmitOverlayCapture) },
-                        onDismiss = { onAction(VerificationAction.DismissOverlayCapturePreview) },
+                        onDismiss = { onAction(VerificationAction.DismissImagePreview) },
                     )
                 }
             }
@@ -311,7 +310,16 @@ fun VerificationScreen(
             enabled = !isSubmitting,
             overlayModeEnabled = state.isOverlayModeEnabled,
             onValueChange = { onAction(VerificationAction.InputChanged(it)) },
-            onSubmit = { onAction(VerificationAction.SubmitText) },
+            onSubmit = {
+                onAction(
+                    if (state.pendingImagePreview != null) {
+                        VerificationAction.SubmitPendingImage
+                    } else {
+                        VerificationAction.SubmitText
+                    }
+                )
+            },
+            hasPendingImage = state.pendingImagePreview != null,
             onToggleOverlayMode = {
                 if (state.isOverlayModeEnabled) {
                     FloatingVerifyService.stop(context)
@@ -418,9 +426,8 @@ private fun OverlayPrivacyDialog(
 }
 
 @Composable
-private fun OverlayCapturePreviewCard(
-    preview: OverlayCapturePreview,
-    onSubmit: () -> Unit,
+private fun ImageVerificationPreviewCard(
+    preview: ImageVerificationPreview,
     onDismiss: () -> Unit,
 ) {
     val bitmap = remember(preview.imageBytes) {
@@ -435,7 +442,7 @@ private fun OverlayCapturePreviewCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Preview tangkapan layar", color = Color(0xFF153A52))
+            Text("Preview gambar pemeriksaan", color = Color(0xFF153A52))
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
@@ -451,7 +458,8 @@ private fun OverlayCapturePreviewCard(
                 Text("Preview belum dapat dibuka. Ambil ulang screenshot.", color = Color(0xFFA52219))
             }
             Text(
-                "Gambar belum dikirim. Periksa dulu, lalu pilih kirim atau batal.",
+                "Gambar belum dikirim. Tulis pesan atau konteks di kolom bawah, " +
+                    "lalu tekan kirim untuk memeriksa gambar ini.",
                 color = Color(0xFF557383),
             )
             androidx.compose.foundation.layout.Row(
@@ -459,10 +467,7 @@ private fun OverlayCapturePreviewCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Batal")
-                }
-                Button(onClick = onSubmit, enabled = bitmap != null) {
-                    Text("Kirim untuk diperiksa")
+                    Text("Hapus gambar")
                 }
             }
         }

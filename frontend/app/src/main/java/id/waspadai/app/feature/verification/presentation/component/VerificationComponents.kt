@@ -388,6 +388,7 @@ fun VerificationComposer(
     value: String,
     enabled: Boolean,
     overlayModeEnabled: Boolean,
+    hasPendingImage: Boolean = false,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onToggleOverlayMode: () -> Unit,
@@ -432,7 +433,14 @@ fun VerificationComposer(
             onValueChange = onValueChange,
             enabled = enabled,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Ketik pesan untuk diperiksa…", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            placeholder = {
+                Text(
+                    if (hasPendingImage) "Tulis pesan untuk gambar…"
+                    else "Ketik pesan untuk diperiksa…",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
             singleLine = true,
             shape = RoundedCornerShape(28.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

@@ -36,17 +36,24 @@ class VerificationViewModel(
             is VerificationAction.InputChanged -> updateInput(action.value)
             VerificationAction.SubmitText -> submitText()
             VerificationAction.RequestImageCapture -> Unit
-            is VerificationAction.SubmitImage -> submitImage(action)
+            is VerificationAction.ImageSelected -> showImagePreview(action)
+            VerificationAction.SubmitPendingImage -> submitPendingImage()
+            VerificationAction.DismissImagePreview -> dismissImagePreview()
             is VerificationAction.ImageSelectionFailed -> showImageSelectionFailure(action.message)
             VerificationAction.RequestOverlayMode -> requestOverlayMode()
             VerificationAction.AcceptOverlayPrivacy -> acceptOverlayPrivacy()
             VerificationAction.DismissOverlayPrivacy -> dismissOverlayPrivacy()
             is VerificationAction.OverlayPermissionResult -> setOverlayPermissionResult(action.granted)
             is VerificationAction.OverlayModeConsentResult -> setOverlayModeFromConsent(action.granted)
-            is VerificationAction.OverlayCaptureReady -> showOverlayCapturePreview(action)
+            is VerificationAction.OverlayCaptureReady -> showImagePreview(
+                VerificationAction.ImageSelected(
+                    imageBytes = action.imageBytes,
+                    contentType = action.contentType,
+                    fileName = action.fileName,
+                    overlayModeEnabled = true,
+                )
+            )
             VerificationAction.OverlayStopped -> stopOverlayMode()
-            VerificationAction.SubmitOverlayCapture -> submitOverlayCapture()
-            VerificationAction.DismissOverlayCapturePreview -> dismissOverlayCapturePreview()
             VerificationAction.DismissFailure -> dismissFailure()
             VerificationAction.ToggleHistory -> toggleHistory()
             VerificationAction.RefreshHistory -> refreshHistory()
@@ -96,12 +103,12 @@ class VerificationViewModel(
     }
 
     private fun submitImage(
-        action: VerificationAction.SubmitImage,
+        action: VerificationAction.ImageSelected,
         forceOverlayModeEnabled: Boolean? = null,
     ) {
         val question = state.value.draft.trim().takeIf(String::isNotBlank)
         val overlayModeEnabled = forceOverlayModeEnabled ?: state.value.isOverlayModeEnabled
-        val userMessage = question ?: action.fileName
+        val userMessage = question ?: "Gambar dikirim untuk diperiksa."
         _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
         viewModelScope.launch {
             _state.update { current ->
@@ -189,14 +196,15 @@ class VerificationViewModel(
         }
     }
 
-    private fun showOverlayCapturePreview(action: VerificationAction.OverlayCaptureReady) {
+    private fun showImagePreview(action: VerificationAction.ImageSelected) {
         _state.update { current ->
             current.copy(
                 isOverlayModeEnabled = false,
-                overlayCapturePreview = OverlayCapturePreview(
+                pendingImagePreview = ImageVerificationPreview(
                     imageBytes = action.imageBytes,
                     contentType = action.contentType,
                     fileName = action.fileName,
+                    overlayModeEnabled = action.overlayModeEnabled,
                 ),
                 phase = VerificationPhase.Idle,
             )
@@ -209,22 +217,23 @@ class VerificationViewModel(
         }
     }
 
-    private fun submitOverlayCapture() {
-        val preview = state.value.overlayCapturePreview ?: return
-        _state.update { current -> current.copy(overlayCapturePreview = null) }
+    private fun submitPendingImage() {
+        val preview = state.value.pendingImagePreview ?: return
+        _state.update { current -> current.copy(pendingImagePreview = null) }
         submitImage(
-            VerificationAction.SubmitImage(
+            VerificationAction.ImageSelected(
                 imageBytes = preview.imageBytes,
                 contentType = preview.contentType,
                 fileName = preview.fileName,
+                overlayModeEnabled = preview.overlayModeEnabled,
             ),
-            forceOverlayModeEnabled = true,
+            forceOverlayModeEnabled = preview.overlayModeEnabled,
         )
     }
 
-    private fun dismissOverlayCapturePreview() {
+    private fun dismissImagePreview() {
         _state.update { current ->
-            current.copy(overlayCapturePreview = null, phase = VerificationPhase.Idle)
+            current.copy(pendingImagePreview = null, phase = VerificationPhase.Idle)
         }
     }
 

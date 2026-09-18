@@ -14,7 +14,7 @@ data class VerificationUiState(
     val phase: VerificationPhase = VerificationPhase.Idle,
     val isOverlayModeEnabled: Boolean = false,
     val isOverlayPrivacyDialogVisible: Boolean = false,
-    val overlayCapturePreview: OverlayCapturePreview? = null,
+    val pendingImagePreview: ImageVerificationPreview? = null,
     val isRemoteEnabled: Boolean = false,
     val communityShare: CommunityShareState = CommunityShareState(),
 ) {
@@ -64,8 +64,9 @@ sealed interface CommunitySharePhase {
     data class Failure(val message: String) : CommunitySharePhase
 }
 
-data class OverlayCapturePreview(
+data class ImageVerificationPreview(
     val imageBytes: ByteArray,
     val contentType: String,
     val fileName: String,
+    val overlayModeEnabled: Boolean = false,
 )
