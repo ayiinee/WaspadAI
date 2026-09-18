@@ -136,3 +136,37 @@ def test_builder_excludes_records_without_required_moderation_projection() -> No
     }
 
     assert evidence_service._records_from_rows([row], "pesan") == []
+
+
+def test_builder_can_use_explicit_development_fixture_when_database_has_no_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection([])
+
+    @asynccontextmanager
+    async def transaction(*_args: object, **_kwargs: object) -> AsyncIterator[FakeConnection]:
+        yield connection
+
+    monkeypatch.setattr(evidence_service, "user_transaction", transaction)
+    request = TextVerificationRequest.model_validate(
+        {"text": "Apakah tautan bantuan tunai ini benar dan aman ditindaklanjuti?"}
+    )
+
+    result = asyncio.run(
+        evidence_service.build_text_community_evidence(
+            object(),
+            SimpleNamespace(
+                db_statement_timeout_seconds=15,
+                community_evidence_fixture_enabled=True,
+            ),
+            uuid4(),
+            request,
+        )
+    )
+
+    assert len(result) == 1
+    assert result[0]["record_type"] == "COMMUNITY_VERIFIED_EVIDENCE"
+    assert result[0]["status"] == "VERIFIED_EVIDENCE"
+    assert "owner_id" not in result[0]
+    assert "moderator_id" not in result[0]
+    assert "rag_consent_id" not in result[0]

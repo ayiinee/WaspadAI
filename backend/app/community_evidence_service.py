@@ -11,6 +11,7 @@ from psycopg.rows import DictRow
 from psycopg_pool import AsyncConnectionPool
 from pydantic import ValidationError
 
+from app.community_evidence_fixture import hardcoded_community_evidence
 from app.config import Settings
 from app.database import user_transaction
 from app.models import CommunityEvidenceRecord, CommunityEvidenceSource, TextVerificationRequest
@@ -129,6 +130,8 @@ async def _build_community_evidence(
         rows = await query.fetchall()
 
     records = _records_from_rows(rows, relevance_text)
+    if not records and settings.community_evidence_fixture_enabled:
+        records = hardcoded_community_evidence()
     return _trim_to_payload_budget(records)
 
 

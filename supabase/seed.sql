@@ -7,8 +7,13 @@ declare
     unverified_case uuid := '00000000-0000-0000-0000-000000000101';
     verified_case uuid := '00000000-0000-0000-0000-000000000102';
     private_case uuid := '00000000-0000-0000-0000-000000000103';
+    verified_preview uuid := '00000000-0000-0000-0000-000000000121';
+    verified_post uuid := '00000000-0000-0000-0000-000000000122';
+    verified_contribution uuid := '00000000-0000-0000-0000-000000000123';
+    verified_source uuid := '00000000-0000-0000-0000-000000000124';
     unverified_consent uuid := '00000000-0000-0000-0000-000000000201';
-    verified_consent uuid := '00000000-0000-0000-0000-000000000202';
+    verified_publication_consent uuid := '00000000-0000-0000-0000-000000000202';
+    verified_rag_consent uuid := '00000000-0000-0000-0000-000000000203';
     result_json jsonb := jsonb_build_object(
         'request_id', 'seed-request',
         'trace_id', 'seed-trace',
@@ -85,26 +90,137 @@ begin
          'UNKNOWN', 'NOT_APPLICABLE', 0, result_json, 'MOCK')
     on conflict (case_id) do nothing;
 
+    insert into public.community_previews
+        (id, case_id, user_id, case_revision, redacted_text, content_hash,
+         redaction_version, redactions, state, expires_at, consumed_at)
+    values
+        (verified_preview, verified_case, seed_user, 1,
+         'Pesan menawarkan bantuan tunai melalui tautan tidak resmi.',
+         '59233c84c571aa6bf2bf27eb0e2403c1ed9c71eb37635ff411f20a6a9c3fd52f',
+         'server-v1', '[]'::jsonb, 'CONSUMED', now() + interval '90 days', now())
+    on conflict (id) do update set
+        redacted_text = excluded.redacted_text,
+        content_hash = excluded.content_hash,
+        state = excluded.state,
+        expires_at = excluded.expires_at,
+        consumed_at = excluded.consumed_at;
+
+    insert into public.contributions
+        (id, user_id, case_id, title, summary, reasoning, sanitized_content, status,
+         content_hash, revision, submitted_at, verified_at)
+    values
+        (verified_contribution, seed_user, verified_case,
+         'Klaim bantuan tunai melalui tautan tidak resmi',
+         'Pesan menawarkan bantuan tunai melalui tautan tidak resmi.',
+         'Sumber resmi menyatakan program bantuan diumumkan melalui kanal pemerintah.',
+         'Pesan menawarkan bantuan tunai melalui tautan tidak resmi.',
+         'VERIFIED',
+         '59233c84c571aa6bf2bf27eb0e2403c1ed9c71eb37635ff411f20a6a9c3fd52f',
+         1, now() - interval '1 day', now() - interval '1 day')
+    on conflict (id) do update set
+        status = excluded.status,
+        content_hash = excluded.content_hash,
+        revision = excluded.revision,
+        submitted_at = excluded.submitted_at,
+        verified_at = excluded.verified_at,
+        retracted_at = null;
+
+    insert into public.contribution_sources
+        (id, contribution_id, source_url, title, publisher, source_hash)
+    values
+        (verified_source, verified_contribution,
+         'https://example.go.id/klarifikasi-bantuan',
+         'Klarifikasi program bantuan', 'Instansi resmi',
+         '28e27ca6b0c0fcd6ee6340afa4fcabf3c2859b82d545b6c400b7d86cd7e16f2f')
+    on conflict (id) do update set
+        source_url = excluded.source_url,
+        title = excluded.title,
+        publisher = excluded.publisher,
+        source_hash = excluded.source_hash;
+
+    insert into public.moderation_decisions
+        (id, contribution_id, moderator_id, expected_revision, previous_status,
+         action, new_status, reason, evidence_ids, sanitized_snapshot,
+         publish_to_connection, allow_rag)
+    values
+        ('00000000-0000-0000-0000-000000000125', verified_contribution, seed_user, 1,
+         'SUBMITTED', 'VERIFY', 'VERIFIED',
+         'Fixture development: source publik diverifikasi.',
+         jsonb_build_array(verified_source::text),
+         jsonb_build_object(
+             'verified_claim', 'Tautan pada pesan bantuan tunai tersebut bukan kanal resmi program pemerintah.',
+             'stance', 'REFUTES',
+             'evidence_summary', 'Moderator memverifikasi sumber resmi yang menyatakan program bantuan diumumkan melalui kanal pemerintah.'
+         ),
+         true, true)
+    on conflict (id) do update set
+        expected_revision = excluded.expected_revision,
+        action = excluded.action,
+        new_status = excluded.new_status,
+        evidence_ids = excluded.evidence_ids,
+        sanitized_snapshot = excluded.sanitized_snapshot,
+        publish_to_connection = excluded.publish_to_connection,
+        allow_rag = excluded.allow_rag;
+
     insert into private.consent_records
-        (id, user_id, scope, case_id, content_hash, policy_version)
+        (id, user_id, scope, case_id, contribution_id, preview_id, content_hash, policy_version)
     values
         (unverified_consent, seed_user, 'COMMUNITY_PUBLICATION', unverified_case,
-         repeat('a', 64), 'community-v1'),
-        (verified_consent, seed_user, 'COMMUNITY_PUBLICATION', verified_case,
-         repeat('b', 64), 'community-v1')
-    on conflict (id) do nothing;
+         null, null,
+         'cbfa931e75e825753f2ca57e404dc7ab359c36af5c294e32e265367446c78688',
+         'community-v1'),
+        (verified_publication_consent, seed_user, 'COMMUNITY_PUBLICATION', verified_case,
+         verified_contribution, verified_preview,
+         '59233c84c571aa6bf2bf27eb0e2403c1ed9c71eb37635ff411f20a6a9c3fd52f',
+         'community-v1'),
+        (verified_rag_consent, seed_user, 'RAG_REUSE', verified_case,
+         verified_contribution, verified_preview,
+         '59233c84c571aa6bf2bf27eb0e2403c1ed9c71eb37635ff411f20a6a9c3fd52f',
+         'community-v1')
+    on conflict (id) do update set
+        scope = excluded.scope,
+        case_id = excluded.case_id,
+        contribution_id = excluded.contribution_id,
+        preview_id = excluded.preview_id,
+        content_hash = excluded.content_hash,
+        revoked_at = null,
+        expires_at = null;
+
+    update public.contributions
+       set publication_consent_id = verified_publication_consent,
+           rag_consent_id = verified_rag_consent
+     where id = verified_contribution;
 
     insert into public.community_posts
-        (case_id, owner_id, title, redacted_text, status, publication_consent_id,
-         content_hash, revision)
+        (id, case_id, owner_id, preview_id, title, redacted_text, status,
+         verification_contribution_id, publication_consent_id, rag_consent_id,
+         content_hash, revision, verified_at)
     values
-        (unverified_case, seed_user, 'Kasus komunitas belum terverifikasi',
+        ('00000000-0000-0000-0000-000000000111', unverified_case, seed_user, null,
+         'Kasus komunitas belum terverifikasi',
          'Fixture publik untuk menguji feed dan vote.', 'PUBLISHED_UNVERIFIED',
-         unverified_consent, repeat('a', 64), 1),
-        (verified_case, seed_user, 'Kasus komunitas dengan bukti',
-         'Fixture terverifikasi untuk menguji feed dan detail.', 'VERIFIED_EVIDENCE',
-         verified_consent, repeat('b', 64), 1)
-    on conflict (case_id) do nothing;
+         null, unverified_consent, null,
+         'cbfa931e75e825753f2ca57e404dc7ab359c36af5c294e32e265367446c78688',
+         1, null),
+        (verified_post, verified_case, seed_user, verified_preview,
+         'Klaim bantuan tunai melalui tautan tidak resmi',
+         'Pesan menawarkan bantuan tunai melalui tautan tidak resmi.', 'VERIFIED_EVIDENCE',
+         verified_contribution, verified_publication_consent, verified_rag_consent,
+         '59233c84c571aa6bf2bf27eb0e2403c1ed9c71eb37635ff411f20a6a9c3fd52f',
+         1, now() - interval '1 day')
+    on conflict (case_id) do update set
+        owner_id = excluded.owner_id,
+        preview_id = excluded.preview_id,
+        title = excluded.title,
+        redacted_text = excluded.redacted_text,
+        status = excluded.status,
+        verification_contribution_id = excluded.verification_contribution_id,
+        publication_consent_id = excluded.publication_consent_id,
+        rag_consent_id = excluded.rag_consent_id,
+        content_hash = excluded.content_hash,
+        revision = excluded.revision,
+        verified_at = excluded.verified_at,
+        withdrawn_at = null;
 
     -- Seed konten Pelajari (Learning Modules, Lessons, Quiz Questions & Options)
     insert into public.learning_modules
