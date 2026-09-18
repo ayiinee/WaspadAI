@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from json import loads
+
 import anyio
 import httpx
 import pytest
@@ -110,8 +112,11 @@ def test_remote_text_forwards_community_evidence() -> None:
 
         def handler(request: httpx.Request) -> httpx.Response:
             body = request.read().decode()
+            payload = loads(body)
             assert '"community_evidence":[{' in body
             assert '"record_type":"COMMUNITY_VERIFIED_EVIDENCE"' in body
+            assert '"url":"https://example.go.id/klarifikasi-bantuan"' in body
+            assert "source_url" not in payload["community_evidence"][0]["sources"][0]
             assert '"owner_id"' not in body
             assert '"vote"' not in body
             return httpx.Response(200, json=_result())

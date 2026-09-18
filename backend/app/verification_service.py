@@ -58,8 +58,28 @@ def remote_text_payload(
     if payload["question"] is None:
         payload["question"] = DEFAULT_TEXT_QUESTION
     payload["output_mode"] = "BOTH"
-    payload["community_evidence"] = community_evidence or []
+    payload["community_evidence"] = _community_evidence_for_ai(community_evidence)
     return payload
+
+
+def _community_evidence_for_ai(
+    community_evidence: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Adapt the product evidence shape to the currently deployed AI contract."""
+
+    adapted: list[dict[str, Any]] = []
+    for record in community_evidence or []:
+        item = dict(record)
+        sources: list[dict[str, Any]] = []
+        for source in record.get("sources", []):
+            source_item = dict(source)
+            source_url = source_item.pop("source_url", None)
+            if source_url is not None:
+                source_item["url"] = source_url
+            sources.append(source_item)
+        item["sources"] = sources
+        adapted.append(item)
+    return adapted
 
 
 def payload_hash(request: TextVerificationRequest) -> str:
@@ -669,7 +689,7 @@ async def verify_remote_image(
                     "question": request.question or "",
                     "output_mode": "BOTH",
                     "community_evidence_json": json.dumps(
-                        community_evidence or [],
+                        _community_evidence_for_ai(community_evidence),
                         ensure_ascii=False,
                         separators=(",", ":"),
                     ),

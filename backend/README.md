@@ -8,9 +8,11 @@ Keputusan Android memakai Product API sudah berlaku, tetapi integrasi end-to-end
 
 ```powershell
 uv sync --locked
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload --loop app.uvicorn_loop:selector_loop_factory
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --loop app.uvicorn_loop:selector_loop_factory
 uv run pytest
 ```
+
+Untuk testing di HP fisik, pakai IP LAN komputer sebagai `WASPADAI_API_BASE_URL`, misalnya `http://10.30.172.167:8001`, lalu rebuild dan reinstall APK debug.
 
 Konfigurasi dibaca dari `.env` root. Untuk runtime saat ini, siapkan `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, dan `HISTORY_CURSOR_SIGNING_KEY`. Gunakan role `product_app` pada `DATABASE_URL`; jangan memakai password migrator atau service-role sebagai credential umum runtime.
 
