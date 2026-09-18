@@ -23,6 +23,8 @@ import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
+import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
+import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.presentation.VerificationRoute
 import id.waspadai.app.feature.verification.presentation.VerificationViewModel
 import id.waspadai.app.ui.theme.WaspadAITheme
@@ -81,6 +83,10 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                     submitImageVerification = SubmitImageVerificationUseCase(app.verificationRepository),
                     loadHistory = LoadVerificationHistoryUseCase(app.verificationRepository),
                     loadHistoryDetail = LoadVerificationHistoryDetailUseCase(app.verificationRepository),
+                    requestCommunityPreview = RequestCommunityPreviewUseCase(app.communityRepository),
+                    publishCommunityCase = PublishCommunityCaseUseCase(app.communityRepository),
+                    communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+                    accessTokenProvider = app.authRepository,
                     isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED,
                 ),
             )

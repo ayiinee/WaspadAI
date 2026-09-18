@@ -93,4 +93,5 @@ class MockVerificationRepository : VerificationRepository {
 
     override suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail> =
         AppResult.Failure("History hanya tersedia saat backend aktif.")
+
 }

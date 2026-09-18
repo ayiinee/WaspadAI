@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
+import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
+import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
@@ -19,6 +22,10 @@ class VerificationViewModel(
     private val submitImageVerification: SubmitImageVerificationUseCase,
     private val loadHistory: LoadVerificationHistoryUseCase,
     private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
+    private val requestCommunityPreview: RequestCommunityPreviewUseCase,
+    private val publishCommunityCase: PublishCommunityCaseUseCase,
+    private val communityBaseUrl: String,
+    private val accessTokenProvider: AccessTokenProvider,
     isRemoteEnabled: Boolean
 ) : ViewModel() {
     private val _state = MutableStateFlow(VerificationUiState.initial(isRemoteEnabled))
@@ -44,6 +51,12 @@ class VerificationViewModel(
             VerificationAction.ToggleHistory -> toggleHistory()
             VerificationAction.RefreshHistory -> refreshHistory()
             is VerificationAction.OpenHistory -> openHistory(action.caseId)
+            VerificationAction.RequestCommunityPreview -> requestCommunityPreview()
+            is VerificationAction.CommunityRagConsentChanged -> _state.update {
+                it.copy(communityShare = it.communityShare.copy(ragReuseConsent = action.granted))
+            }
+            VerificationAction.PublishCommunity -> publishCommunity()
+            VerificationAction.DismissCommunityShare -> dismissCommunityShare()
         }
     }
 
@@ -270,11 +283,138 @@ class VerificationViewModel(
         }
     }
 
+    private fun requestCommunityPreview() {
+        val result = currentResult() ?: return
+        val caseId = result.caseId ?: return
+        if (!result.communityEligible || result.communityState != "PRIVATE") return
+        _state.update {
+            it.copy(
+                communityShare = it.communityShare.copy(
+                    phase = CommunitySharePhase.RequestingPreview,
+                    ragReuseConsent = false,
+                )
+            )
+        }
+        viewModelScope.launch {
+            val token = accessTokenProvider.currentAccessToken()
+            if (token.isNullOrBlank()) {
+                _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(
+                                "Sesi Supabase belum tersedia. Login ulang lalu coba lagi."
+                            )
+                        )
+                    )
+                }
+                return@launch
+            }
+            when (
+                val result = requestCommunityPreview(
+                    baseUrl = communityBaseUrl,
+                    accessToken = token,
+                    caseId = caseId,
+                )
+            ) {
+                is AppResult.Success -> _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.PreviewReady(result.value)
+                        )
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(result.message)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun publishCommunity() {
+        val result = currentResult() ?: return
+        val caseId = result.caseId ?: return
+        val preview = (state.value.communityShare.phase as? CommunitySharePhase.PreviewReady)?.preview
+            ?: return
+        _state.update {
+            it.copy(communityShare = it.communityShare.copy(phase = CommunitySharePhase.Publishing))
+        }
+        viewModelScope.launch {
+            val token = accessTokenProvider.currentAccessToken()
+            if (token.isNullOrBlank()) {
+                _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(
+                                "Sesi Supabase belum tersedia. Login ulang lalu coba lagi."
+                            )
+                        )
+                    )
+                }
+                return@launch
+            }
+            when (
+                val published = publishCommunityCase(
+                    baseUrl = communityBaseUrl,
+                    accessToken = token,
+                    caseId = caseId,
+                    previewId = preview.previewId,
+                    ragReuseConsent = state.value.communityShare.ragReuseConsent,
+                )
+            ) {
+                is AppResult.Success -> _state.update { current ->
+                    val updatedResult = result.copy(
+                        communityState = published.value.communityState,
+                        communityEligible = false,
+                    )
+                    current.copy(
+                        conversation = current.conversation.map { item ->
+                            if (item is VerificationConversationItem.Analysis && item.result.caseId == caseId) {
+                                item.copy(result = updatedResult)
+                            } else {
+                                item
+                            }
+                        },
+                        communityShare = current.communityShare.copy(
+                            phase = CommunitySharePhase.Published(published.value)
+                        )
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(published.message)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun dismissCommunityShare() {
+        _state.update {
+            it.copy(communityShare = CommunityShareState())
+        }
+    }
+
+    private fun currentResult(): id.waspadai.app.core.model.VerificationResult? =
+        state.value.conversation.asReversed()
+            .filterIsInstance<VerificationConversationItem.Analysis>()
+            .firstOrNull()
+            ?.result
+
     class Factory(
         private val submitTextVerification: SubmitTextVerificationUseCase,
         private val submitImageVerification: SubmitImageVerificationUseCase,
         private val loadHistory: LoadVerificationHistoryUseCase,
         private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
+        private val requestCommunityPreview: RequestCommunityPreviewUseCase,
+        private val publishCommunityCase: PublishCommunityCaseUseCase,
+        private val communityBaseUrl: String,
+        private val accessTokenProvider: AccessTokenProvider,
         private val isRemoteEnabled: Boolean
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -285,6 +425,10 @@ class VerificationViewModel(
                 submitImageVerification,
                 loadHistory,
                 loadHistoryDetail,
+                requestCommunityPreview,
+                publishCommunityCase,
+                communityBaseUrl,
+                accessTokenProvider,
                 isRemoteEnabled
             ) as T
         }

@@ -45,3 +45,27 @@ data class CommunityUserSummaryDto(
     @SerialName("evidence_added_count") val evidenceAddedCount: Int = 0,
     @SerialName("resolved_cases_count") val resolvedCasesCount: Int = 0,
 )
+
+@Serializable
+data class CommunityPreviewDto(
+    @SerialName("preview_id") val previewId: String = "",
+    @SerialName("expires_at") val expiresAt: String = "",
+    @SerialName("redacted_text") val redactedText: String = "",
+    @SerialName("redacted_image_url") val redactedImageUrl: String? = null,
+    val redactions: List<String> = emptyList(),
+    @SerialName("confirmation_required") val confirmationRequired: Boolean = true,
+)
+
+@Serializable
+data class CommunityStateDto(
+    @SerialName("case_id") val caseId: String = "",
+    @SerialName("community_state") val communityState: String = "",
+    val revision: Int = 1,
+)
+
+@Serializable
+data class CommunityPublishRequestDto(
+    @SerialName("preview_id") val previewId: String,
+    @SerialName("publication_consent") val publicationConsent: Boolean = true,
+    @SerialName("rag_reuse_consent") val ragReuseConsent: Boolean = false,
+)

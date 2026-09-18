@@ -1,6 +1,8 @@
 package id.waspadai.app.feature.verification.presentation
 
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.feature.community.domain.CommunityPreview
+import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 
 data class VerificationUiState(
@@ -13,7 +15,8 @@ data class VerificationUiState(
     val isOverlayModeEnabled: Boolean = false,
     val isOverlayPrivacyDialogVisible: Boolean = false,
     val overlayCapturePreview: OverlayCapturePreview? = null,
-    val isRemoteEnabled: Boolean = false
+    val isRemoteEnabled: Boolean = false,
+    val communityShare: CommunityShareState = CommunityShareState(),
 ) {
     companion object {
         fun initial(isRemoteEnabled: Boolean): VerificationUiState {
@@ -45,6 +48,20 @@ sealed interface VerificationConversationItem {
     ) : VerificationConversationItem
 
     data class Analysis(val result: VerificationResult, val isSample: Boolean = false) : VerificationConversationItem
+}
+
+data class CommunityShareState(
+    val phase: CommunitySharePhase = CommunitySharePhase.Idle,
+    val ragReuseConsent: Boolean = false,
+)
+
+sealed interface CommunitySharePhase {
+    data object Idle : CommunitySharePhase
+    data object RequestingPreview : CommunitySharePhase
+    data class PreviewReady(val preview: CommunityPreview) : CommunitySharePhase
+    data object Publishing : CommunitySharePhase
+    data class Published(val state: CommunityState) : CommunitySharePhase
+    data class Failure(val message: String) : CommunitySharePhase
 }
 
 data class OverlayCapturePreview(

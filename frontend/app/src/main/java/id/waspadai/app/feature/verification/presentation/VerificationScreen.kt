@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,16 +24,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.waspadai.app.core.capture.CaptureEvent
 import id.waspadai.app.core.capture.CaptureResultBus
@@ -155,6 +160,70 @@ fun VerificationScreen(
         )
     }
 
+    when (val sharePhase = state.communityShare.phase) {
+        CommunitySharePhase.RequestingPreview,
+        CommunitySharePhase.Publishing -> {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Menyiapkan publikasi") },
+                text = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                        Text(
+                            if (sharePhase is CommunitySharePhase.Publishing) {
+                                "Mempublikasikan kasus ke Koneksi..."
+                            } else {
+                                "Membuat preview aman..."
+                            }
+                        )
+                    }
+                },
+                confirmButton = {},
+            )
+        }
+        is CommunitySharePhase.PreviewReady -> {
+            CommunityConsentDialog(
+                preview = sharePhase.preview,
+                ragReuseConsent = state.communityShare.ragReuseConsent,
+                onRagReuseConsentChanged = {
+                    onAction(VerificationAction.CommunityRagConsentChanged(it))
+                },
+                onDismiss = { onAction(VerificationAction.DismissCommunityShare) },
+                onPublish = { onAction(VerificationAction.PublishCommunity) },
+            )
+        }
+        is CommunitySharePhase.Published -> {
+            AlertDialog(
+                onDismissRequest = { onAction(VerificationAction.DismissCommunityShare) },
+                title = { Text("Berhasil dibagikan") },
+                text = {
+                    Text("Kasus sudah dipublikasikan ke Koneksi sebagai konten yang belum diverifikasi.")
+                },
+                confirmButton = {
+                    Button(onClick = { onAction(VerificationAction.DismissCommunityShare) }) {
+                        Text("Selesai")
+                    }
+                },
+            )
+        }
+        is CommunitySharePhase.Failure -> {
+            AlertDialog(
+                onDismissRequest = { onAction(VerificationAction.DismissCommunityShare) },
+                title = { Text("Gagal membagikan kasus") },
+                text = { Text(sharePhase.message) },
+                confirmButton = {
+                    TextButton(onClick = { onAction(VerificationAction.DismissCommunityShare) }) {
+                        Text("Tutup")
+                    }
+                },
+            )
+        }
+        CommunitySharePhase.Idle -> Unit
+    }
+
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val selection = runCatching { context.readImageSelection(uri) }.getOrNull()
@@ -218,7 +287,13 @@ fun VerificationScreen(
                     is VerificationConversationItem.UserMessage -> {
                         UserMessage(item.text, item.hasAttachment, item.attachmentName)
                     }
-                    is VerificationConversationItem.Analysis -> AnalysisCard(item.result, item.isSample)
+                    is VerificationConversationItem.Analysis -> AnalysisCard(
+                        result = item.result,
+                        isSample = item.isSample,
+                        onShareToCommunity = {
+                            onAction(VerificationAction.RequestCommunityPreview)
+                        },
+                    )
                 }
             }
             when (val phase = state.phase) {
@@ -259,6 +334,59 @@ fun VerificationScreen(
             modifier = Modifier.navigationBarsPadding(),
         )
     }
+}
+
+@Composable
+private fun CommunityConsentDialog(
+    preview: id.waspadai.app.feature.community.domain.CommunityPreview,
+    ragReuseConsent: Boolean,
+    onRagReuseConsentChanged: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    onPublish: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Preview Bagikan ke Koneksi") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Periksa teks aman berikut sebelum dipublikasikan. " +
+                        "Identitas pribadi dan data mentah tidak ikut dibagikan."
+                )
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF4F8FB)),
+                ) {
+                    Text(
+                        preview.redactedText,
+                        modifier = Modifier.padding(12.dp),
+                        color = Color(0xFF153A52),
+                    )
+                }
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = ragReuseConsent,
+                        onCheckedChange = onRagReuseConsentChanged,
+                    )
+                    Text("Izinkan kasus ini dipakai sebagai evidence AI berikutnya.")
+                }
+                Text(
+                    "Preview berlaku sampai ${preview.expiresAt}.",
+                    color = Color(0xFF557383),
+                    fontSize = 12.sp,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal")
+            }
+        },
+        confirmButton = {
+            Button(onClick = onPublish) {
+                Text("Publikasikan")
+            }
+        },
+    )
 }
 
 @Composable

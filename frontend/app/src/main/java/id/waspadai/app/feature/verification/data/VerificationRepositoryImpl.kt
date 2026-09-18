@@ -17,7 +17,7 @@ class VerificationRepositoryImpl(
 ) : VerificationRepository {
     override suspend fun submitText(text: String): AppResult<VerificationResult> = try {
         val envelope = remoteDataSource.submitText(text)
-        AppResult.Success(mapper.map(envelope.result))
+        AppResult.Success(mapper.map(envelope.result, envelope.history))
     } catch (error: CancellationException) {
         throw error
     } catch (error: MissingAccessTokenException) {
@@ -48,7 +48,7 @@ class VerificationRepositoryImpl(
             fileName = fileName,
             question = enrichedQuestion,
         )
-        AppResult.Success(mapper.map(envelope.result))
+        AppResult.Success(mapper.map(envelope.result, envelope.history))
     } catch (error: CancellationException) {
         throw error
     } catch (error: MissingAccessTokenException) {
@@ -96,7 +96,7 @@ class VerificationRepositoryImpl(
             VerificationHistoryDetail(
                 caseId = envelope.history.caseId,
                 inputText = envelope.inputText,
-                result = mapper.map(envelope.result)
+                result = mapper.map(envelope.result, envelope.history)
             )
         )
     } catch (error: CancellationException) {

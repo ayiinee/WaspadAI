@@ -27,6 +27,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -261,7 +263,11 @@ private fun AttachmentPreview(fileName: String) {
 }
 
 @Composable
-fun AnalysisCard(result: VerificationResult, isSample: Boolean) {
+fun AnalysisCard(
+    result: VerificationResult,
+    isSample: Boolean,
+    onShareToCommunity: () -> Unit = {},
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -300,6 +306,23 @@ fun AnalysisCard(result: VerificationResult, isSample: Boolean) {
             }
             Spacer(Modifier.height(13.dp))
             RiskLabel(result.riskLevel)
+            if (result.communityEligible &&
+                result.communityState == "PRIVATE" &&
+                !result.caseId.isNullOrBlank()
+            ) {
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = onShareToCommunity,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Bagikan ke Koneksi")
+                }
+            }
         }
     }
 }

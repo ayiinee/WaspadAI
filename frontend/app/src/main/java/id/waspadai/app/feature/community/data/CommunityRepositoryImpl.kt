@@ -3,13 +3,18 @@ package id.waspadai.app.feature.community.data
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.community.data.dto.CommunityItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityPageDto
+import id.waspadai.app.feature.community.data.dto.CommunityPreviewDto
+import id.waspadai.app.feature.community.data.dto.CommunityPublishRequestDto
+import id.waspadai.app.feature.community.data.dto.CommunityStateDto
 import id.waspadai.app.feature.community.data.dto.CommunityUserSummaryDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteCountsDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteResultDto
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
+import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityRepository
+import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
 import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
@@ -92,6 +97,47 @@ class CommunityRepositoryImpl(
         response.body<CommunityVoteResultDto>().toDomain()
     }
 
+    override suspend fun requestPreview(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+    ): AppResult<CommunityPreview> = runCommunityRequest {
+        val response = client.post(
+            "${baseUrl.normalized()}/api/v1/history/$caseId/community-preview"
+        ) {
+            authorize(accessToken)
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status)
+        }
+        response.body<CommunityPreviewDto>().toDomain()
+    }
+
+    override suspend fun publishCase(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+        previewId: String,
+        ragReuseConsent: Boolean,
+    ): AppResult<CommunityState> = runCommunityRequest {
+        val response = client.post("${baseUrl.normalized()}/api/v1/history/$caseId/community") {
+            authorize(accessToken)
+            headers {
+                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            }
+            setBody(
+                CommunityPublishRequestDto(
+                    previewId = previewId,
+                    ragReuseConsent = ragReuseConsent,
+                )
+            )
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status)
+        }
+        response.body<CommunityStateDto>().toDomain()
+    }
+
     private suspend fun <T> runCommunityRequest(block: suspend () -> T): AppResult<T> = try {
         AppResult.Success(block())
     } catch (error: CancellationException) {
@@ -136,6 +182,20 @@ private fun CommunityVoteResultDto.toDomain(): CommunityVoteUpdate = CommunityVo
     caseId = caseId,
     userVote = userVote.toVoteOrNull(),
     counts = counts.toDomain(),
+)
+
+private fun CommunityPreviewDto.toDomain(): CommunityPreview = CommunityPreview(
+    previewId = previewId,
+    expiresAt = expiresAt,
+    redactedText = redactedText,
+    redactedImageUrl = redactedImageUrl,
+    redactions = redactions,
+)
+
+private fun CommunityStateDto.toDomain(): CommunityState = CommunityState(
+    caseId = caseId,
+    communityState = communityState,
+    revision = revision,
 )
 
 private fun CommunityVoteCountsDto.toDomain(): CommunityVoteCounts = CommunityVoteCounts(

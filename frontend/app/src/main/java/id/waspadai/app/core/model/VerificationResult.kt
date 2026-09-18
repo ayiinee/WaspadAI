@@ -4,7 +4,10 @@ data class VerificationResult(
     val narrative: String,
     val riskLevel: RiskLevel,
     val reasons: List<String>,
-    val recommendedActions: List<String>
+    val recommendedActions: List<String>,
+    val caseId: String? = null,
+    val communityEligible: Boolean = false,
+    val communityState: String = "",
 )
 
 enum class RiskLevel(val label: String) {

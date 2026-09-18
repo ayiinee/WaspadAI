@@ -44,4 +44,12 @@ sealed interface VerificationAction {
     data object RefreshHistory : VerificationAction
 
     data class OpenHistory(val caseId: String) : VerificationAction
+
+    data object RequestCommunityPreview : VerificationAction
+
+    data class CommunityRagConsentChanged(val granted: Boolean) : VerificationAction
+
+    data object PublishCommunity : VerificationAction
+
+    data object DismissCommunityShare : VerificationAction
 }
