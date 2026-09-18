@@ -27,7 +27,7 @@ data class CommunityPost(
     val hoaksCount: Int = 0,
     val waspadaCount: Int = 0,
     val validCount: Int = 0,
-    val supportCount: Int = 0,
+    val viewCount: Int = 0,
     val commentCount: Int = 0,
     val isSupported: Boolean = false,
     val selectedVerdict: CommunityVerdict? = null,
@@ -37,6 +37,9 @@ data class CommunityPost(
 
     val cautionCount: Int
         get() = waspadaCount
+
+    val totalVoteCount: Int
+        get() = hoaksCount + waspadaCount + validCount
 }
 
 data class CommunitySummary(
@@ -116,8 +119,8 @@ private val sampleCommunityPosts = listOf(
         hoaksCount = 2,
         waspadaCount = 6,
         validCount = 2,
-        supportCount = 96,
-        commentCount = 23,
+        viewCount = 96,
+        commentCount = 3,
     ),
     CommunityPost(
         id = "gibran-position",
@@ -132,7 +135,7 @@ private val sampleCommunityPosts = listOf(
         hoaksCount = 1,
         waspadaCount = 7,
         validCount = 2,
-        supportCount = 74,
-        commentCount = 18,
+        viewCount = 74,
+        commentCount = 3,
     ),
 )

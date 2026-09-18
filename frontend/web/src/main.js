@@ -8,8 +8,14 @@ const config = {
 const conversation = document.querySelector("#conversation");
 const input = document.querySelector("#message-input");
 const imageInput = document.querySelector("#image-input");
+const fileInput = document.querySelector("#file-input");
 const attachmentPreview = document.querySelector("#attachment-preview");
 const sendButton = document.querySelector("#send-button");
+const modeToggle = document.querySelector("#mode-toggle");
+const attachButton = document.querySelector("#attach-button");
+const attachMenu = document.querySelector("#attach-menu");
+const choosePhoto = document.querySelector("#choose-photo");
+const chooseFile = document.querySelector("#choose-file");
 const authScreen = document.querySelector("#auth-screen");
 const appShell = document.querySelector("#app-shell");
 const authForm = document.querySelector("#auth-form");
@@ -242,7 +248,9 @@ function makeAttachment(name) {
   const inner = createElement("div", "attachment-inner");
   inner.append(createElement("p", "attachment-label", "Contoh lampiran"));
   const file = createElement("div", "attachment-file");
-  const icon = createElement("span", "attachment-icon", "APK");
+  const extension = name.split(".").pop()?.toUpperCase() || "FILE";
+  const isPhoto = /\.(png|jpe?g|webp)$/i.test(name);
+  const icon = createElement("span", "attachment-icon", isPhoto ? "IMG" : extension.slice(0, 4));
   const details = createElement("div", "attachment-details");
   details.append(createElement("strong", "", name));
   details.append(createElement("small", "", "5,1 MB · APK"));
@@ -384,6 +392,39 @@ function showAttachmentPreview() {
   attachmentPreview.append(remove);
 }
 
+function setAttachment(file) {
+  if (!file) return;
+  if (file.size > 8_000_000) {
+    state.messages.push({ kind: "status", error: true, text: "Ukuran lampiran melebihi batas 8 MB." });
+    render();
+    return;
+  }
+  state.attachment = file;
+  showAttachmentPreview();
+}
+
+function closeAttachMenu() {
+  attachMenu.hidden = true;
+  attachButton.setAttribute("aria-expanded", "false");
+}
+
+attachButton.addEventListener("click", () => {
+  const open = attachMenu.hidden;
+  attachMenu.hidden = !open;
+  attachButton.setAttribute("aria-expanded", String(open));
+});
+choosePhoto.addEventListener("click", () => { closeAttachMenu(); imageInput.click(); });
+chooseFile.addEventListener("click", () => { closeAttachMenu(); fileInput.click(); });
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".attach-menu-wrap")) closeAttachMenu();
+});
+modeToggle.addEventListener("click", () => {
+  const active = modeToggle.getAttribute("aria-pressed") === "true";
+  modeToggle.setAttribute("aria-pressed", String(!active));
+  modeToggle.classList.toggle("inactive", active);
+  modeToggle.setAttribute("aria-label", active ? "Aktifkan pemeriksaan pesan" : "Nonaktifkan pemeriksaan pesan");
+});
+
 async function submit() {
   const text = input.value.trim();
   const attachment = state.attachment;
@@ -426,14 +467,12 @@ async function submit() {
 imageInput.addEventListener("change", () => {
   const file = imageInput.files?.[0];
   if (!file) return;
-  if (file.size > 8_000_000) {
-    state.messages.push({ kind: "status", error: true, text: "Ukuran gambar melebihi batas 8 MB." });
-    imageInput.value = "";
-    render();
-    return;
-  }
-  state.attachment = file;
-  showAttachmentPreview();
+  setAttachment(file);
+  imageInput.value = "";
+});
+fileInput.addEventListener("change", () => {
+  setAttachment(fileInput.files?.[0]);
+  fileInput.value = "";
 });
 
 sendButton.addEventListener("click", submit);

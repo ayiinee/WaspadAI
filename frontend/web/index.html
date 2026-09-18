@@ -40,6 +40,10 @@
       <section class="app-frame" aria-label="WaspadAI demo browser">
         <header class="app-header">
           <h1>WaspadAI</h1>
+          <button id="mode-toggle" class="mode-toggle" type="button" aria-label="Aktifkan pemeriksaan pesan" aria-pressed="true">
+            <span class="mode-toggle-track" aria-hidden="true"><span class="mode-toggle-thumb"></span></span>
+            <span class="mode-toggle-label">Periksa</span>
+          </button>
         </header>
 
         <section id="conversation" class="conversation" aria-label="Riwayat pemeriksaan"></section>
@@ -47,11 +51,16 @@
         <section class="composer-section" aria-label="Kirim pesan untuk diperiksa">
           <div id="attachment-preview" class="attachment-preview" hidden></div>
           <div class="composer-row">
-            <button class="toggle-button" type="button" aria-label="Aktifkan pemeriksaan pesan"><span aria-hidden="true"></span></button>
-            <label class="attach-button" for="image-input" title="Tambahkan gambar">
+            <div class="attach-menu-wrap">
+              <button id="attach-button" class="attach-button" type="button" aria-label="Tambahkan foto atau file" aria-expanded="false" aria-controls="attach-menu">
               <span aria-hidden="true">+</span>
-              <span class="sr-only">Tambahkan gambar</span>
-            </label>
+              <span class="sr-only">Tambahkan foto atau file</span>
+              </button>
+              <div id="attach-menu" class="attach-menu" hidden>
+                <button id="choose-photo" type="button"><span class="attach-option-icon photo-icon" aria-hidden="true">▧</span><span>Foto</span></button>
+                <button id="choose-file" type="button"><span class="attach-option-icon file-icon" aria-hidden="true">▤</span><span>File</span></button>
+              </div>
+            </div>
             <textarea
               id="message-input"
               rows="1"
@@ -64,6 +73,7 @@
             </button>
           </div>
           <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+          <input id="file-input" type="file" accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.apk,application/pdf,text/plain,application/zip" hidden />
           <p class="composer-hint">Teks minimal 10 karakter. Gambar: JPG, PNG, atau WEBP, maksimal 8 MB.</p>
         </section>
 
