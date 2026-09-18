@@ -473,9 +473,7 @@ def _attempt_result(row: DictRow) -> QuizAttemptResult:
 
 def _progress_item(row: DictRow) -> LearningProgressItem:
     updated_at = (
-        row["latest_quiz_completed_at"]
-        or row["last_lesson_completed_at"]
-        or datetime.now(UTC)
+        row["latest_quiz_completed_at"] or row["last_lesson_completed_at"] or datetime.now(UTC)
     )
     return LearningProgressItem(
         module_id=row["module_id"],

@@ -217,7 +217,7 @@ async def create_community_preview(
         if case is None:
             raise ProductAPIError(404, "CASE_NOT_FOUND", "History tidak ditemukan.")
 
-        redacted_text = (case["sanitized_text"] or "").strip()
+        redacted_text = (case["sanitized_text"] or case["headline"] or "").strip()
         if not redacted_text:
             raise ProductAPIError(
                 422,

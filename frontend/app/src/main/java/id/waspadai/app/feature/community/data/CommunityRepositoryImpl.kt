@@ -148,7 +148,7 @@ class CommunityRepositoryImpl(
     } catch (error: CancellationException) {
         throw error
     } catch (error: CommunityApiException) {
-        AppResult.Failure(error.status.toSafeMessage())
+        AppResult.Failure(error.toSafeMessage())
     } catch (error: HttpRequestTimeoutException) {
         AppResult.Failure("Koneksi backend terlalu lama merespons.")
     } catch (error: IOException) {

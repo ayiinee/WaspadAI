@@ -145,7 +145,7 @@ def test_remote_image_sends_multipart_and_forces_both() -> None:
             body = request.read()
             assert str(request.url).endswith("/api/internal/v1/verify/image")
             assert request.headers["X-Waspadai-API-Key"] == "server-key"
-            assert b"name=\"image\"" in body
+            assert b'name="image"' in body
             assert b"output_mode" in body
             assert b"community_evidence_json" in body
             return httpx.Response(200, json=_result())
@@ -172,7 +172,7 @@ def test_remote_image_forwards_community_evidence_json() -> None:
 
         def handler(request: httpx.Request) -> httpx.Response:
             body = request.read()
-            assert b"name=\"community_evidence_json\"" in body
+            assert b'name="community_evidence_json"' in body
             assert b"COMMUNITY_VERIFIED_EVIDENCE" in body
             return httpx.Response(200, json=_result())
 

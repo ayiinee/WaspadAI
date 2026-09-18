@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Annotated
 from uuid import UUID
 
-import httpx
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import httpx
 
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -43,6 +46,7 @@ async def get_current_user(
             },
         )
     except httpx.RequestError as error:
+        logger.warning(f"Supabase auth request failed: {error}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="auth unavailable",
@@ -50,6 +54,7 @@ async def get_current_user(
     if response.status_code in {400, 401, 403}:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token")
     if response.is_error:
+        logger.warning(f"Supabase auth returned HTTP {response.status_code}: {response.text}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="auth unavailable",

@@ -441,6 +441,11 @@ async def _persist_terminal_result(
     reason = save_reason(result, settings) if eligible else "NOT_REQUIRED"
     case_id = uuid4() if eligible else None
     community_state = "PRIVATE" if eligible else "NOT_AVAILABLE"
+    sanitized_text = (
+        request.text
+        if request is not None
+        else (result.headline or result.privacy_notice or "")
+    )
     envelope = _envelope(
         request_id=operation_id,
         case_id=case_id,
@@ -464,7 +469,7 @@ async def _persist_terminal_result(
                     operation_id,
                     operation_id,
                     input_type,
-                    request.text if request is not None else None,
+                    sanitized_text,
                     digest,
                     result.headline,
                     result.verdict,

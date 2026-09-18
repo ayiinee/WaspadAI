@@ -153,10 +153,7 @@ def _records_from_rows(rows: list[DictRow], input_text: str) -> list[dict[str, A
         ),
         reverse=True,
     )
-    return [
-        record.model_dump(mode="json")
-        for record in records[:MAX_COMMUNITY_EVIDENCE_RECORDS]
-    ]
+    return [record.model_dump(mode="json") for record in records[:MAX_COMMUNITY_EVIDENCE_RECORDS]]
 
 
 def _record_from_group(rows: list[DictRow]) -> CommunityEvidenceRecord | None:

@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             max_keepalive_connections=settings.ai_service_max_keepalive_connections,
         ),
     )
-    app.state.auth_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0))
+    app.state.auth_client = httpx.AsyncClient(timeout=httpx.Timeout(15.0))
     app.state.db_pool = create_pool(settings)
     if app.state.db_pool is not None:
         await app.state.db_pool.open(wait=False)
@@ -347,9 +347,7 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await publish_community_case(
-            pool, app.state.settings, user.id, case_id, payload
-        )
+        return await publish_community_case(pool, app.state.settings, user.id, case_id, payload)
 
     @app.delete(
         "/api/v1/history/{case_id}/community",
@@ -446,9 +444,7 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await complete_lesson(
-            pool, app.state.settings, user.id, lesson_id, idempotency_key
-        )
+        return await complete_lesson(pool, app.state.settings, user.id, lesson_id, idempotency_key)
 
     @app.get(
         "/api/v1/learning/modules/{module_id}/quiz",
@@ -533,9 +529,7 @@ def _matches_image_signature(image_bytes: bytes, content_type: str | None) -> bo
         return image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
     if content_type == "image/webp":
         return (
-            len(image_bytes) >= 12
-            and image_bytes[:4] == b"RIFF"
-            and image_bytes[8:12] == b"WEBP"
+            len(image_bytes) >= 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
         )
     return False
 
