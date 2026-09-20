@@ -80,10 +80,12 @@ async def open_single_connection_pool(dsn: str) -> AsyncConnectionPool:
     await pool.open(wait=True)
     return pool
 
+
 async def _reset_connection(connection: psycopg.AsyncConnection) -> None:
     await connection.execute("RESET ALL")
     if not connection.autocommit:
         await connection.rollback()
+
 
 async def set_test_claim(connection: psycopg.AsyncConnection, user_id: UUID) -> None:
     # Match the Product backend's transaction-local claim mechanism.
@@ -193,7 +195,6 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
                         (operation_id,),
                     )
                     assert await cursor.fetchone() is None
-
 
             # max_size=1 reuses the pooled client connection. The transaction-local
             # claim itself must not survive; auth.uid() is intentionally exercised

@@ -285,7 +285,12 @@ def test_submit_quiz_valid_answers_computes_server_score(monkeypatch: pytest.Mon
 
     result = asyncio.run(
         learning_service.submit_quiz_attempt(
-            pool, settings, user_id, module_id, idempotency_key, payload  # type: ignore[arg-type]
+            pool,
+            settings,
+            user_id,
+            module_id,
+            idempotency_key,
+            payload,  # type: ignore[arg-type]
         )
     )
 
@@ -362,7 +367,12 @@ def test_submit_quiz_rejects_option_from_another_question(
     with pytest.raises(ProductAPIError) as exc_info:
         asyncio.run(
             learning_service.submit_quiz_attempt(
-                pool, settings, user_id, module_id, idempotency_key, payload  # type: ignore[arg-type]
+                pool,
+                settings,
+                user_id,
+                module_id,
+                idempotency_key,
+                payload,  # type: ignore[arg-type]
             )
         )
 
@@ -442,4 +452,3 @@ def test_user_progress_is_isolated_between_users(monkeypatch: pytest.MonkeyPatch
     # Verifikasi parameter user_id pada SQL query diikat ke user masing-masing
     assert executed_params[0] == (user_a, user_a, user_a)
     assert executed_params[1] == (user_b, user_b, user_b)
-
