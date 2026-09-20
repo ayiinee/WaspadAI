@@ -3,13 +3,18 @@ package id.waspadai.app.feature.community.data
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.community.data.dto.CommunityItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityPageDto
+import id.waspadai.app.feature.community.data.dto.CommunityPreviewDto
+import id.waspadai.app.feature.community.data.dto.CommunityPublishRequestDto
+import id.waspadai.app.feature.community.data.dto.CommunityStateDto
 import id.waspadai.app.feature.community.data.dto.CommunityUserSummaryDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteCountsDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteResultDto
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
+import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityRepository
+import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
 import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
@@ -24,12 +29,16 @@ import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 class CommunityRepositoryImpl(
     private val client: HttpClient,
@@ -45,10 +54,10 @@ class CommunityRepositoryImpl(
             authorize(accessToken)
         }
         if (!summary.status.isSuccess()) {
-            throw CommunityApiException(summary.status)
+            throw CommunityApiException(summary.status, summary.safeError())
         }
         if (!feed.status.isSuccess()) {
-            throw CommunityApiException(feed.status)
+            throw CommunityApiException(feed.status, feed.safeError())
         }
         val summaryDto = summary.body<CommunityUserSummaryDto>()
         val pageDto = feed.body<CommunityPageDto>()
@@ -73,7 +82,7 @@ class CommunityRepositoryImpl(
             setBody(CommunityVoteRequestDto(vote.wireValue))
         }
         if (!response.status.isSuccess()) {
-            throw CommunityApiException(response.status)
+            throw CommunityApiException(response.status, response.safeError())
         }
         response.body<CommunityVoteResultDto>().toDomain()
     }
@@ -87,9 +96,51 @@ class CommunityRepositoryImpl(
             authorize(accessToken)
         }
         if (!response.status.isSuccess()) {
-            throw CommunityApiException(response.status)
+            throw CommunityApiException(response.status, response.safeError())
         }
         response.body<CommunityVoteResultDto>().toDomain()
+    }
+
+    override suspend fun requestPreview(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+    ): AppResult<CommunityPreview> = runCommunityRequest {
+        val response = client.post(
+            "${baseUrl.normalized()}/api/v1/history/$caseId/community-preview"
+        ) {
+            authorize(accessToken)
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+        response.body<CommunityPreviewDto>().toDomain()
+    }
+
+    override suspend fun publishCase(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+        previewId: String,
+        ragReuseConsent: Boolean,
+    ): AppResult<CommunityState> = runCommunityRequest {
+        val response = client.post("${baseUrl.normalized()}/api/v1/history/$caseId/community") {
+            authorize(accessToken)
+            headers {
+                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            }
+            setBody(
+                CommunityPublishRequestDto(
+                    previewId = previewId,
+                    publicationConsent = true,
+                    ragReuseConsent = ragReuseConsent,
+                )
+            )
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+        response.body<CommunityStateDto>().toDomain()
     }
 
     private suspend fun <T> runCommunityRequest(block: suspend () -> T): AppResult<T> = try {
@@ -111,6 +162,13 @@ class CommunityRepositoryImpl(
             append(HttpHeaders.Authorization, "Bearer ${accessToken.trim()}")
         }
         accept(ContentType.Application.Json)
+    }
+
+    private suspend fun HttpResponse.safeError(): CommunityApiError? {
+        val rawBody = runCatching { bodyAsText() }.getOrNull() ?: return null
+        return runCatching {
+            json.decodeFromString<CommunityErrorEnvelope>(rawBody).error
+        }.getOrNull()
     }
 }
 
@@ -138,6 +196,20 @@ private fun CommunityVoteResultDto.toDomain(): CommunityVoteUpdate = CommunityVo
     counts = counts.toDomain(),
 )
 
+private fun CommunityPreviewDto.toDomain(): CommunityPreview = CommunityPreview(
+    previewId = previewId,
+    expiresAt = expiresAt,
+    redactedText = redactedText,
+    redactedImageUrl = redactedImageUrl,
+    redactions = redactions,
+)
+
+private fun CommunityStateDto.toDomain(): CommunityState = CommunityState(
+    caseId = caseId,
+    communityState = communityState,
+    revision = revision,
+)
+
 private fun CommunityVoteCountsDto.toDomain(): CommunityVoteCounts = CommunityVoteCounts(
     hoaks = hoaks,
     waspada = waspada,
@@ -157,6 +229,9 @@ private fun String?.toVoteOrNull(): CommunityVote? = when (this) {
     else -> null
 }
 
+private fun CommunityApiException.toSafeMessage(): String =
+    error?.message?.takeIf(String::isNotBlank) ?: status.toSafeMessage()
+
 private fun HttpStatusCode.toSafeMessage(): String = when (value) {
     401 -> "Token Supabase tidak valid atau sudah kedaluwarsa."
     403 -> "Aksi ini tidak diizinkan untuk akun ini."
@@ -166,4 +241,24 @@ private fun HttpStatusCode.toSafeMessage(): String = when (value) {
     else -> "Request Koneksi ditolak backend."
 }
 
-private class CommunityApiException(val status: HttpStatusCode) : RuntimeException()
+private class CommunityApiException(
+    val status: HttpStatusCode,
+    val error: CommunityApiError?,
+) : RuntimeException()
+
+@Serializable
+private data class CommunityErrorEnvelope(
+    val error: CommunityApiError? = null,
+)
+
+@Serializable
+private data class CommunityApiError(
+    val code: String = "",
+    val message: String = "",
+    val retryable: Boolean = false,
+)
+
+private val json = Json {
+    ignoreUnknownKeys = true
+    explicitNulls = false
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 import uvicorn
 
@@ -14,8 +15,8 @@ def selector_event_loop_factory(use_subprocess: bool = False) -> asyncio.Abstrac
 if __name__ == "__main__":
     config = uvicorn.Config(
         "app.main:app",
-        host="127.0.0.1",
-        port=8001,
+        host=os.getenv("APP_HOST", "0.0.0.0"),
+        port=int(os.getenv("APP_PORT", "8001")),
         reload=True,
         loop="run_server:selector_event_loop_factory",
     )

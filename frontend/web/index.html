@@ -86,7 +86,7 @@
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h5.5A2.5 2.5 0 0 1 12 8v12a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 5.5h-5.5A2.5 2.5 0 0 0 12 8v12a2.5 2.5 0 0 1 2.5-2.5H20z"/></svg>
             <span>Pelajari</span>
           </button>
-          <button class="center-nav" type="button" data-tab="Periksa" aria-label="Periksa informasi" aria-pressed="true">
+          <button class="center-nav active" type="button" data-tab="Periksa" aria-label="Periksa informasi" aria-pressed="true">
             <svg class="center-focus-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3"/></svg>
             <svg class="center-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="4.5"/><path d="m14 14 5 5"/></svg>
           </button>
@@ -135,6 +135,66 @@
       <section class="community-frame" aria-label="Detail kasus komunitas">
         <section id="community-detail-content" class="community-content"></section>
         <nav id="community-detail-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
+
+    <main id="learn-screen" class="page-shell" hidden>
+      <section class="learn-frame" aria-label="Halaman Pelajari">
+        <section class="learn-content">
+          <header class="learn-header">
+            <div>
+              <p class="learn-eyebrow">Ruang belajar</p>
+              <h1>Pelajari</h1>
+              <p class="learn-subtitle">Bangun kebiasaan mengenali informasi yang aman.</p>
+            </div>
+            <div class="learn-streak" aria-label="Streak belajar 3 hari"><span>✦</span><strong>3</strong><small>hari</small></div>
+          </header>
+          <section class="learn-tools" aria-label="Cari materi">
+            <label class="learn-search"><span class="sr-only">Cari materi</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg><input id="learn-search-input" type="search" placeholder="Cari materi atau topik..." /></label>
+          </section>
+          <section class="learn-challenge" aria-label="Misi terbatas">
+            <div class="learn-challenge-icon" aria-hidden="true">⚡</div>
+            <div><p class="learn-card-kicker">MISI KILAT · TERBATAS</p><h2>Jadi detektif hoaks hari ini</h2><p>Jawab 3 skenario singkat sebelum waktunya habis.</p></div>
+            <button type="button" class="learn-arrow" aria-label="Mulai misi">›</button>
+          </section>
+          <section class="learn-today" aria-labelledby="learn-today-title">
+            <div class="learn-section-heading"><div><p class="learn-card-kicker">LANGKAH BERIKUTNYA</p><h2 id="learn-today-title">Target hari ini</h2></div><span class="learn-progress-label">1 dari 3</span></div>
+            <div class="learn-progress"><span style="width: 34%"></span></div>
+          </section>
+          <section id="learn-materials" class="learn-materials" aria-label="Daftar materi"></section>
+        </section>
+        <nav id="learn-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
+
+    <main id="material-screen" class="page-shell" hidden>
+      <section class="material-frame" aria-label="Materi pembelajaran">
+        <section id="material-content" class="material-content"></section>
+        <nav id="material-nav" aria-label="Navigasi utama"></nav>
+        <div id="quiz-choice-modal" class="quiz-modal-backdrop" hidden>
+          <section class="quiz-choice-card" role="dialog" aria-modal="true" aria-labelledby="quiz-choice-title">
+            <button id="quiz-choice-close" class="quiz-modal-close" type="button" aria-label="Tutup">×</button>
+            <div class="quiz-choice-icon" aria-hidden="true">✓</div>
+            <p class="material-kicker">MATERI SELESAI</p>
+            <h2 id="quiz-choice-title">Siap menguji pemahamanmu?</h2>
+            <p>Kamu sudah menyelesaikan materi ini. Lanjutkan dengan latihan soal singkat atau kembali ke daftar materi.</p>
+            <div class="quiz-choice-actions">
+              <button id="quiz-start-button" class="material-primary-button" type="button">Mulai latihan soal</button>
+              <button id="quiz-later-button" class="material-secondary-button" type="button">Nanti saja</button>
+            </div>
+          </section>
+        </div>
+        <div id="quiz-screen" class="quiz-modal-backdrop" hidden>
+          <section class="quiz-card" role="dialog" aria-modal="true" aria-labelledby="quiz-title">
+            <header class="quiz-header">
+              <button id="quiz-back" class="material-back-button" type="button" aria-label="Kembali ke materi">←</button>
+              <div><p class="material-kicker">LATIHAN SOAL</p><h2 id="quiz-title">Cek pemahaman</h2></div>
+              <span id="quiz-count" class="quiz-count">1/3</span>
+            </header>
+            <div class="quiz-progress"><span id="quiz-progress-bar"></span></div>
+            <div id="quiz-body" class="quiz-body"></div>
+          </section>
+        </div>
       </section>
     </main>
     <script type="module" src="/src/main.js"></script>

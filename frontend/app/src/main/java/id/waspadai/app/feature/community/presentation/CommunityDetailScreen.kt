@@ -56,6 +56,7 @@ import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
 import id.waspadai.app.ui.theme.WaspadAIDarkBlue
 import id.waspadai.app.ui.theme.WaspadAIHoax
+import id.waspadai.app.ui.theme.WaspadAIMuted
 import id.waspadai.app.ui.theme.WaspadAIValid
 
 @Composable
@@ -109,14 +110,6 @@ fun CommunityDetailScreen(
                             lineHeight = 20.sp,
                             fontWeight = FontWeight.Bold,
                         )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = post.statusLabel,
-                            color = post.statusTextColor(),
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(post.body, color = Color.Black, fontSize = 15.sp, lineHeight = 22.sp)
@@ -166,12 +159,33 @@ private fun DetailAuthor(post: CommunityPost) {
             painter = painterResource(post.avatarRes),
             contentDescription = "Foto ${post.author}",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(52.dp).clip(CircleShape),
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape),
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f)) {
-            Text(post.author, color = WaspadAIDarkBlue, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text(post.timestamp, color = Color(0xFF71808A), fontSize = 12.sp)
+            Text(
+                text = post.author,
+                color = WaspadAIDarkBlue,
+                fontSize = 16.sp,
+                lineHeight = 19.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = post.timestamp,
+                color = WaspadAIMuted,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = post.statusLabel,
+                color = post.statusTextColor(),
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }

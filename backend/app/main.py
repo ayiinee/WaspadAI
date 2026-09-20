@@ -37,6 +37,14 @@ from app.community_service import (
 from app.config import get_settings
 from app.database import create_pool
 from app.errors import ProductAPIError, error_body
+from app.learning_service import (
+    complete_lesson,
+    get_learning_module_detail,
+    get_learning_progress,
+    get_module_quiz,
+    list_learning_modules,
+    submit_quiz_attempt,
+)
 from app.models import (
     CommunityDetail,
     CommunityPage,
@@ -48,6 +56,13 @@ from app.models import (
     CommunityVoteResult,
     HistoryPage,
     ImageVerificationRequest,
+    LearningModuleDetail,
+    LearningModuleItem,
+    LearningProgressResponse,
+    LearningQuiz,
+    LessonCompleteResponse,
+    QuizAttemptRequest,
+    QuizAttemptResult,
     TextVerificationRequest,
     VerificationEnvelope,
 )
@@ -384,6 +399,108 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         return await remove_community_vote(pool, app.state.settings, user.id, case_id)
+
+    @app.get(
+        "/api/v1/learning/modules",
+        tags=["Learning"],
+        response_model=list[LearningModuleItem],
+    )
+    async def list_learning_modules_endpoint(
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> list[LearningModuleItem]:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await list_learning_modules(pool, app.state.settings, user.id)
+
+    @app.get(
+        "/api/v1/learning/modules/{module_id}",
+        tags=["Learning"],
+        response_model=LearningModuleDetail,
+    )
+    async def get_learning_module_detail_endpoint(
+        module_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> LearningModuleDetail:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await get_learning_module_detail(pool, app.state.settings, user.id, module_id)
+
+    @app.post(
+        "/api/v1/learning/lessons/{lesson_id}/complete",
+        tags=["Learning"],
+        response_model=LessonCompleteResponse,
+    )
+    async def complete_lesson_endpoint(
+        lesson_id: UUID,
+        idempotency_key: UUID = Header(alias="Idempotency-Key"),
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> LessonCompleteResponse:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await complete_lesson(
+            pool, app.state.settings, user.id, lesson_id, idempotency_key
+        )
+
+    @app.get(
+        "/api/v1/learning/modules/{module_id}/quiz",
+        tags=["Learning"],
+        response_model=LearningQuiz,
+    )
+    async def get_module_quiz_endpoint(
+        module_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> LearningQuiz:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await get_module_quiz(pool, app.state.settings, user.id, module_id)
+
+    @app.post(
+        "/api/v1/learning/modules/{module_id}/quiz-attempts",
+        tags=["Learning"],
+        response_model=QuizAttemptResult,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def submit_quiz_attempt_endpoint(
+        module_id: UUID,
+        payload: QuizAttemptRequest,
+        idempotency_key: UUID = Header(alias="Idempotency-Key"),
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> QuizAttemptResult:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await submit_quiz_attempt(
+            pool, app.state.settings, user.id, module_id, idempotency_key, payload
+        )
+
+    @app.get(
+        "/api/v1/learning/progress",
+        tags=["Learning"],
+        response_model=LearningProgressResponse,
+    )
+    async def get_learning_progress_endpoint(
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> LearningProgressResponse:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await get_learning_progress(pool, app.state.settings, user.id)
 
     return app
 

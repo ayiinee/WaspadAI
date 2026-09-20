@@ -260,3 +260,163 @@ class CommunityStateResponse(BaseModel):
     case_id: UUID
     community_state: Literal["PRIVATE", "PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE", "WITHDRAWN"]
     revision: int = Field(ge=1)
+
+
+class CommunityEvidenceSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=300)
+    publisher: str = Field(min_length=1, max_length=200)
+    published_at: str | None = None
+
+
+class CommunityEvidenceRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["1.0"] = "1.0"
+    record_type: Literal["COMMUNITY_VERIFIED_EVIDENCE"] = "COMMUNITY_VERIFIED_EVIDENCE"
+    community_post_id: UUID
+    case_id: UUID
+    revision: int = Field(ge=1)
+    content_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    status: Literal["VERIFIED_EVIDENCE"] = "VERIFIED_EVIDENCE"
+    title: str = Field(min_length=1, max_length=200)
+    verified_claim: str = Field(min_length=1, max_length=500)
+    stance: Literal["SUPPORTS", "REFUTES", "CONTEXT"]
+    evidence_summary: str = Field(min_length=1, max_length=800)
+    redacted_text: str = Field(min_length=1, max_length=4_000)
+    published_at: str
+    verified_at: str
+    sources: list[CommunityEvidenceSource] = Field(min_length=1, max_length=3)
+
+
+class LearningModuleItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: UUID
+    slug: str
+    title: str
+    summary: str
+    difficulty: int = Field(ge=1, le=5)
+    version: int = Field(ge=1)
+    total_lessons: int = Field(ge=0)
+    completed_lessons: int = Field(ge=0)
+    progress_percent: float = Field(ge=0, le=100)
+
+
+class LearningLesson(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lesson_id: UUID
+    title: str
+    body_md: str
+    duration_minutes: int = Field(ge=1)
+    display_order: int = Field(ge=0)
+    completed: bool
+
+
+class LearningModuleDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: UUID
+    slug: str
+    title: str
+    summary: str
+    difficulty: int = Field(ge=1, le=5)
+    version: int = Field(ge=1)
+    total_lessons: int = Field(ge=0)
+    completed_lessons: int = Field(ge=0)
+    progress_percent: float = Field(ge=0, le=100)
+    lessons: list[LearningLesson]
+
+
+class LessonCompleteResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lesson_id: UUID
+    module_id: UUID
+    completed: Literal[True] = True
+    completed_at: str
+    progress_percent: float = Field(ge=0, le=100)
+
+
+class QuizOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    option_id: UUID
+    text: str
+
+
+class QuizQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: UUID
+    text: str
+    options: list[QuizOption]
+
+
+class LearningQuiz(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: UUID
+    module_version: int = Field(ge=1)
+    questions: list[QuizQuestion]
+
+
+class QuizAttemptAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: UUID
+    selected_option_id: UUID
+
+
+class QuizAttemptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_version: int = Field(ge=1)
+    answers: list[QuizAttemptAnswer] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def reject_duplicate_questions(self) -> QuizAttemptRequest:
+        question_ids = [answer.question_id for answer in self.answers]
+        if len(set(question_ids)) != len(question_ids):
+            raise ValueError("answers must contain each question at most once")
+        return self
+
+
+class QuizQuestionFeedback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: UUID
+    selected_option_id: UUID
+    correct: bool
+    explanation: str
+
+
+class QuizAttemptResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attempt_id: UUID
+    score: float = Field(ge=0, le=100)
+    correct_answers: int = Field(ge=0)
+    total_questions: int = Field(ge=1)
+    feedback: list[QuizQuestionFeedback]
+
+
+class LearningProgressItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: UUID
+    completed_lessons: int = Field(ge=0)
+    total_lessons: int = Field(ge=0)
+    progress_percent: float = Field(ge=0, le=100)
+    latest_score: float | None = Field(default=None, ge=0, le=100)
+    best_score: float | None = Field(default=None, ge=0, le=100)
+    updated_at: str
+
+
+class LearningProgressResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[LearningProgressItem]

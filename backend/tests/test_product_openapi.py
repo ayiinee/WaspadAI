@@ -25,6 +25,22 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert "/api/v1/community/{case_id}" in specification["paths"]
     assert "/api/v1/history/{case_id}/community-preview" in specification["paths"]
     assert "/api/v1/history/{case_id}/community" in specification["paths"]
+    assert "/api/v1/learning/modules" in specification["paths"]
+    assert "/api/v1/learning/modules/{module_id}" in specification["paths"]
+    assert "/api/v1/learning/lessons/{lesson_id}/complete" in specification["paths"]
+    assert "/api/v1/learning/modules/{module_id}/quiz" in specification["paths"]
+    assert "/api/v1/learning/modules/{module_id}/quiz-attempts" in specification["paths"]
+    assert "/api/v1/learning/progress" in specification["paths"]
+    complete_parameters = specification["paths"][
+        "/api/v1/learning/lessons/{lesson_id}/complete"
+    ]["post"]["parameters"]
+    assert "Idempotency-Key" in {parameter["name"] for parameter in complete_parameters}
+    quiz_attempt_parameters = specification["paths"][
+        "/api/v1/learning/modules/{module_id}/quiz-attempts"
+    ]["post"]["parameters"]
+    assert "Idempotency-Key" in {parameter["name"] for parameter in quiz_attempt_parameters}
+    quiz_option_schema = specification["components"]["schemas"]["QuizOption"]
+    assert "is_correct" not in quiz_option_schema["properties"]
     withdrawal = specification["paths"]["/api/v1/history/{case_id}/community"]["delete"]
     assert withdrawal["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/CommunityStateResponse"

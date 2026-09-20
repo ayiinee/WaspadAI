@@ -20,6 +20,20 @@ interface CommunityRepository {
         accessToken: String,
         caseId: String,
     ): AppResult<CommunityVoteUpdate>
+
+    suspend fun requestPreview(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+    ): AppResult<CommunityPreview>
+
+    suspend fun publishCase(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+        previewId: String,
+        ragReuseConsent: Boolean,
+    ): AppResult<CommunityState>
 }
 
 data class CommunitySnapshot(
@@ -54,6 +68,20 @@ data class CommunityVoteUpdate(
     val caseId: String,
     val userVote: CommunityVote?,
     val counts: CommunityVoteCounts,
+)
+
+data class CommunityPreview(
+    val previewId: String,
+    val expiresAt: String,
+    val redactedText: String,
+    val redactedImageUrl: String?,
+    val redactions: List<String>,
+)
+
+data class CommunityState(
+    val caseId: String,
+    val communityState: String,
+    val revision: Int,
 )
 
 enum class CommunityPostStatus {

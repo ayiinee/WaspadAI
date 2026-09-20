@@ -1,4 +1,4 @@
-package id.waspadai.app.feature.community.presentation
+﻿package id.waspadai.app.feature.community.presentation
 
 import android.content.Intent
 import android.net.Uri
@@ -248,25 +248,37 @@ internal fun CommunityPageHeader(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(WaspadAIBlue)
-            .statusBarsPadding()
-            .height(64.dp),
+            .background(WaspadAIBlue),
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 16.dp),
-        ) {
-            Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-        }
-        Text(
-            text = title,
-            modifier = Modifier.align(Alignment.Center),
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
+        Image(
+            painter = painterResource(id = R.drawable.community_header_background),
+            contentDescription = null,
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Crop,
+            alpha = .6f,
         )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(64.dp),
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 16.dp),
+            ) {
+                Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+            }
+            Text(
+                text = title,
+                modifier = Modifier.align(Alignment.Center),
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
     }
 }
 
@@ -691,7 +703,7 @@ private fun CommunityPostCard(
                 evidenceRes = post.evidenceRes,
                 author = post.author,
             )
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -703,14 +715,14 @@ private fun CommunityPostCard(
             ) {
                 Text("Beri penilaian", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.height(5.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = "Agregat: Hoaks ${post.hoaksCount} - Waspada ${post.waspadaCount} - Valid ${post.validCount}",
                 color = WaspadAIMuted,
                 fontSize = 10.sp,
                 lineHeight = 12.sp,
             )
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -832,13 +844,13 @@ fun CommunityAssessmentPanel(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                         .background(WaspadAIBlue)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         "Beri penilaian",
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )
@@ -847,9 +859,9 @@ fun CommunityAssessmentPanel(
                             onClick = onToggle,
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .size(36.dp),
+                                .size(32.dp),
                         ) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Tutup formulir", tint = Color.White)
+                            Icon(Icons.Rounded.Close, contentDescription = "Tutup formulir", tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -900,7 +912,7 @@ fun CommunityAssessmentPanel(
                             enabled = submissionState == AssessmentSubmissionState.Editing,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, WaspadAIBlue, RoundedCornerShape(8.dp)),
+                                .border(1.dp, WaspadAILightBlue, RoundedCornerShape(8.dp)),
                             placeholder = {
                                 Text(
                                     "Jelaskan sumber, konteks, atau alasan penilaian Anda.",
@@ -941,14 +953,14 @@ fun CommunityAssessmentPanel(
                                     .fillMaxWidth()
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .border(1.dp, WaspadAIBlue, RoundedCornerShape(8.dp))
+                                    .border(1.dp, WaspadAILightBlue, RoundedCornerShape(8.dp))
                                     .clickable(enabled = submissionState == AssessmentSubmissionState.Editing) {
                                         evidencePicker.launch(arrayOf("*/*"))
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
-                                    text = "* Pilih file bukti (wajib)",
+                                    text = "+ Tambahkan bukti",
                                     color = WaspadAIBlue,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,

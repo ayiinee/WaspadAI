@@ -6,6 +6,8 @@ import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.auth.data.SupabaseAuthRepository
 import id.waspadai.app.feature.community.data.CommunityRepositoryImpl
 import id.waspadai.app.feature.community.domain.CommunityRepository
+import id.waspadai.app.feature.learning.data.LearningRepositoryImpl
+import id.waspadai.app.feature.learning.domain.LearningRepository
 import id.waspadai.app.feature.verification.data.MockVerificationRepository
 import id.waspadai.app.feature.verification.data.VerificationRemoteDataSource
 import id.waspadai.app.feature.verification.data.VerificationRepositoryImpl
@@ -17,6 +19,10 @@ class WaspadAIApplication : Application() {
 
     val communityRepository: CommunityRepository by lazy {
         CommunityRepositoryImpl(apiClient)
+    }
+
+    val learningRepository: LearningRepository by lazy {
+        LearningRepositoryImpl(apiClient)
     }
 
     val authRepository by lazy {

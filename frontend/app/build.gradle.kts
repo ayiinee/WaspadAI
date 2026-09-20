@@ -42,7 +42,7 @@ android {
         buildConfigField(
             "String",
             "WASPADAI_API_BASE_URL",
-            buildConfigString(publicConfig("WASPADAI_API_BASE_URL", "http://127.0.0.1:8001"))
+            buildConfigString(publicConfig("WASPADAI_API_BASE_URL", "http://10.0.2.2:8001"))
         )
         buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", publicConfig("WASPADAI_REMOTE_ENABLED", "true"))
         buildConfigField(

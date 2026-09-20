@@ -8,4 +8,8 @@ data class WaspadAiApiConfig(private val baseUrl: String) {
     val historyUrl: String = "$normalizedBaseUrl/api/v1/history"
 
     fun historyDetailUrl(caseId: String): String = "$historyUrl/$caseId"
+
+    fun communityPreviewUrl(caseId: String): String = "$historyUrl/$caseId/community-preview"
+
+    fun communityPublishUrl(caseId: String): String = "$historyUrl/$caseId/community"
 }

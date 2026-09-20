@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
+import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
+import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
@@ -19,6 +22,10 @@ class VerificationViewModel(
     private val submitImageVerification: SubmitImageVerificationUseCase,
     private val loadHistory: LoadVerificationHistoryUseCase,
     private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
+    private val requestCommunityPreview: RequestCommunityPreviewUseCase,
+    private val publishCommunityCase: PublishCommunityCaseUseCase,
+    private val communityBaseUrl: String,
+    private val accessTokenProvider: AccessTokenProvider,
     isRemoteEnabled: Boolean
 ) : ViewModel() {
     private val _state = MutableStateFlow(VerificationUiState.initial(isRemoteEnabled))
@@ -29,13 +36,34 @@ class VerificationViewModel(
             is VerificationAction.InputChanged -> updateInput(action.value)
             VerificationAction.SubmitText -> submitText()
             VerificationAction.RequestImageCapture -> Unit
-            is VerificationAction.SubmitImage -> submitImage(action)
+            is VerificationAction.ImageSelected -> showImagePreview(action)
+            VerificationAction.SubmitPendingImage -> submitPendingImage()
+            VerificationAction.DismissImagePreview -> dismissImagePreview()
             is VerificationAction.ImageSelectionFailed -> showImageSelectionFailure(action.message)
-            VerificationAction.ToggleOverlayMode -> toggleOverlayMode()
+            VerificationAction.RequestOverlayMode -> requestOverlayMode()
+            VerificationAction.AcceptOverlayPrivacy -> acceptOverlayPrivacy()
+            VerificationAction.DismissOverlayPrivacy -> dismissOverlayPrivacy()
+            is VerificationAction.OverlayPermissionResult -> setOverlayPermissionResult(action.granted)
+            is VerificationAction.OverlayModeConsentResult -> setOverlayModeFromConsent(action.granted)
+            is VerificationAction.OverlayCaptureReady -> showImagePreview(
+                VerificationAction.ImageSelected(
+                    imageBytes = action.imageBytes,
+                    contentType = action.contentType,
+                    fileName = action.fileName,
+                    overlayModeEnabled = true,
+                )
+            )
+            VerificationAction.OverlayStopped -> stopOverlayMode()
             VerificationAction.DismissFailure -> dismissFailure()
             VerificationAction.ToggleHistory -> toggleHistory()
             VerificationAction.RefreshHistory -> refreshHistory()
             is VerificationAction.OpenHistory -> openHistory(action.caseId)
+            VerificationAction.RequestCommunityPreview -> requestCommunityPreview()
+            is VerificationAction.CommunityRagConsentChanged -> _state.update {
+                it.copy(communityShare = it.communityShare.copy(ragReuseConsent = action.granted))
+            }
+            VerificationAction.PublishCommunity -> publishCommunity()
+            VerificationAction.DismissCommunityShare -> dismissCommunityShare()
         }
     }
 
@@ -74,21 +102,21 @@ class VerificationViewModel(
         }
     }
 
-    private fun submitImage(action: VerificationAction.SubmitImage) {
+    private fun submitImage(
+        action: VerificationAction.ImageSelected,
+        forceOverlayModeEnabled: Boolean? = null,
+    ) {
         val question = state.value.draft.trim().takeIf(String::isNotBlank)
-        val overlayModeEnabled = state.value.isOverlayModeEnabled
-        val userMessage = question ?: if (overlayModeEnabled) {
-            "Periksa gambar ini dengan mode overlay."
-        } else {
-            "Periksa gambar ini."
-        }
+        val overlayModeEnabled = forceOverlayModeEnabled ?: state.value.isOverlayModeEnabled
+        val userMessage = question ?: "Gambar dikirim untuk diperiksa."
         _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
         viewModelScope.launch {
             _state.update { current ->
                 current.copy(
                     conversation = current.conversation + VerificationConversationItem.UserMessage(
                         text = userMessage,
-                        hasAttachment = true
+                        hasAttachment = true,
+                        attachmentName = action.fileName
                     ),
                     phase = VerificationPhase.Submitting
                 )
@@ -120,12 +148,92 @@ class VerificationViewModel(
         _state.update { current -> current.copy(phase = VerificationPhase.Failure(message)) }
     }
 
-    private fun toggleOverlayMode() {
+    private fun requestOverlayMode() {
+        if (state.value.isOverlayModeEnabled) {
+            stopOverlayMode()
+        } else {
+            _state.update { current ->
+                current.copy(isOverlayPrivacyDialogVisible = true, phase = VerificationPhase.Idle)
+            }
+        }
+    }
+
+    private fun acceptOverlayPrivacy() {
+        _state.update { current ->
+            current.copy(isOverlayPrivacyDialogVisible = false, phase = VerificationPhase.Idle)
+        }
+    }
+
+    private fun dismissOverlayPrivacy() {
+        _state.update { current ->
+            current.copy(isOverlayPrivacyDialogVisible = false, isOverlayModeEnabled = false)
+        }
+    }
+
+    private fun setOverlayPermissionResult(granted: Boolean) {
+        if (granted) {
+            _state.update { current -> current.copy(phase = VerificationPhase.Idle) }
+        } else {
+            _state.update { current ->
+                current.copy(
+                    isOverlayModeEnabled = false,
+                    phase = VerificationPhase.Failure("Izin tampil di atas aplikasi lain belum aktif. Aktifkan izin overlay lalu coba lagi.")
+                )
+            }
+        }
+    }
+
+    private fun setOverlayModeFromConsent(granted: Boolean) {
         _state.update { current ->
             current.copy(
-                isOverlayModeEnabled = !current.isOverlayModeEnabled,
+                isOverlayModeEnabled = granted,
+                phase = if (granted) {
+                    VerificationPhase.Idle
+                } else {
+                    VerificationPhase.Failure("Izin tangkapan layar dibatalkan. Mode overlay belum aktif.")
+                },
+            )
+        }
+    }
+
+    private fun showImagePreview(action: VerificationAction.ImageSelected) {
+        _state.update { current ->
+            current.copy(
+                isOverlayModeEnabled = false,
+                pendingImagePreview = ImageVerificationPreview(
+                    imageBytes = action.imageBytes,
+                    contentType = action.contentType,
+                    fileName = action.fileName,
+                    overlayModeEnabled = action.overlayModeEnabled,
+                ),
                 phase = VerificationPhase.Idle,
             )
+        }
+    }
+
+    private fun stopOverlayMode() {
+        _state.update { current ->
+            current.copy(isOverlayModeEnabled = false, phase = VerificationPhase.Idle)
+        }
+    }
+
+    private fun submitPendingImage() {
+        val preview = state.value.pendingImagePreview ?: return
+        _state.update { current -> current.copy(pendingImagePreview = null) }
+        submitImage(
+            VerificationAction.ImageSelected(
+                imageBytes = preview.imageBytes,
+                contentType = preview.contentType,
+                fileName = preview.fileName,
+                overlayModeEnabled = preview.overlayModeEnabled,
+            ),
+            forceOverlayModeEnabled = preview.overlayModeEnabled,
+        )
+    }
+
+    private fun dismissImagePreview() {
+        _state.update { current ->
+            current.copy(pendingImagePreview = null, phase = VerificationPhase.Idle)
         }
     }
 
@@ -184,11 +292,138 @@ class VerificationViewModel(
         }
     }
 
+    private fun requestCommunityPreview() {
+        val result = currentResult() ?: return
+        val caseId = result.caseId ?: return
+        if (!result.communityEligible || result.communityState != "PRIVATE") return
+        _state.update {
+            it.copy(
+                communityShare = it.communityShare.copy(
+                    phase = CommunitySharePhase.RequestingPreview,
+                    ragReuseConsent = false,
+                )
+            )
+        }
+        viewModelScope.launch {
+            val token = accessTokenProvider.currentAccessToken()
+            if (token.isNullOrBlank()) {
+                _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(
+                                "Sesi Supabase belum tersedia. Login ulang lalu coba lagi."
+                            )
+                        )
+                    )
+                }
+                return@launch
+            }
+            when (
+                val result = requestCommunityPreview(
+                    baseUrl = communityBaseUrl,
+                    accessToken = token,
+                    caseId = caseId,
+                )
+            ) {
+                is AppResult.Success -> _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.PreviewReady(result.value)
+                        )
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(result.message)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun publishCommunity() {
+        val result = currentResult() ?: return
+        val caseId = result.caseId ?: return
+        val preview = (state.value.communityShare.phase as? CommunitySharePhase.PreviewReady)?.preview
+            ?: return
+        _state.update {
+            it.copy(communityShare = it.communityShare.copy(phase = CommunitySharePhase.Publishing))
+        }
+        viewModelScope.launch {
+            val token = accessTokenProvider.currentAccessToken()
+            if (token.isNullOrBlank()) {
+                _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(
+                                "Sesi Supabase belum tersedia. Login ulang lalu coba lagi."
+                            )
+                        )
+                    )
+                }
+                return@launch
+            }
+            when (
+                val published = publishCommunityCase(
+                    baseUrl = communityBaseUrl,
+                    accessToken = token,
+                    caseId = caseId,
+                    previewId = preview.previewId,
+                    ragReuseConsent = state.value.communityShare.ragReuseConsent,
+                )
+            ) {
+                is AppResult.Success -> _state.update { current ->
+                    val updatedResult = result.copy(
+                        communityState = published.value.communityState,
+                        communityEligible = false,
+                    )
+                    current.copy(
+                        conversation = current.conversation.map { item ->
+                            if (item is VerificationConversationItem.Analysis && item.result.caseId == caseId) {
+                                item.copy(result = updatedResult)
+                            } else {
+                                item
+                            }
+                        },
+                        communityShare = current.communityShare.copy(
+                            phase = CommunitySharePhase.Published(published.value)
+                        )
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        communityShare = it.communityShare.copy(
+                            phase = CommunitySharePhase.Failure(published.message)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun dismissCommunityShare() {
+        _state.update {
+            it.copy(communityShare = CommunityShareState())
+        }
+    }
+
+    private fun currentResult(): id.waspadai.app.core.model.VerificationResult? =
+        state.value.conversation.asReversed()
+            .filterIsInstance<VerificationConversationItem.Analysis>()
+            .firstOrNull()
+            ?.result
+
     class Factory(
         private val submitTextVerification: SubmitTextVerificationUseCase,
         private val submitImageVerification: SubmitImageVerificationUseCase,
         private val loadHistory: LoadVerificationHistoryUseCase,
         private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
+        private val requestCommunityPreview: RequestCommunityPreviewUseCase,
+        private val publishCommunityCase: PublishCommunityCaseUseCase,
+        private val communityBaseUrl: String,
+        private val accessTokenProvider: AccessTokenProvider,
         private val isRemoteEnabled: Boolean
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -199,6 +434,10 @@ class VerificationViewModel(
                 submitImageVerification,
                 loadHistory,
                 loadHistoryDetail,
+                requestCommunityPreview,
+                publishCommunityCase,
+                communityBaseUrl,
+                accessTokenProvider,
                 isRemoteEnabled
             ) as T
         }

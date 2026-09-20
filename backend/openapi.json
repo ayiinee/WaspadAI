@@ -1,0 +1,2361 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WaspadAI Product API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Readiness",
+        "operationId": "readiness_api_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Readiness Api Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/verifications/text": {
+      "post": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Verify Text Endpoint",
+        "operationId": "verify_text_endpoint_api_v1_verifications_text_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextVerificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/verifications/image": {
+      "post": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Verify Image Endpoint",
+        "operationId": "verify_image_endpoint_api_v1_verifications_image_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_verify_image_endpoint_api_v1_verifications_image_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/history": {
+      "get": {
+        "tags": [
+          "History"
+        ],
+        "summary": "List History Endpoint",
+        "operationId": "list_history_endpoint_api_v1_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/history/{case_id}": {
+      "get": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Get History Detail Endpoint",
+        "operationId": "get_history_detail_endpoint_api_v1_history__case_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "List Community Endpoint",
+        "operationId": "list_community_endpoint_api_v1_community_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/me/summary": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Get Community User Summary Endpoint",
+        "operationId": "get_community_user_summary_endpoint_api_v1_community_me_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityUserSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/community/{case_id}": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Get Community Detail Endpoint",
+        "operationId": "get_community_detail_endpoint_api_v1_community__case_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/history/{case_id}/community-preview": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Create Community Preview Endpoint",
+        "operationId": "create_community_preview_endpoint_api_v1_history__case_id__community_preview_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/history/{case_id}/community": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Publish Community Case Endpoint",
+        "operationId": "publish_community_case_endpoint_api_v1_history__case_id__community_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityPublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Withdraw Community Case Endpoint",
+        "operationId": "withdraw_community_case_endpoint_api_v1_history__case_id__community_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/{case_id}/vote": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Cast Community Vote Endpoint",
+        "operationId": "cast_community_vote_endpoint_api_v1_community__case_id__vote_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityVoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityVoteResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Remove Community Vote Endpoint",
+        "operationId": "remove_community_vote_endpoint_api_v1_community__case_id__vote_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityVoteResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/modules": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "List Learning Modules Endpoint",
+        "operationId": "list_learning_modules_endpoint_api_v1_learning_modules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LearningModuleItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Learning Modules Endpoint Api V1 Learning Modules Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning/modules/{module_id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get Learning Module Detail Endpoint",
+        "operationId": "get_learning_module_detail_endpoint_api_v1_learning_modules__module_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Module Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningModuleDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/lessons/{lesson_id}/complete": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Complete Lesson Endpoint",
+        "operationId": "complete_lesson_endpoint_api_v1_learning_lessons__lesson_id__complete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lesson_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lesson Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonCompleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/modules/{module_id}/quiz": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get Module Quiz Endpoint",
+        "operationId": "get_module_quiz_endpoint_api_v1_learning_modules__module_id__quiz_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Module Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningQuiz"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/modules/{module_id}/quiz-attempts": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Submit Quiz Attempt Endpoint",
+        "operationId": "submit_quiz_attempt_endpoint_api_v1_learning_modules__module_id__quiz_attempts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Module Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuizAttemptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizAttemptResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/progress": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get Learning Progress Endpoint",
+        "operationId": "get_learning_progress_endpoint_api_v1_learning_progress_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProgressResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AIResult": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "COMPLETED",
+            "title": "Status"
+          },
+          "mode": {
+            "type": "string",
+            "const": "LIVE",
+            "title": "Mode"
+          },
+          "mode_notice": {
+            "type": "string",
+            "title": "Mode Notice"
+          },
+          "input_summary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Summary"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "risk_level": {
+            "type": "string",
+            "title": "Risk Level"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Dimensions"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "evidence_sufficiency": {
+            "type": "number",
+            "title": "Evidence Sufficiency"
+          },
+          "evidence_sufficiency_label": {
+            "type": "string",
+            "title": "Evidence Sufficiency Label"
+          },
+          "what_checked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "What Checked"
+          },
+          "why": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Why"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "recommended_actions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Recommended Actions"
+          },
+          "sources": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "uncertainty": {
+            "type": "string",
+            "title": "Uncertainty"
+          },
+          "requires_human_review": {
+            "type": "boolean",
+            "title": "Requires Human Review"
+          },
+          "community_status": {
+            "type": "string",
+            "title": "Community Status"
+          },
+          "privacy_notice": {
+            "type": "string",
+            "title": "Privacy Notice"
+          },
+          "rulebook": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Rulebook"
+          },
+          "pipeline": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Pipeline"
+          },
+          "presentation": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Presentation"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "trace_id",
+          "status",
+          "mode",
+          "mode_notice",
+          "input_summary",
+          "verdict",
+          "risk_level",
+          "dimensions",
+          "headline",
+          "evidence_sufficiency",
+          "evidence_sufficiency_label",
+          "what_checked",
+          "why",
+          "evidence",
+          "recommended_actions",
+          "sources",
+          "uncertainty",
+          "requires_human_review",
+          "community_status",
+          "privacy_notice",
+          "rulebook",
+          "pipeline",
+          "presentation",
+          "disclaimer"
+        ],
+        "title": "AIResult",
+        "description": "The Product stores the complete, validated upstream-shaped result."
+      },
+      "Body_verify_image_endpoint_api_v1_verifications_image_post": {
+        "properties": {
+          "image": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Image"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image"
+        ],
+        "title": "Body_verify_image_endpoint_api_v1_verifications_image_post"
+      },
+      "CommunityDetail": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "redacted_text": {
+            "type": "string",
+            "title": "Redacted Text"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED_UNVERIFIED",
+              "VERIFIED_EVIDENCE"
+            ],
+            "title": "Status"
+          },
+          "published_at": {
+            "type": "string",
+            "title": "Published At"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CommunityVoteCounts"
+          },
+          "user_vote": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "HOAKS",
+                  "WASPADA",
+                  "VALID"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Vote"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AIResult"
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "MOCK",
+              "REMOTE"
+            ],
+            "title": "Execution Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "title",
+          "redacted_text",
+          "status",
+          "published_at",
+          "counts",
+          "user_vote",
+          "result",
+          "execution_mode"
+        ],
+        "title": "CommunityDetail"
+      },
+      "CommunityItem": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "redacted_text": {
+            "type": "string",
+            "title": "Redacted Text"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED_UNVERIFIED",
+              "VERIFIED_EVIDENCE"
+            ],
+            "title": "Status"
+          },
+          "published_at": {
+            "type": "string",
+            "title": "Published At"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CommunityVoteCounts"
+          },
+          "user_vote": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "HOAKS",
+                  "WASPADA",
+                  "VALID"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Vote"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "title",
+          "redacted_text",
+          "status",
+          "published_at",
+          "counts"
+        ],
+        "title": "CommunityItem"
+      },
+      "CommunityPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommunityItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "CommunityPage"
+      },
+      "CommunityPreviewResponse": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "redacted_text": {
+            "type": "string",
+            "title": "Redacted Text"
+          },
+          "redacted_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redacted Image Url"
+          },
+          "redactions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Redactions"
+          },
+          "confirmation_required": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmation Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id",
+          "expires_at",
+          "redacted_text",
+          "redacted_image_url",
+          "redactions"
+        ],
+        "title": "CommunityPreviewResponse"
+      },
+      "CommunityPublishRequest": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "publication_consent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Publication Consent"
+          },
+          "rag_reuse_consent": {
+            "type": "boolean",
+            "title": "Rag Reuse Consent",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id",
+          "publication_consent"
+        ],
+        "title": "CommunityPublishRequest"
+      },
+      "CommunityStateResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "community_state": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLISHED_UNVERIFIED",
+              "VERIFIED_EVIDENCE",
+              "WITHDRAWN"
+            ],
+            "title": "Community State"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "community_state",
+          "revision"
+        ],
+        "title": "CommunityStateResponse"
+      },
+      "CommunityUserSummary": {
+        "properties": {
+          "assessments_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Assessments Count"
+          },
+          "evidence_added_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Evidence Added Count"
+          },
+          "resolved_cases_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Resolved Cases Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assessments_count",
+          "evidence_added_count",
+          "resolved_cases_count"
+        ],
+        "title": "CommunityUserSummary"
+      },
+      "CommunityVoteCounts": {
+        "properties": {
+          "HOAKS": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hoaks",
+            "default": 0
+          },
+          "WASPADA": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Waspada",
+            "default": 0
+          },
+          "VALID": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Valid",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CommunityVoteCounts"
+      },
+      "CommunityVoteRequest": {
+        "properties": {
+          "vote": {
+            "type": "string",
+            "enum": [
+              "HOAKS",
+              "WASPADA",
+              "VALID"
+            ],
+            "title": "Vote"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vote"
+        ],
+        "title": "CommunityVoteRequest"
+      },
+      "CommunityVoteResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "user_vote": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "HOAKS",
+                  "WASPADA",
+                  "VALID"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Vote"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CommunityVoteCounts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "user_vote",
+          "counts"
+        ],
+        "title": "CommunityVoteResult"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HistoryItem": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "input_type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE"
+            ],
+            "title": "Input Type"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "requires_human_review": {
+            "type": "boolean",
+            "title": "Requires Human Review"
+          },
+          "community_state": {
+            "type": "string",
+            "title": "Community State"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "input_type",
+          "headline",
+          "verdict",
+          "requires_human_review",
+          "community_state",
+          "created_at"
+        ],
+        "title": "HistoryItem"
+      },
+      "HistoryMeta": {
+        "properties": {
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "save_reason": {
+            "type": "string",
+            "title": "Save Reason"
+          },
+          "community_eligible": {
+            "type": "boolean",
+            "title": "Community Eligible"
+          },
+          "community_state": {
+            "type": "string",
+            "title": "Community State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "saved",
+          "case_id",
+          "save_reason",
+          "community_eligible",
+          "community_state"
+        ],
+        "title": "HistoryMeta"
+      },
+      "HistoryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "HistoryPage"
+      },
+      "LearningLesson": {
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body_md": {
+            "type": "string",
+            "title": "Body Md"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Duration Minutes"
+          },
+          "display_order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Display Order"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lesson_id",
+          "title",
+          "body_md",
+          "duration_minutes",
+          "display_order",
+          "completed"
+        ],
+        "title": "LearningLesson"
+      },
+      "LearningModuleDetail": {
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "difficulty": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Difficulty"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "total_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Lessons"
+          },
+          "completed_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completed Lessons"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          },
+          "lessons": {
+            "items": {
+              "$ref": "#/components/schemas/LearningLesson"
+            },
+            "type": "array",
+            "title": "Lessons"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "module_id",
+          "slug",
+          "title",
+          "summary",
+          "difficulty",
+          "version",
+          "total_lessons",
+          "completed_lessons",
+          "progress_percent",
+          "lessons"
+        ],
+        "title": "LearningModuleDetail"
+      },
+      "LearningModuleItem": {
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "difficulty": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Difficulty"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "total_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Lessons"
+          },
+          "completed_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completed Lessons"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "module_id",
+          "slug",
+          "title",
+          "summary",
+          "difficulty",
+          "version",
+          "total_lessons",
+          "completed_lessons",
+          "progress_percent"
+        ],
+        "title": "LearningModuleItem"
+      },
+      "LearningProgressItem": {
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "completed_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completed Lessons"
+          },
+          "total_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Lessons"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          },
+          "latest_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Score"
+          },
+          "best_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Score"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "module_id",
+          "completed_lessons",
+          "total_lessons",
+          "progress_percent",
+          "updated_at"
+        ],
+        "title": "LearningProgressItem"
+      },
+      "LearningProgressResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LearningProgressItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "LearningProgressResponse"
+      },
+      "LearningQuiz": {
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "module_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Module Version"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuizQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "module_id",
+          "module_version",
+          "questions"
+        ],
+        "title": "LearningQuiz"
+      },
+      "LessonCompleteResponse": {
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "completed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Completed",
+            "default": true
+          },
+          "completed_at": {
+            "type": "string",
+            "title": "Completed At"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lesson_id",
+          "module_id",
+          "completed_at",
+          "progress_percent"
+        ],
+        "title": "LessonCompleteResponse"
+      },
+      "PageContext": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PageContext"
+      },
+      "QuizAttemptAnswer": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Question Id"
+          },
+          "selected_option_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Selected Option Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question_id",
+          "selected_option_id"
+        ],
+        "title": "QuizAttemptAnswer"
+      },
+      "QuizAttemptRequest": {
+        "properties": {
+          "module_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Module Version"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/QuizAttemptAnswer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Answers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "module_version",
+          "answers"
+        ],
+        "title": "QuizAttemptRequest"
+      },
+      "QuizAttemptResult": {
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attempt Id"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "correct_answers": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Correct Answers"
+          },
+          "total_questions": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Total Questions"
+          },
+          "feedback": {
+            "items": {
+              "$ref": "#/components/schemas/QuizQuestionFeedback"
+            },
+            "type": "array",
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "score",
+          "correct_answers",
+          "total_questions",
+          "feedback"
+        ],
+        "title": "QuizAttemptResult"
+      },
+      "QuizOption": {
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Option Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "option_id",
+          "text"
+        ],
+        "title": "QuizOption"
+      },
+      "QuizQuestion": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Question Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/QuizOption"
+            },
+            "type": "array",
+            "title": "Options"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question_id",
+          "text",
+          "options"
+        ],
+        "title": "QuizQuestion"
+      },
+      "QuizQuestionFeedback": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Question Id"
+          },
+          "selected_option_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Selected Option Id"
+          },
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question_id",
+          "selected_option_id",
+          "correct",
+          "explanation"
+        ],
+        "title": "QuizQuestionFeedback"
+      },
+      "SenderContext": {
+        "type": "string",
+        "enum": [
+          "NOT_APPLICABLE",
+          "UNKNOWN_NUMBER",
+          "KNOWN_CONTACT",
+          "FORWARDED",
+          "SOCIAL_MEDIA",
+          "UNKNOWN"
+        ],
+        "title": "SenderContext"
+      },
+      "TextVerificationRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 25000,
+            "minLength": 10,
+            "title": "Text"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "sender_context": {
+            "$ref": "#/components/schemas/SenderContext",
+            "default": "UNKNOWN"
+          },
+          "page_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TextVerificationRequest",
+        "description": "Client payload. output_mode is intentionally absent and therefore forbidden."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerificationEnvelope": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "COMPLETED",
+            "title": "Status"
+          },
+          "history": {
+            "$ref": "#/components/schemas/HistoryMeta"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AIResult"
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "MOCK",
+              "REMOTE"
+            ],
+            "title": "Execution Mode"
+          },
+          "input_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "history",
+          "result",
+          "execution_mode"
+        ],
+        "title": "VerificationEnvelope"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

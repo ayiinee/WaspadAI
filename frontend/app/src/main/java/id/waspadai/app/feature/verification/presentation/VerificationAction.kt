@@ -7,15 +7,36 @@ sealed interface VerificationAction {
 
     data object RequestImageCapture : VerificationAction
 
-    data class SubmitImage(
+    data class ImageSelected(
+        val imageBytes: ByteArray,
+        val contentType: String,
+        val fileName: String,
+        val overlayModeEnabled: Boolean = false,
+    ) : VerificationAction
+
+    data object SubmitPendingImage : VerificationAction
+
+    data object DismissImagePreview : VerificationAction
+
+    data class ImageSelectionFailed(val message: String) : VerificationAction
+
+    data object RequestOverlayMode : VerificationAction
+
+    data object AcceptOverlayPrivacy : VerificationAction
+
+    data object DismissOverlayPrivacy : VerificationAction
+
+    data class OverlayPermissionResult(val granted: Boolean) : VerificationAction
+
+    data class OverlayModeConsentResult(val granted: Boolean) : VerificationAction
+
+    data class OverlayCaptureReady(
         val imageBytes: ByteArray,
         val contentType: String,
         val fileName: String,
     ) : VerificationAction
 
-    data class ImageSelectionFailed(val message: String) : VerificationAction
-
-    data object ToggleOverlayMode : VerificationAction
+    data object OverlayStopped : VerificationAction
 
     data object DismissFailure : VerificationAction
 
@@ -24,4 +45,12 @@ sealed interface VerificationAction {
     data object RefreshHistory : VerificationAction
 
     data class OpenHistory(val caseId: String) : VerificationAction
+
+    data object RequestCommunityPreview : VerificationAction
+
+    data class CommunityRagConsentChanged(val granted: Boolean) : VerificationAction
+
+    data object PublishCommunity : VerificationAction
+
+    data object DismissCommunityShare : VerificationAction
 }
