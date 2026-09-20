@@ -5,10 +5,11 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +43,6 @@ import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -217,11 +217,19 @@ fun CommunityScreen(
                 contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                item {
+                item(key = "community-search") {
                     AnimatedVisibility(
                         visible = isSearchVisible,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+                        enter = fadeIn(animationSpec = tween(180)) +
+                            slideInVertically(
+                                initialOffsetY = { fullHeight -> -fullHeight / 3 },
+                                animationSpec = tween(220),
+                            ),
+                        exit = fadeOut(animationSpec = tween(120)) +
+                            slideOutVertically(
+                                targetOffsetY = { fullHeight -> -fullHeight / 4 },
+                                animationSpec = tween(160),
+                            ),
                     ) {
                         Column {
                             CommunitySearchBar(
@@ -655,22 +663,12 @@ private fun CommunitySearchBar(
                 expanded = isFilterMenuVisible,
                 onDismissRequest = { onAction(CommunityAction.FilterDismissed) },
                 modifier = Modifier
-                    .widthIn(min = 220.dp)
+                    .widthIn(min = 180.dp)
                     .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
                 shape = RoundedCornerShape(16.dp),
                 containerColor = Color.White,
                 shadowElevation = 10.dp,
             ) {
-                Text(
-                    text = "Tampilkan koneksi",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(WaspadAIBlue)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
                 CommunityFeedFilter.entries.forEach { filter ->
                     val isSelected = filter == selectedFilter
                     DropdownMenuItem(
@@ -684,16 +682,6 @@ private fun CommunitySearchBar(
                                     FontWeight.Normal
                                 },
                             )
-                        },
-                        trailingIcon = {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    tint = WaspadAIBlue,
-                                    modifier = Modifier.size(19.dp),
-                                )
-                            }
                         },
                         onClick = { onAction(CommunityAction.FilterSelected(filter)) },
                         modifier = Modifier.background(

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.Button
@@ -84,6 +87,7 @@ import id.waspadai.app.core.ui.Ink
 import id.waspadai.app.core.ui.RiskRed
 import id.waspadai.app.core.ui.SoftBlue
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.presentation.ImageVerificationPreview
 
 @Composable
 fun WaspadAiHeader(
@@ -270,6 +274,7 @@ private fun AttachmentPreview(
     imageBytes: ByteArray?,
     contentType: String?,
 ) {
+    val isDocument = fileName.endsWith(".pdf", ignoreCase = true)
     val bitmap = remember(imageBytes) {
         imageBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
     }
@@ -284,7 +289,7 @@ private fun AttachmentPreview(
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFFF2F6F8))
             ) {
-                if (bitmap != null) {
+                if (bitmap != null && !isDocument) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = "Preview $fileName",
@@ -294,7 +299,23 @@ private fun AttachmentPreview(
                         contentScale = ContentScale.Fit,
                     )
                 }
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isDocument) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFE8493F)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("PDF", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Column(Modifier.weight(1f)) {
                     Text(
                         fileName,
                         color = Ink,
@@ -304,14 +325,15 @@ private fun AttachmentPreview(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        if (contentType == "image/png" && fileName.endsWith(".pdf", true)) {
-                            "Preview halaman pertama PDF"
+                        if (isDocument) {
+                            "Dokumen terlampir"
                         } else {
                             "Preview gambar verifikasi"
                         },
                         color = Color(0xFF71808A),
                         fontSize = 10.sp,
                     )
+                    }
                 }
             }
         }
@@ -443,11 +465,13 @@ fun FailureNotice(message: String, onDismiss: () -> Unit) {
 fun VerificationComposer(
     value: String,
     enabled: Boolean,
-    hasPendingImage: Boolean = false,
+    pendingAttachments: List<ImageVerificationPreview> = emptyList(),
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
+    onRemovePendingAttachment: (Int) -> Unit,
     onRequestImageCapture: () -> Unit,
     onRequestFileCapture: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var isAttachmentMenuVisible by remember { mutableStateOf(false) }
     val sendColor by animateColorAsState(
@@ -455,53 +479,58 @@ fun VerificationComposer(
         label = "sendColor",
     )
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp)
-            .heightIn(min = 54.dp)
+            .then(modifier)
             .border(1.5.dp, WaspadAILightBlue, RoundedCornerShape(28.dp))
-            .padding(horizontal = 6.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(RoundedCornerShape(28.dp)),
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
+        if (pendingAttachments.isNotEmpty()) {
+            PendingAttachmentDrafts(
+                attachments = pendingAttachments,
+                onRemove = onRemovePendingAttachment,
+            )
+            Spacer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(WaspadAILightBlue.copy(alpha = .7f)),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 54.dp)
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(BrandBlue)
-                    .clickable(enabled = enabled) { isAttachmentMenuVisible = true },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "Tambah lampiran",
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
-            DropdownMenu(
-                expanded = isAttachmentMenuVisible,
-                onDismissRequest = { isAttachmentMenuVisible = false },
-                modifier = Modifier
-                    .widthIn(min = 220.dp)
-                    .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                containerColor = Color.White,
-                shadowElevation = 10.dp,
-            ) {
-                Text(
-                    text = "Tambahkan lampiran",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
+            Box(contentAlignment = Alignment.Center) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(WaspadAIBlue)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(BrandBlue)
+                        .clickable(enabled = enabled) { isAttachmentMenuVisible = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Tambah lampiran",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = isAttachmentMenuVisible,
+                    onDismissRequest = { isAttachmentMenuVisible = false },
+                    modifier = Modifier
+                        .widthIn(min = 180.dp)
+                        .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = Color.White,
+                    shadowElevation = 8.dp,
+                ) {
                 DropdownMenuItem(
                     text = {
                         Column {
@@ -533,9 +562,9 @@ fun VerificationComposer(
                     },
                 )
             }
-        }
-        Spacer(Modifier.width(10.dp))
-        BasicTextField(
+            }
+            Spacer(Modifier.width(10.dp))
+            BasicTextField(
             value = value,
             onValueChange = onValueChange,
             enabled = enabled,
@@ -548,7 +577,7 @@ fun VerificationComposer(
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (value.isBlank()) {
                         Text(
-                            if (hasPendingImage) "Tulis pesan untuk lampiran…"
+                            if (pendingAttachments.isNotEmpty()) "Tulis pesan untuk lampiran…"
                             else "Ketik pesan untuk diperiksa…",
                             color = Color(0xFF71808A),
                             fontSize = 14.sp,
@@ -559,21 +588,98 @@ fun VerificationComposer(
                     innerTextField()
                 }
             },
-        )
-        Spacer(Modifier.width(8.dp))
-        Box(
+            )
+            Spacer(Modifier.width(8.dp))
+            Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(sendColor)
                 .clickable(enabled = enabled, onClick = onSubmit),
             contentAlignment = Alignment.Center
-        ) {
-            Icon(
+            ) {
+                Icon(
                 imageVector = Icons.Rounded.ArrowUpward,
                 contentDescription = "Kirim pemeriksaan",
                 tint = Color.White,
                 modifier = Modifier.size(25.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingAttachmentDrafts(
+    attachments: List<ImageVerificationPreview>,
+    onRemove: (Int) -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 9.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(
+            items = attachments,
+            key = { index, attachment -> "$index-${attachment.fileName}" },
+        ) { index, attachment ->
+            PendingAttachmentDraft(
+                attachment = attachment,
+                onRemove = { onRemove(index) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PendingAttachmentDraft(
+    attachment: ImageVerificationPreview,
+    onRemove: () -> Unit,
+) {
+    val isDocument = attachment.fileName.endsWith(".pdf", ignoreCase = true)
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    Box(
+        modifier = Modifier
+            .size(width = 96.dp, height = 72.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF2F6F8)),
+    ) {
+        if (isDocument) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Color(0xFFE8493F)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("PDF", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        } else if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Draft ${attachment.fileName}",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(24.dp)
+                .padding(2.dp)
+                .background(Color.Black.copy(alpha = .5f), CircleShape),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Hapus ${attachment.fileName}",
+                tint = Color.White,
+                modifier = Modifier.size(15.dp),
             )
         }
     }

@@ -17,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,9 +26,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -45,11 +48,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -269,28 +274,31 @@ fun VerificationScreen(
         }
     }
 
-    Column(
+    val density = LocalDensity.current
+    val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .imePadding()
     ) {
-        WaspadAiHeader(
-            overlayModeEnabled = state.isOverlayModeEnabled,
-            enabled = !isSubmitting,
-            onToggleOverlayMode = {
-                if (state.isOverlayModeEnabled && !state.isOverlayPrivacyDialogVisible) {
-                    FloatingVerifyService.stop(context)
-                }
-                onAction(VerificationAction.RequestOverlayMode)
-            },
-        )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            WaspadAiHeader(
+                overlayModeEnabled = state.isOverlayModeEnabled,
+                enabled = !isSubmitting,
+                onToggleOverlayMode = {
+                    if (state.isOverlayModeEnabled && !state.isOverlayPrivacyDialogVisible) {
+                        FloatingVerifyService.stop(context)
+                    }
+                    onAction(VerificationAction.RequestOverlayMode)
+                },
+            )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 126.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             if (state.isHistoryVisible) {
                 item {
                     HistoryPanel(
@@ -298,14 +306,6 @@ fun VerificationScreen(
                         isLoading = state.isHistoryLoading,
                         onRefresh = { onAction(VerificationAction.RefreshHistory) },
                         onOpen = { onAction(VerificationAction.OpenHistory(it)) }
-                    )
-                }
-            }
-            state.pendingImagePreview?.let { preview ->
-                item {
-                    ImageVerificationPreviewCard(
-                        preview = preview,
-                        onDismiss = { onAction(VerificationAction.DismissImagePreview) },
                     )
                 }
             }
@@ -338,21 +338,33 @@ fun VerificationScreen(
                 else -> Unit
             }
             item { Spacer(Modifier.padding(bottom = 1.dp)) }
+            }
         }
         VerificationComposer(
             value = state.draft,
             enabled = !isSubmitting,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .imePadding()
+                .padding(
+                    start = 20.dp,
+                    end = 20.dp,
+                    bottom = if (isKeyboardVisible) 12.dp else 88.dp,
+                ),
             onValueChange = { onAction(VerificationAction.InputChanged(it)) },
             onSubmit = {
                 onAction(
-                    if (state.pendingImagePreview != null) {
+                    if (state.pendingAttachments.isNotEmpty()) {
                         VerificationAction.SubmitPendingImage
                     } else {
                         VerificationAction.SubmitText
                     }
                 )
             },
-            hasPendingImage = state.pendingImagePreview != null,
+            pendingAttachments = state.pendingAttachments,
+            onRemovePendingAttachment = { index ->
+                onAction(VerificationAction.RemovePendingAttachment(index))
+            },
             onRequestImageCapture = {
                 onAction(VerificationAction.RequestImageCapture)
                 imagePicker.launch("image/*")
@@ -365,7 +377,9 @@ fun VerificationScreen(
         WaspadAIBottomNavigation(
             selectedDestination = "Periksa",
             onDestinationSelected = onDestinationSelected,
-            modifier = Modifier.navigationBarsPadding(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
         )
     }
 }

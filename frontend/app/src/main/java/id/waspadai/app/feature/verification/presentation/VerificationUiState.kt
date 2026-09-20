@@ -14,10 +14,13 @@ data class VerificationUiState(
     val phase: VerificationPhase = VerificationPhase.Idle,
     val isOverlayModeEnabled: Boolean = false,
     val isOverlayPrivacyDialogVisible: Boolean = false,
-    val pendingImagePreview: ImageVerificationPreview? = null,
+    val pendingAttachments: List<ImageVerificationPreview> = emptyList(),
     val isRemoteEnabled: Boolean = false,
     val communityShare: CommunityShareState = CommunityShareState(),
 ) {
+    val pendingImagePreview: ImageVerificationPreview?
+        get() = pendingAttachments.firstOrNull()
+
     companion object {
         fun initial(isRemoteEnabled: Boolean): VerificationUiState {
             return VerificationUiState(

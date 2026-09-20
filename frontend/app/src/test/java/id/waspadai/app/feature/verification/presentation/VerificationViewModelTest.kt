@@ -94,6 +94,25 @@ class VerificationViewModelTest {
     }
 
     @Test
+    fun `draft accepts up to five attachments and keeps their order`() {
+        val viewModel = viewModel(FakeRepository())
+
+        repeat(5) { index ->
+            viewModel.onAction(
+                VerificationAction.ImageSelected(
+                    imageBytes = byteArrayOf(index.toByte()),
+                    contentType = "image/png",
+                    fileName = "bukti-$index.png",
+                )
+            )
+        }
+
+        assertEquals(5, viewModel.state.value.pendingAttachments.size)
+        assertEquals("bukti-0.png", viewModel.state.value.pendingAttachments.first().fileName)
+        assertEquals("bukti-4.png", viewModel.state.value.pendingAttachments.last().fileName)
+    }
+
+    @Test
     fun `overlay switch is active while confirmation is visible and resets when cancelled`() {
         val viewModel = viewModel(FakeRepository())
 

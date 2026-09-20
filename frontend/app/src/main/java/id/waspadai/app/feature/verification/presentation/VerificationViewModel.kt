@@ -39,6 +39,7 @@ class VerificationViewModel(
             is VerificationAction.ImageSelected -> showImagePreview(action)
             VerificationAction.SubmitPendingImage -> submitPendingImage()
             VerificationAction.DismissImagePreview -> dismissImagePreview()
+            is VerificationAction.RemovePendingAttachment -> removePendingAttachment(action.index)
             is VerificationAction.ImageSelectionFailed -> showImageSelectionFailure(action.message)
             VerificationAction.RequestOverlayMode -> requestOverlayMode()
             VerificationAction.AcceptOverlayPrivacy -> acceptOverlayPrivacy()
@@ -203,15 +204,21 @@ class VerificationViewModel(
     }
 
     private fun showImagePreview(action: VerificationAction.ImageSelected) {
+        val attachment = ImageVerificationPreview(
+            imageBytes = action.imageBytes,
+            contentType = action.contentType,
+            fileName = action.fileName,
+            overlayModeEnabled = action.overlayModeEnabled,
+        )
         _state.update { current ->
+            if (current.pendingAttachments.size >= MAXIMUM_PENDING_ATTACHMENTS) {
+                return@update current.copy(
+                    phase = VerificationPhase.Failure("Maksimal 5 lampiran dapat ditambahkan dalam satu pesan."),
+                )
+            }
             current.copy(
                 isOverlayModeEnabled = false,
-                pendingImagePreview = ImageVerificationPreview(
-                    imageBytes = action.imageBytes,
-                    contentType = action.contentType,
-                    fileName = action.fileName,
-                    overlayModeEnabled = action.overlayModeEnabled,
-                ),
+                pendingAttachments = current.pendingAttachments + attachment,
                 phase = VerificationPhase.Idle,
             )
         }
@@ -224,22 +231,64 @@ class VerificationViewModel(
     }
 
     private fun submitPendingImage() {
-        val preview = state.value.pendingImagePreview ?: return
-        _state.update { current -> current.copy(pendingImagePreview = null) }
-        submitImage(
-            VerificationAction.ImageSelected(
-                imageBytes = preview.imageBytes,
-                contentType = preview.contentType,
-                fileName = preview.fileName,
-                overlayModeEnabled = preview.overlayModeEnabled,
-            ),
-            forceOverlayModeEnabled = preview.overlayModeEnabled,
-        )
+        val attachments = state.value.pendingAttachments
+        if (attachments.isEmpty()) return
+        val question = state.value.draft.trim().takeIf(String::isNotBlank)
+        _state.update { current ->
+            current.copy(pendingAttachments = emptyList(), phase = VerificationPhase.Validating)
+        }
+        viewModelScope.launch {
+            attachments.forEach { attachment ->
+                val userMessage = question ?: "Lampiran dikirim untuk diperiksa."
+                _state.update { current ->
+                    current.copy(
+                        conversation = current.conversation + VerificationConversationItem.UserMessage(
+                            text = userMessage,
+                            hasAttachment = true,
+                            attachmentName = attachment.fileName,
+                            attachmentBytes = attachment.imageBytes,
+                            attachmentContentType = attachment.contentType,
+                        ),
+                        phase = VerificationPhase.Submitting,
+                    )
+                }
+                when (val result = submitImageVerification(
+                    imageBytes = attachment.imageBytes,
+                    contentType = attachment.contentType,
+                    fileName = attachment.fileName,
+                    question = question,
+                    overlayModeEnabled = attachment.overlayModeEnabled,
+                )) {
+                    is AppResult.Success -> _state.update { current ->
+                        current.copy(
+                            conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
+                            phase = VerificationPhase.Success(result.value),
+                        )
+                    }
+                    is AppResult.Failure -> {
+                        _state.update { current -> current.copy(phase = VerificationPhase.Failure(result.message)) }
+                        return@launch
+                    }
+                }
+            }
+            _state.update { current -> current.copy(draft = "") }
+        }
     }
 
     private fun dismissImagePreview() {
         _state.update { current ->
-            current.copy(pendingImagePreview = null, phase = VerificationPhase.Idle)
+            current.copy(pendingAttachments = emptyList(), phase = VerificationPhase.Idle)
+        }
+    }
+
+    private fun removePendingAttachment(index: Int) {
+        _state.update { current ->
+            current.copy(
+                pendingAttachments = current.pendingAttachments.filterIndexed { itemIndex, _ ->
+                    itemIndex != index
+                },
+                phase = VerificationPhase.Idle,
+            )
         }
     }
 
@@ -451,5 +500,6 @@ class VerificationViewModel(
 
     private companion object {
         const val MINIMUM_TEXT_LENGTH = 10
+        const val MAXIMUM_PENDING_ATTACHMENTS = 5
     }
 }
