@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,6 +55,9 @@ fun AuthLandingScreen(
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var isSubmitting by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val configuration = LocalConfiguration.current
+    val horizontalGutter = if (configuration.screenWidthDp < 360) 16.dp else 20.dp
+    val verticalGutter = if (configuration.screenHeightDp < 700) 24.dp else 48.dp
 
     fun submit() {
         error = when {
@@ -82,7 +86,7 @@ fun AuthLandingScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 48.dp),
+                .padding(horizontal = horizontalGutter, vertical = verticalGutter),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -108,7 +112,7 @@ fun AuthLandingScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(horizontalGutter),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {

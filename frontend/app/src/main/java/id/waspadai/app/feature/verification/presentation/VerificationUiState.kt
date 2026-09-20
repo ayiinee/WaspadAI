@@ -50,6 +50,7 @@ sealed interface VerificationConversationItem {
         val attachmentName: String? = null,
         val attachmentBytes: ByteArray? = null,
         val attachmentContentType: String? = null,
+        val attachmentGroup: List<ImageVerificationPreview> = emptyList(),
     ) : VerificationConversationItem
 
     data class Analysis(val result: VerificationResult, val isSample: Boolean = false) : VerificationConversationItem

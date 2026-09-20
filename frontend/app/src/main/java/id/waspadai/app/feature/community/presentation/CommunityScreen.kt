@@ -8,8 +8,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -87,6 +87,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -99,6 +101,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -189,7 +192,11 @@ fun CommunityScreen(
     var isSearchVisible by rememberSaveable {
         mutableStateOf(uiState.searchQuery.isNotBlank())
     }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val closeSearch: () -> Unit = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
         isSearchVisible = false
         onAction(CommunityAction.SearchChanged(""))
         onAction(CommunityAction.FilterSelected(CommunityFeedFilter.Semua))
@@ -216,45 +223,46 @@ fun CommunityScreen(
             CommunityPageHeader(
                 title = "Koneksi",
                 onBack = onBack,
+                showBack = false,
                 isSearchVisible = isSearchVisible,
                 onSearchClick = {
                     if (isSearchVisible) closeSearch() else isSearchVisible = true
                 },
             )
+            AnimatedVisibility(
+                visible = isSearchVisible,
+                enter = expandVertically(
+                    expandFrom = Alignment.Top,
+                    animationSpec = tween(150),
+                ) + fadeIn(animationSpec = tween(120)),
+                exit = shrinkVertically(
+                    shrinkTowards = Alignment.Top,
+                    animationSpec = tween(120),
+                ) + fadeOut(animationSpec = tween(90)),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(WaspadAIBackground)
+                        .padding(top = 14.dp, bottom = 8.dp),
+                ) {
+                    CommunitySearchBar(
+                        query = uiState.searchQuery,
+                        selectedFilter = uiState.selectedFilter,
+                        isFilterMenuVisible = uiState.isFilterMenuVisible,
+                        onAction = onAction,
+                        requestFocus = isSearchVisible,
+                    )
+                }
+            }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                item(key = "community-search") {
-                    AnimatedVisibility(
-                        visible = isSearchVisible,
-                        enter = fadeIn(animationSpec = tween(180)) +
-                            slideInVertically(
-                                initialOffsetY = { fullHeight -> -fullHeight / 3 },
-                                animationSpec = tween(220),
-                            ),
-                        exit = fadeOut(animationSpec = tween(120)) +
-                            slideOutVertically(
-                                targetOffsetY = { fullHeight -> -fullHeight / 4 },
-                                animationSpec = tween(160),
-                            ),
-                    ) {
-                        Column {
-                            CommunitySearchBar(
-                                query = uiState.searchQuery,
-                                selectedFilter = uiState.selectedFilter,
-                                isFilterMenuVisible = uiState.isFilterMenuVisible,
-                                onAction = onAction,
-                                requestFocus = isSearchVisible,
-                            )
-                            Spacer(Modifier.height(14.dp))
-                        }
-                    }
-                }
                 if (uiState.visiblePosts.isEmpty()) {
                     item {
-                        EmptyCommunityResult(modifier = Modifier.animateItem())
+                        EmptyCommunityResult()
                     }
                 } else {
                     items(
@@ -288,6 +296,7 @@ internal fun CommunityPageHeader(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    showBack: Boolean = true,
     isSearchVisible: Boolean = false,
     onSearchClick: (() -> Unit)? = null,
 ) {
@@ -309,13 +318,15 @@ internal fun CommunityPageHeader(
                 .statusBarsPadding()
                 .height(64.dp),
         ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 16.dp),
-            ) {
-                Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+            if (showBack) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 16.dp),
+                ) {
+                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+                }
             }
             Text(
                 text = title,
@@ -334,7 +345,7 @@ internal fun CommunityPageHeader(
                     Icon(
                         imageVector = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
                         contentDescription = if (isSearchVisible) "Tutup pencarian" else "Buka pencarian",
-                        tint = if (isSearchVisible) WaspadAICaution else Color.White,
+                        tint = Color.White,
                         modifier = Modifier.size(25.dp),
                     )
                 }
@@ -594,19 +605,21 @@ private fun CommunitySearchBar(
     requestFocus: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-
+    val horizontalPadding = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 22.dp
     LaunchedEffect(requestFocus) {
         if (requestFocus) {
+            // Let the small expand animation finish before the IME starts resizing the screen.
+            delay(150)
             focusRequester.requestFocus()
-            keyboardController?.show()
         }
     }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = horizontalPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -658,7 +671,11 @@ private fun CommunitySearchBar(
                     .size(48.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .background(WaspadAIBlue)
-                    .clickable { onAction(CommunityAction.FilterClicked) }
+                    .clickable {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                        onAction(CommunityAction.FilterClicked)
+                    }
                     .semantics {
                         contentDescription = "Filter: ${selectedFilter.label}"
                     },
@@ -716,10 +733,11 @@ private fun CommunityPostCard(
     onOpenDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val horizontalPadding = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 28.dp
     Column(
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(post.avatarRes),
@@ -751,14 +769,6 @@ private fun CommunityPostCard(
                         fontSize = 10.sp,
                         lineHeight = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                IconButton(onClick = onShareClick, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Rounded.Share,
-                        contentDescription = "Bagikan kasus",
-                        tint = WaspadAIDarkBlue,
-                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -814,7 +824,7 @@ private fun CommunityPostCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 InlineAction(
                     icon = if (post.isSupported) {
@@ -848,6 +858,15 @@ private fun CommunityPostCard(
                     containerColor = Color(0xFFE7F3FC),
                     onClick = {},
                 )
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onShareClick, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = "Bagikan kasus",
+                        tint = WaspadAIDarkBlue,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
         HorizontalDivider(color = WaspadAILightBlue, thickness = 1.dp)
@@ -932,7 +951,7 @@ fun CommunityAssessmentPanel(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                         .background(WaspadAIBlue)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

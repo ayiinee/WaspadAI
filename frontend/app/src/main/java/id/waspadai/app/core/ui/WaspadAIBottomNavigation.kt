@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Home
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -38,25 +41,29 @@ import id.waspadai.app.R
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAILightBlue
 
+private val BottomNavigationBarHeight = 66.dp
+private val CenterCtaDiameter = 72.dp
+val WaspadAIBottomNavigationHeight = BottomNavigationBarHeight + CenterCtaDiameter / 2
+
 @Composable
 fun WaspadAIBottomNavigation(
     selectedDestination: String,
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isCenterSelected = selectedDestination == "Periksa"
     val centerNavigationInteraction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(92.dp),
+            .height(WaspadAIBottomNavigationHeight),
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(74.dp)
+                .height(BottomNavigationBarHeight)
                 .align(Alignment.BottomCenter),
             color = Color.White,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             shadowElevation = 0.dp,
         ) {
             Row(
@@ -97,11 +104,10 @@ fun WaspadAIBottomNavigation(
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .size(72.dp)
-                .background(
-                    if (isCenterSelected) WaspadAIBlue else Color(0xFFAAB4BC),
-                    CircleShape,
-                )
+                .offset(y = 8.dp)
+                .size(CenterCtaDiameter)
+                .shadow(8.dp, CircleShape)
+                .background(WaspadAIBlue, CircleShape)
                 .border(4.dp, Color.White, CircleShape)
                 .clickable(
                     interactionSource = centerNavigationInteraction,

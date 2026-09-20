@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -39,7 +37,6 @@ import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -57,14 +54,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -79,6 +77,10 @@ import id.waspadai.app.ui.theme.WaspadAIMuted
 import id.waspadai.app.ui.theme.WaspadAIValid
 
 private data class LearningStage(val title: String, val body: String)
+
+@Composable
+private fun learningContentGutter() =
+    if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 22.dp
 
 private data class LearningQuestion(
     val question: String,
@@ -211,6 +213,7 @@ private fun LearningListScreen(
     onMaterialSelected: (LearningMaterial) -> Unit,
     onDestinationSelected: (String) -> Unit,
 ) {
+    val completedCount = learningMaterials.count { statusFor(it)?.kind == "completed" }
     Scaffold(
         containerColor = WaspadAIBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -223,166 +226,173 @@ private fun LearningListScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LearningPageHeader(title = "Pelajari", onBack = { onDestinationSelected("Periksa") })
+            LearningPageHeader(
+                title = "Pelajari",
+                onBack = { onDestinationSelected("Periksa") },
+                showBack = false,
+            )
             LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                ,
-            contentPadding = PaddingValues(bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item {
-                LearningChallengeFixed()
-            }
-            item {
-                Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 3.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        Column {
-                            Text("LANGKAH BERIKUTNYA", color = WaspadAIMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Text("Target hari ini", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item {
+                    LearningDailyMissions(
+                        isCurrentMissionComplete = statusFor(learningMaterials.first())?.kind == "completed",
+                        onCurrentMissionClick = { onMaterialSelected(learningMaterials.first()) },
+                    )
+                }
+                item {
+                    Column(modifier = Modifier.padding(horizontal = learningContentGutter(), vertical = 5.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom,
+                        ) {
+                            Text("Materi untukmu", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                            Text("$completedCount dari ${learningMaterials.size}", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
-                        Text("1 dari 3", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .background(WaspadAILightBlue, RoundedCornerShape(8.dp)),
-                    ) {
+                        Spacer(Modifier.height(10.dp))
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(.34f)
+                                .fillMaxWidth()
                                 .height(6.dp)
-                                .background(WaspadAIBlue, RoundedCornerShape(8.dp)),
-                        )
+                                .background(WaspadAILightBlue, RoundedCornerShape(8.dp)),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(completedCount.toFloat() / learningMaterials.size)
+                                    .height(6.dp)
+                                    .background(WaspadAIBlue, RoundedCornerShape(8.dp)),
+                            )
+                        }
                     }
                 }
-            }
-            items(learningMaterials) { material ->
-                LearningMaterialCard(material = material, status = statusFor(material), onClick = { onMaterialSelected(material) })
-            }
+                items(learningMaterials) { material ->
+                    LearningMaterialCard(material = material, status = statusFor(material), onClick = { onMaterialSelected(material) })
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LearningHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WaspadAIDarkBlue)
-            .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 20.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(modifier = Modifier.widthIn(max = 270.dp)) {
-            Text("RUANG BELAJAR", color = Color(0xFFCFE8F8), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            Text("Pelajari", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Text("Bangun kebiasaan mengenali informasi yang aman.", color = Color(0xFFE0F0F8), fontSize = 12.sp, lineHeight = 17.sp)
-        }
-        Column(
-            modifier = Modifier
-                .size(58.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = .15f)),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text("✦", color = Color(0xFFFFDC6B), fontSize = 14.sp)
-            Text("3", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 17.sp)
-            Text("hari", color = Color(0xFFD9EEF8), fontSize = 9.sp)
-        }
-    }
-}
-
-@Composable
-private fun LearningPageHeader(title: String, onBack: () -> Unit) {
+private fun LearningPageHeader(title: String, onBack: () -> Unit, showBack: Boolean = true) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(WaspadAIBlue)
-            .statusBarsPadding()
-            .height(64.dp),
-        contentAlignment = Alignment.Center,
+            .background(WaspadAIBlue),
     ) {
         Image(
             painter = painterResource(id = id.waspadai.app.R.drawable.community_header_background),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop,
             alpha = .6f,
         )
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
-        ) {
-            Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-        }
-        Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun LearningChallengeFixed() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 22.dp, vertical = 10.dp)
-            .background(WaspadAIContribution, RoundedCornerShape(10.dp))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            modifier = Modifier.size(38.dp).background(Color.White, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
-        ) { Text("⚡", color = Color.White, fontSize = 19.sp) }
-        Box(modifier = Modifier.size(0.dp).offset(x = (-38).dp).alpha(0f), contentAlignment = Alignment.Center) {
-            Text("⚡", color = Color(0xFFFFDC6B), fontSize = 19.sp)
-        }
-        Box(modifier = Modifier.size(0.dp).offset(x = (-38).dp), contentAlignment = Alignment.Center) {
-            Text("\u26A1", color = Color(0xFFFFDC6B), fontSize = 19.sp)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text("Jadi detektif hoaks hari ini", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text("Jawab 3 skenario singkat sebelum waktunya habis.", color = Color.Black, fontSize = 11.sp, lineHeight = 15.sp)
-        }
-        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.Black, modifier = Modifier.size(25.dp))
-    }
-}
-
-@Composable
-private fun LearningChallenge() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 22.dp, vertical = 10.dp)
-            .border(1.dp, Color(0xFFF2CF67), RoundedCornerShape(10.dp))
-            .background(WaspadAIContribution, RoundedCornerShape(10.dp))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
-                .background(WaspadAIBlue, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(64.dp),
         ) {
-            Text("⚡", color = Color.White, fontSize = 19.sp)
+            if (showBack) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
+                ) {
+                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+                }
+            }
+            Text(
+                text = title,
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 64.dp),
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Text("MISI KILAT · TERBATAS", color = Color(0xFF936D00), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .7.sp)
-            Text("Jadi detektif hoaks hari ini", color = WaspadAITextColor, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text("Jawab 3 skenario singkat sebelum waktunya habis.", color = Color.Black, fontSize = 11.sp, lineHeight = 15.sp)
+    }
+}
+
+@Composable
+private fun LearningDailyMissions(
+    isCurrentMissionComplete: Boolean,
+    onCurrentMissionClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = learningContentGutter(), vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Misi harian", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        LearningMissionCard(
+            title = "Jadi detektif hoaks hari ini",
+            description = if (isCurrentMissionComplete) {
+                "Materi dan 3 soal sudah kamu selesaikan."
+            } else {
+                "Pelajari ciri hoaks, lalu jawab 3 soal singkat."
+            },
+            isComplete = isCurrentMissionComplete,
+            onClick = onCurrentMissionClick,
+        )
+        LearningMissionCard(
+            title = "Misi cek sumber selesai",
+            description = "Kamu sudah berlatih memeriksa sumber informasi.",
+            isComplete = true,
+        )
+    }
+}
+@Composable
+private fun LearningMissionCard(
+    title: String,
+    description: String,
+    isComplete: Boolean,
+    onClick: (() -> Unit)? = null,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        shape = RoundedCornerShape(14.dp),
+        color = if (isComplete) WaspadAIContribution else Color.White,
+        shadowElevation = 2.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isComplete) Color(0xFFF2CF67) else Color(0xFFD8E4EC),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier.size(42.dp).background(WaspadAIBlue, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isComplete) Icons.Rounded.Check else Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = WaspadAIDarkBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(2.dp))
+                Text(description, color = if (isComplete) Color(0xFF554714) else WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
+            }
+            if (onClick != null) {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Buka misi", tint = WaspadAIBlue, modifier = Modifier.size(25.dp))
+            } else {
+                Icon(Icons.Rounded.CheckCircle, contentDescription = "Misi selesai", tint = WaspadAIDarkBlue, modifier = Modifier.size(23.dp))
+            }
         }
-        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.Black, modifier = Modifier.size(25.dp))
     }
 }
 
@@ -392,38 +402,47 @@ private fun LearningMaterialCard(
     status: LearningStatus?,
     onClick: () -> Unit,
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 22.dp)
-            .border(1.dp, if (material == learningMaterials.first()) Color(0xFF7EAECA) else Color(0xFFD8E4EC), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = learningContentGutter())
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (material == learningMaterials.first()) Color(0xFF7EAECA) else Color(0xFFD8E4EC),
+        ),
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .background(material.iconColor, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(material.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(material.title, color = WaspadAIDarkBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(1.dp))
-            Text(material.description, color = WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
-        }
-        when (status?.kind) {
-            "completed" -> Box(
+            Box(
                 modifier = Modifier
-                    .size(26.dp)
-                    .border(2.dp, WaspadAIValid, CircleShape),
+                    .size(42.dp)
+                    .background(material.iconColor, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.Check, contentDescription = "Materi selesai", tint = WaspadAIValid, modifier = Modifier.size(17.dp)) }
-            "in_progress" -> Icon(Icons.Rounded.PlayArrow, contentDescription = "Materi sedang dipelajari", tint = WaspadAIBlue, modifier = Modifier.size(25.dp))
-            else -> Icon(Icons.Rounded.ChevronRight, contentDescription = "Buka materi", tint = Color.Black, modifier = Modifier.size(25.dp))
+            ) {
+                Icon(material.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(material.title, color = WaspadAIDarkBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(2.dp))
+                Text(material.description, color = WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
+            }
+            when (status?.kind) {
+                "completed" -> Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .border(2.dp, WaspadAIValid, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Rounded.Check, contentDescription = "Materi selesai", tint = WaspadAIValid, modifier = Modifier.size(17.dp)) }
+                "in_progress" -> Icon(Icons.Rounded.PlayArrow, contentDescription = "Materi sedang dipelajari", tint = WaspadAIBlue, modifier = Modifier.size(25.dp))
+                else -> Icon(Icons.Rounded.ChevronRight, contentDescription = "Buka materi", tint = WaspadAIBlue, modifier = Modifier.size(25.dp))
+            }
         }
     }
 }
@@ -458,56 +477,17 @@ private fun LearningDetailScreen(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 22.dp, vertical = 20.dp),
+                    .padding(horizontal = learningContentGutter(), vertical = 20.dp),
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("TAHAP ${stageIndex + 1} DARI ${material.stages.size}", color = WaspadAIMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
-                    Text("${(completedStages * 100) / material.stages.size}%", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(7.dp).background(WaspadAILightBlue, RoundedCornerShape(8.dp))) {
-                    Box(modifier = Modifier.fillMaxWidth(completedStages.toFloat() / material.stages.size).height(7.dp).background(WaspadAIBlue, RoundedCornerShape(8.dp)))
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .padding(top = 20.dp)
-                        .border(1.dp, Color(0xFF9FC4D8), RoundedCornerShape(14.dp))
-                        .background(Color(0xFFF2FAFE), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.CollectionsBookmark, contentDescription = null, tint = Color(0xFF9FC4D8), modifier = Modifier.size(42.dp))
-                        Spacer(Modifier.height(7.dp))
-                        Text("Placeholder materi visual", color = WaspadAIDarkBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text("Area ilustrasi/video dapat diisi nanti.", color = WaspadAIMuted, fontSize = 11.sp)
-                    }
-                }
+                LearningStageStepper(
+                    stages = material.stages,
+                    selectedIndex = stageIndex,
+                    completedStages = completedStages,
+                )
+                Spacer(Modifier.height(18.dp))
+                LearningMaterialPlaceholders()
                 Spacer(Modifier.height(17.dp))
-                LearningStageCard(stage = material.stages[stageIndex], index = stageIndex)
-                Spacer(Modifier.height(16.dp))
-                material.stages.forEachIndexed { index, stage ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { stageIndex = index }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .background(if (index < stageIndex) WaspadAIValid else if (index == stageIndex) WaspadAIBlue else WaspadAIBackground, CircleShape)
-                                .border(1.dp, if (index <= stageIndex) WaspadAIBlue else WaspadAILightBlue, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (index < stageIndex) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp)) else Text("${index + 1}", color = if (index == stageIndex) Color.White else WaspadAIMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.width(9.dp))
-                        Text(stage.title, color = if (index == stageIndex) WaspadAIBlue else WaspadAIMuted, fontSize = 12.sp, fontWeight = if (index == stageIndex) FontWeight.Bold else FontWeight.Normal)
-                    }
-                }
+                LearningStageCard(stage = material.stages[stageIndex])
                 Spacer(Modifier.height(15.dp))
                 Button(
                     onClick = {
@@ -532,14 +512,42 @@ private fun LearningDetailScreen(
     }
 
     if (showQuizChoice) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { showQuizChoice = false },
-            icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = WaspadAIValid, modifier = Modifier.size(42.dp)) },
-            title = { Text("Siap menguji pemahamanmu?", fontWeight = FontWeight.Bold) },
-            text = { Text("Kamu sudah menyelesaikan materi ini. Lanjutkan dengan latihan soal singkat atau kembali ke daftar materi.") },
-            confirmButton = { Button(onClick = { showQuizChoice = false; showQuiz = true }) { Text("Mulai latihan soal") } },
-            dismissButton = { OutlinedButton(onClick = { showQuizChoice = false }) { Text("Nanti saja") } },
-        )
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Surface(
+                modifier = Modifier.padding(horizontal = 24.dp).widthIn(max = 340.dp).fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = WaspadAIValid, modifier = Modifier.size(36.dp))
+                    Spacer(Modifier.height(12.dp))
+                    Text("Siap menguji pemahamanmu?", fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, color = WaspadAIDarkBlue, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Materi selesai dibaca. Yuk, uji pemahamanmu dengan latihan soal singkat.", fontSize = 13.sp, lineHeight = 19.sp, color = Color(0xFF557383), textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(18.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { showQuizChoice = false },
+                            modifier = Modifier.weight(.4f).height(48.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WaspadAIBlue),
+                        ) { Text("Nanti saja", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                        Button(
+                            onClick = { showQuizChoice = false; showQuiz = true },
+                            modifier = Modifier.weight(.6f).height(48.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue, contentColor = Color.White),
+                        ) { Text("Mulai latihan soal", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                    }
+                }
+            }
+        }
     }
     if (showQuiz) {
         LearningQuizScreen(
@@ -553,22 +561,85 @@ private fun LearningDetailScreen(
 }
 
 @Composable
-private fun LearningStageCard(stage: LearningStage, index: Int) {
-    Surface(shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 4.dp) {
-        Row(modifier = Modifier.padding(17.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            Box(modifier = Modifier.size(35.dp).background(Color(0xFFE7F3FC), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Text("${index + 1}".padStart(2, '0'), color = WaspadAIBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            Column {
-                Text("TAHAP ${index + 1}", color = WaspadAIBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
-                Spacer(Modifier.height(4.dp))
-                Text(stage.title, color = WaspadAIDarkBlue, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(7.dp))
-                Text(stage.body, color = Color(0xFF557383), fontSize = 13.sp, lineHeight = 20.sp)
+private fun LearningStageCard(stage: LearningStage) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White, shadowElevation = 4.dp) {
+        Column(modifier = Modifier.padding(17.dp)) {
+            Text(stage.title, color = WaspadAIDarkBlue, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
+            Text(stage.body, color = Color(0xFF557383), fontSize = 13.sp, lineHeight = 20.sp)
+        }
+    }
+}
+
+@Composable
+private fun LearningStageStepper(
+    stages: List<LearningStage>,
+    selectedIndex: Int,
+    completedStages: Int,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("URUTAN MATERI", color = WaspadAIMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+            Text("${selectedIndex + 1} / ${stages.size}", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(11.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            stages.forEachIndexed { index, _ ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(5.dp)
+                        .background(if (index < completedStages) WaspadAIBlue else WaspadAILightBlue, RoundedCornerShape(6.dp)),
+                )
             }
         }
     }
 }
+
+@Composable
+private fun LearningMaterialPlaceholders() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        LearningPlaceholder(
+            modifier = Modifier.weight(1f),
+            title = "Visual materi",
+            subtitle = "Ilustrasi atau video",
+            icon = Icons.Rounded.CollectionsBookmark,
+        )
+        LearningPlaceholder(
+            modifier = Modifier.weight(1f),
+            title = "Contoh kasus",
+            subtitle = "Tangkapan layar contoh",
+            icon = Icons.Rounded.Visibility,
+        )
+    }
+}
+
+@Composable
+private fun LearningPlaceholder(
+    modifier: Modifier,
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+) {
+    Column(
+        modifier = modifier
+            .height(118.dp)
+            .border(1.dp, Color(0xFF9FC4D8), RoundedCornerShape(14.dp))
+            .background(Color(0xFFF2FAFE), RoundedCornerShape(14.dp))
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = Color(0xFF78A9C4), modifier = Modifier.size(28.dp))
+        Spacer(Modifier.height(7.dp))
+        Text(title, color = WaspadAIDarkBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(subtitle, color = WaspadAIMuted, fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 12.sp)
+    }
+}
+
 
 @Composable
 private fun LearningQuizScreen(
@@ -593,91 +664,145 @@ private fun LearningQuizScreen(
         onDismissRequest = ::leaveQuiz,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(WaspadAIBlue)) {
-            Image(
-                painter = painterResource(id = id.waspadai.app.R.drawable.community_header_background),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                alpha = .55f,
-            )
+        Box(modifier = Modifier.fillMaxSize().background(WaspadAIBackground)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .background(WaspadAIBlue),
+            ) {
+                Image(
+                    painter = painterResource(id = id.waspadai.app.R.drawable.community_header_background),
+                    contentDescription = null,
+                    modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop,
+                    alpha = .68f,
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp),
+                    .navigationBarsPadding(),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .height(64.dp)
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = ::leaveQuiz) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White, modifier = Modifier.size(30.dp))
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White, modifier = Modifier.size(26.dp))
                     }
-                    Text("Lesson ${questionIndex + 1}", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Text("Skip", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = ::leaveQuiz).padding(horizontal = 5.dp, vertical = 10.dp))
-                }
-                Box(modifier = Modifier.fillMaxWidth().height(18.dp).padding(horizontal = 6.dp).background(Color(0xFFD9D9D9), RoundedCornerShape(20.dp))) {
-                    Box(modifier = Modifier.fillMaxWidth((questionIndex + 1).toFloat() / material.questions.size).height(18.dp).background(Color(0xFFFFD95A), RoundedCornerShape(20.dp)))
-                }
-                if (finished) {
-                    Column(modifier = Modifier.fillMaxSize().padding(top = 100.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = Color(0xFFFFD95A), modifier = Modifier.size(72.dp))
-                        Spacer(Modifier.height(18.dp))
-                        Text("Latihan selesai", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        Text("${score} dari ${material.questions.size} jawaban benar", color = Color.White, fontSize = 18.sp, textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(28.dp))
-                        Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD95A)), modifier = Modifier.fillMaxWidth(.82f)) {
-                            Text("Kembali ke materi", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("LATIHAN SOAL", color = Color(0xFFCFE8F8), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("Cek pemahaman", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                     }
-                } else {
-                    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 30.dp, bottom = 28.dp)) {
-                        Text(question.question, color = Color.White, fontSize = 22.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(28.dp))
-                        question.answers.forEachIndexed { index, answer ->
-                            val selected = selectedAnswer == index
-                            val isCorrect = selected && index == question.correctAnswer
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(if (selected) Color(0xFFFFD95A) else Color.Transparent)
-                                    .border(1.dp, if (selected) Color(0xFFFFD95A) else Color.White, RoundedCornerShape(24.dp))
-                                    .clickable { selectedAnswer = index }
-                                    .padding(horizontal = 16.dp, vertical = 23.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(answer, color = if (selected) Color.Black else Color.White, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                if (isCorrect) Icon(Icons.Rounded.Check, contentDescription = "Jawaban benar", tint = WaspadAIBlue, modifier = Modifier.size(26.dp))
+                    Text(
+                        "Keluar",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable(onClick = ::leaveQuiz).padding(horizontal = 5.dp, vertical = 10.dp),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = learningContentGutter()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    repeat(material.questions.size) { index ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(5.dp)
+                                .background(if (index <= questionIndex) Color(0xFFFFD95A) else Color.White.copy(alpha = .42f), RoundedCornerShape(6.dp)),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+                    color = WaspadAIBackground,
+                ) {
+                    if (finished) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = learningContentGutter(), vertical = 72.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = WaspadAIValid, modifier = Modifier.size(72.dp))
+                            Spacer(Modifier.height(18.dp))
+                            Text("Latihan selesai", color = WaspadAIDarkBlue, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            Text("${score} dari ${material.questions.size} jawaban benar", color = WaspadAIMuted, fontSize = 17.sp, textAlign = TextAlign.Center)
+                            Spacer(Modifier.height(28.dp))
+                            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue), modifier = Modifier.fillMaxWidth()) {
+                                Text("Kembali ke materi", fontWeight = FontWeight.Bold)
                             }
-                            Spacer(Modifier.height(22.dp))
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 15.dp, top = 2.dp)) {
-                            Icon(Icons.Rounded.Visibility, contentDescription = null, tint = Color(0xFFFFD95A), modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("See explanation", color = Color(0xFFFFD95A), fontSize = 14.sp, modifier = Modifier.clickable { })
-                        }
-                        if (selectedAnswer >= 0) {
-                            Spacer(Modifier.height(23.dp))
-                            Button(
-                                onClick = {
-                                    if (selectedAnswer == question.correctAnswer) score += 1
-                                    if (questionIndex == material.questions.lastIndex) {
-                                        finished = true
-                                        onComplete()
-                                    } else {
-                                        questionIndex += 1
-                                        selectedAnswer = -1
-                                        onProgress(questionIndex)
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = learningContentGutter(), vertical = 28.dp),
+                        ) {
+                            Text("SOAL ${questionIndex + 1} DARI ${material.questions.size}", color = WaspadAIBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+                            Spacer(Modifier.height(9.dp))
+                            Text(question.question, color = WaspadAIDarkBlue, fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(25.dp))
+                            question.answers.forEachIndexed { index, answer ->
+                                val selected = selectedAnswer == index
+                                val isCorrect = selected && index == question.correctAnswer
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(if (selected) Color(0xFFE2F1FB) else Color.White)
+                                        .border(1.dp, if (selected) WaspadAIBlue else Color(0xFFD8E4EC), RoundedCornerShape(14.dp))
+                                        .clickable { selectedAnswer = index }
+                                        .padding(13.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(31.dp)
+                                            .background(if (selected) WaspadAIBlue else Color(0xFFE7F3FC), RoundedCornerShape(9.dp)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(('A'.code + index).toChar().toString(), color = if (selected) Color.White else WaspadAIBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                     }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD95A)),
-                                shape = RoundedCornerShape(24.dp),
-                            ) { Text(if (questionIndex == material.questions.lastIndex) "Lihat hasil" else "Lanjut", color = Color.Black, fontWeight = FontWeight.Bold) }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(answer, color = WaspadAIDarkBlue, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                    if (isCorrect) Icon(Icons.Rounded.Check, contentDescription = "Jawaban benar", tint = WaspadAIValid, modifier = Modifier.size(23.dp))
+                                }
+                                Spacer(Modifier.height(11.dp))
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, top = 3.dp)) {
+                                Icon(Icons.Rounded.Visibility, contentDescription = null, tint = WaspadAIBlue, modifier = Modifier.size(19.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text("Lihat penjelasan", color = WaspadAIBlue, fontSize = 13.sp, modifier = Modifier.clickable { })
+                            }
+                            if (selectedAnswer >= 0) {
+                                Spacer(Modifier.height(22.dp))
+                                Button(
+                                    onClick = {
+                                        if (selectedAnswer == question.correctAnswer) score += 1
+                                        if (questionIndex == material.questions.lastIndex) {
+                                            finished = true
+                                            onComplete()
+                                        } else {
+                                            questionIndex += 1
+                                            selectedAnswer = -1
+                                            onProgress(questionIndex)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
+                                    shape = RoundedCornerShape(24.dp),
+                                ) { Text(if (questionIndex == material.questions.lastIndex) "Lihat hasil" else "Soal berikutnya", fontWeight = FontWeight.Bold) }
+                            }
                         }
                     }
                 }
@@ -771,5 +896,3 @@ private fun LearningQuizDialog(
         }
     }
 }
-
-private val WaspadAITextColor = Color(0xFF15212A)
