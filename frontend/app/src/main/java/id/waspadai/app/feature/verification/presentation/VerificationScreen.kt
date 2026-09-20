@@ -243,6 +243,14 @@ fun VerificationScreen(
             )
         }
     }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        onAction(
+            VerificationAction.ImageSelectionFailed(
+                "File dipilih, tetapi pemeriksaan file belum didukung. Pilih Foto untuk JPG, PNG, atau WEBP."
+            )
+        )
+    }
 
     LaunchedEffect(state.conversation.size, state.phase) {
         if (state.conversation.isNotEmpty()) {
@@ -254,9 +262,11 @@ fun VerificationScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .imePadding()
     ) {
-        WaspadAiHeader(onHistoryClick = { onAction(VerificationAction.ToggleHistory) })
+        WaspadAiHeader(
+            overlayModeEnabled = state.isOverlayModeEnabled,
+            onToggleOverlayMode = { onAction(VerificationAction.RequestOverlayMode) },
+        )
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f),
@@ -305,34 +315,27 @@ fun VerificationScreen(
             }
             item { Spacer(Modifier.padding(bottom = 1.dp)) }
         }
-        VerificationComposer(
-            value = state.draft,
-            enabled = !isSubmitting,
-            overlayModeEnabled = state.isOverlayModeEnabled,
-            onValueChange = { onAction(VerificationAction.InputChanged(it)) },
-            onSubmit = {
-                onAction(
-                    if (state.pendingImagePreview != null) {
-                        VerificationAction.SubmitPendingImage
-                    } else {
-                        VerificationAction.SubmitText
-                    }
-                )
-            },
-            hasPendingImage = state.pendingImagePreview != null,
-            onToggleOverlayMode = {
-                if (state.isOverlayModeEnabled) {
-                    FloatingVerifyService.stop(context)
-                    onAction(VerificationAction.RequestOverlayMode)
-                } else {
-                    onAction(VerificationAction.RequestOverlayMode)
-                }
-            },
-            onRequestImageCapture = {
-                onAction(VerificationAction.RequestImageCapture)
-                imagePicker.launch("image/*")
-            }
-        )
+        androidx.compose.foundation.layout.Box(Modifier.imePadding()) {
+            VerificationComposer(
+                value = state.draft,
+                enabled = !isSubmitting,
+                onValueChange = { onAction(VerificationAction.InputChanged(it)) },
+                onSubmit = {
+                    onAction(
+                        if (state.pendingImagePreview != null) {
+                            VerificationAction.SubmitPendingImage
+                        } else {
+                            VerificationAction.SubmitText
+                        }
+                    )
+                },
+                onRequestImageCapture = {
+                    onAction(VerificationAction.RequestImageCapture)
+                    imagePicker.launch("image/*")
+                },
+                onRequestFileUpload = { filePicker.launch("*/*") },
+            )
+        }
         WaspadAIBottomNavigation(
             selectedDestination = activeTab,
             onDestinationSelected = {

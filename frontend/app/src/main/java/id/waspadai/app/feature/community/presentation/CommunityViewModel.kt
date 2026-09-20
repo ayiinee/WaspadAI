@@ -73,11 +73,7 @@ class CommunityViewModel(
             }
 
             is CommunityAction.SupportClicked -> updatePost(action.postId) { post ->
-                val supported = !post.isSupported
-                post.copy(
-                    isSupported = supported,
-                    supportCount = post.supportCount + if (supported) 1 else -1,
-                )
+                post.copy(isSupported = !post.isSupported)
             }
 
             is CommunityAction.VerdictSelected -> updatePost(action.postId) { post ->

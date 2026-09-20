@@ -25,19 +25,30 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -62,7 +73,10 @@ import id.waspadai.app.core.ui.SoftBlue
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 
 @Composable
-fun WaspadAiHeader(onHistoryClick: () -> Unit = {}) {
+fun WaspadAiHeader(
+    overlayModeEnabled: Boolean,
+    onToggleOverlayMode: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -82,16 +96,49 @@ fun WaspadAiHeader(onHistoryClick: () -> Unit = {}) {
                 .align(Alignment.CenterStart)
                 .padding(start = 32.dp)
         )
-        IconButton(
-            onClick = onHistoryClick,
+        VerificationModeSwitch(
+            checked = overlayModeEnabled,
+            onCheckedChange = onToggleOverlayMode,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 20.dp)
+        )
+    }
+}
+
+@Composable
+private fun VerificationModeSwitch(
+    checked: Boolean,
+    onCheckedChange: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val thumbOffset by animateFloatAsState(
+        targetValue = if (checked) 16f else 0f,
+        label = "verification-mode-thumb",
+    )
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0x33002F52))
+            .clickable(onClick = onCheckedChange)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Periksa", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(21.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (checked) BrandBlue else Color(0xFF7893A5))
+                .padding(2.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.History,
-                contentDescription = "History verifikasi",
-                tint = Color.White
+            Box(
+                modifier = Modifier
+                    .size(17.dp)
+                    .graphicsLayer { translationX = thumbOffset.dp.toPx() }
+                    .background(Color.White, CircleShape)
             )
         }
     }
@@ -387,13 +434,88 @@ fun FailureNotice(message: String, onDismiss: () -> Unit) {
 fun VerificationComposer(
     value: String,
     enabled: Boolean,
-    overlayModeEnabled: Boolean,
-    hasPendingImage: Boolean = false,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
-    onToggleOverlayMode: () -> Unit,
-    onRequestImageCapture: () -> Unit
+    onRequestImageCapture: () -> Unit,
+    onRequestFileUpload: () -> Unit,
 ) {
+    var attachmentMenuExpanded by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Ketik pesan untuk diperiksa…", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            singleLine = true,
+            shape = RoundedCornerShape(28.dp),
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (enabled) BrandBlue else Color(0xFF9FC8DD))
+                        .clickable(enabled = enabled) { attachmentMenuExpanded = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Tambahkan foto atau file", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            },
+            trailingIcon = {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (enabled) BrandBlue else Color(0xFF9FC8DD))
+                        .clickable(enabled = enabled, onClick = onSubmit),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.ArrowUpward, contentDescription = "Kirim pesan", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { onSubmit() }),
+        )
+        DropdownMenu(
+            expanded = attachmentMenuExpanded,
+            onDismissRequest = { attachmentMenuExpanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Foto") },
+                leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
+                onClick = {
+                    attachmentMenuExpanded = false
+                    onRequestImageCapture()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("File") },
+                leadingIcon = { Icon(Icons.Filled.Description, contentDescription = null) },
+                onClick = {
+                    attachmentMenuExpanded = false
+                    onRequestFileUpload()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun VerificationComposerLegacy(
+    value: String,
+    enabled: Boolean,
+    onValueChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onRequestImageCapture: () -> Unit,
+    onRequestFileUpload: () -> Unit,
+) {
+    var attachmentMenuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -402,30 +524,34 @@ fun VerificationComposer(
     ) {
         Box(
             modifier = Modifier
-                .width(42.dp)
-                .height(28.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(if (overlayModeEnabled) BrandBlue else Color(0xFFD8E3EA))
-                .clickable(enabled = enabled, onClick = onToggleOverlayMode)
-                .padding(4.dp),
-            contentAlignment = if (overlayModeEnabled) Alignment.CenterEnd else Alignment.CenterStart
-        ) {
-            Box(
-                Modifier
-                    .size(20.dp)
-                    .background(Color.White, CircleShape)
-            )
-        }
-        Spacer(Modifier.width(9.dp))
-        Box(
-            modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
                 .background(BrandBlue)
-                .clickable(enabled = enabled, onClick = onRequestImageCapture),
+                .clickable(enabled = enabled) { attachmentMenuExpanded = true },
             contentAlignment = Alignment.Center
         ) {
-            Text("+", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Medium)
+            Icon(Icons.Filled.Add, contentDescription = "Tambahkan foto atau file", tint = Color.White)
+            DropdownMenu(
+                expanded = attachmentMenuExpanded,
+                onDismissRequest = { attachmentMenuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Foto") },
+                    leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
+                    onClick = {
+                        attachmentMenuExpanded = false
+                        onRequestImageCapture()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("File") },
+                    leadingIcon = { Icon(Icons.Filled.Description, contentDescription = null) },
+                    onClick = {
+                        attachmentMenuExpanded = false
+                        onRequestFileUpload()
+                    },
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         OutlinedTextField(
@@ -435,8 +561,7 @@ fun VerificationComposer(
             modifier = Modifier.weight(1f),
             placeholder = {
                 Text(
-                    if (hasPendingImage) "Tulis pesan untuk gambar…"
-                    else "Ketik pesan untuk diperiksa…",
+                    "Ketik pesan untuk diperiksa…",
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
