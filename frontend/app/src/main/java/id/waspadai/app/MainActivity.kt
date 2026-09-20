@@ -56,6 +56,33 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val navigateToTopLevel: (String) -> Unit = { destination ->
+        val targetRoute = when (destination) {
+            "Periksa" -> VerificationRouteName
+            "Koneksi" -> CommunityRouteName
+            "Pelajari" -> LearningRouteName
+            else -> null
+        }
+        if (targetRoute != null && targetRoute != currentRoute) {
+            if (targetRoute == VerificationRouteName) {
+                val returnedToVerification = navController.popBackStack(
+                    route = VerificationRouteName,
+                    inclusive = false,
+                )
+                if (!returnedToVerification) {
+                    navController.navigate(VerificationRouteName) {
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                navController.navigate(targetRoute) {
+                    popUpTo(VerificationRouteName) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = WelcomeRouteName) {
         composable(WelcomeRouteName) {
@@ -92,19 +119,7 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
             )
             VerificationRoute(
                 viewModel = viewModel,
-                onDestinationSelected = { destination ->
-                    when {
-                        destination == "Koneksi" && currentRoute != CommunityRouteName ->
-                            navController.navigate(CommunityRouteName)
-                        destination == "Pelajari" && currentRoute != LearningRouteName ->
-                            navController.navigate(LearningRouteName)
-                        destination == "Periksa" && currentRoute != VerificationRouteName ->
-                            navController.navigate(VerificationRouteName) {
-                                popUpTo(VerificationRouteName) { inclusive = false }
-                                launchSingleTop = true
-                            }
-                    }
-                },
+                onDestinationSelected = navigateToTopLevel,
             )
         }
         composable(CommunityRouteName) {
@@ -117,32 +132,12 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                 defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
                 defaultAccessToken = accessToken,
                 onBack = { navController.popBackStack() },
-                onDestinationSelected = { destination ->
-                    when (destination) {
-                        "Periksa" -> if (currentRoute != VerificationRouteName) {
-                            navController.navigate(VerificationRouteName) {
-                                popUpTo(VerificationRouteName) { inclusive = false }
-                                launchSingleTop = true
-                            }
-                        }
-                        "Pelajari" -> if (currentRoute != LearningRouteName) navController.navigate(LearningRouteName)
-                    }
-                },
+                onDestinationSelected = navigateToTopLevel,
             )
         }
         composable(LearningRouteName) {
             LearningScreen(
-                onDestinationSelected = { destination ->
-                    when (destination) {
-                        "Periksa" -> if (currentRoute != VerificationRouteName) {
-                            navController.navigate(VerificationRouteName) {
-                                popUpTo(VerificationRouteName) { inclusive = false }
-                                launchSingleTop = true
-                            }
-                        }
-                        "Koneksi" -> if (currentRoute != CommunityRouteName) navController.navigate(CommunityRouteName)
-                    }
-                },
+                onDestinationSelected = navigateToTopLevel,
             )
         }
     }

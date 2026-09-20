@@ -2,9 +2,13 @@
 
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +42,7 @@ import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -66,6 +71,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +87,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -154,17 +163,7 @@ fun CommunityRoute(
             context.startActivity(Intent.createChooser(sendIntent, "Bagikan kasus"))
         },
         onOpenPost = { selectedPostId = it.id },
-        onDestinationSelected = { label ->
-            if (label == "Periksa") {
-                onDestinationSelected(label)
-            } else if (label != "Koneksi") {
-                Toast.makeText(
-                    context,
-                    "$label belum tersedia pada slicing ini",
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
-        },
+        onDestinationSelected = onDestinationSelected,
     )
 }
 
@@ -178,6 +177,15 @@ fun CommunityScreen(
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var isSearchVisible by rememberSaveable {
+        mutableStateOf(uiState.searchQuery.isNotBlank())
+    }
+    val closeSearch: () -> Unit = {
+        isSearchVisible = false
+        onAction(CommunityAction.SearchChanged(""))
+        onAction(CommunityAction.FilterSelected(CommunityFeedFilter.Semua))
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = WaspadAIBackground,
@@ -196,21 +204,37 @@ fun CommunityScreen(
                 .padding(innerPadding),
         ) {
             // Header tetap terlihat saat daftar koneksi digulir.
-            CommunityPageHeader(title = "Koneksi", onBack = onBack)
+            CommunityPageHeader(
+                title = "Koneksi",
+                onBack = onBack,
+                isSearchVisible = isSearchVisible,
+                onSearchClick = {
+                    if (isSearchVisible) closeSearch() else isSearchVisible = true
+                },
+            )
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 item {
-                    CommunitySearchBar(
-                        query = uiState.searchQuery,
-                        selectedFilter = uiState.selectedFilter,
-                        isFilterMenuVisible = uiState.isFilterMenuVisible,
-                        onAction = onAction,
-                    )
+                    AnimatedVisibility(
+                        visible = isSearchVisible,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+                    ) {
+                        Column {
+                            CommunitySearchBar(
+                                query = uiState.searchQuery,
+                                selectedFilter = uiState.selectedFilter,
+                                isFilterMenuVisible = uiState.isFilterMenuVisible,
+                                onAction = onAction,
+                                requestFocus = isSearchVisible,
+                            )
+                            Spacer(Modifier.height(14.dp))
+                        }
+                    }
                 }
-                item { Spacer(Modifier.height(14.dp)) }
                 if (uiState.visiblePosts.isEmpty()) {
                     item {
                         EmptyCommunityResult(modifier = Modifier.animateItem())
@@ -244,6 +268,8 @@ internal fun CommunityPageHeader(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isSearchVisible: Boolean = false,
+    onSearchClick: (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -278,6 +304,21 @@ internal fun CommunityPageHeader(
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
             )
+            if (onSearchClick != null) {
+                IconButton(
+                    onClick = onSearchClick,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 16.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                        contentDescription = if (isSearchVisible) "Tutup pencarian" else "Buka pencarian",
+                        tint = if (isSearchVisible) WaspadAICaution else Color.White,
+                        modifier = Modifier.size(25.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -530,7 +571,18 @@ private fun CommunitySearchBar(
     isFilterMenuVisible: Boolean,
     onAction: (CommunityAction) -> Unit,
     modifier: Modifier = Modifier,
+    requestFocus: Boolean = false,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(requestFocus) {
+        if (requestFocus) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -550,6 +602,7 @@ private fun CommunitySearchBar(
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp)
+                .focusRequester(focusRequester)
                 .border(1.5.dp, WaspadAILightBlue, RoundedCornerShape(28.dp)),
             decorationBox = { innerTextField ->
                 Row(
@@ -601,20 +654,51 @@ private fun CommunitySearchBar(
             DropdownMenu(
                 expanded = isFilterMenuVisible,
                 onDismissRequest = { onAction(CommunityAction.FilterDismissed) },
+                modifier = Modifier
+                    .widthIn(min = 220.dp)
+                    .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White,
+                shadowElevation = 10.dp,
             ) {
+                Text(
+                    text = "Tampilkan koneksi",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(WaspadAIBlue)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
                 CommunityFeedFilter.entries.forEach { filter ->
+                    val isSelected = filter == selectedFilter
                     DropdownMenuItem(
                         text = {
                             Text(
                                 text = filter.label,
-                                fontWeight = if (filter == selectedFilter) {
+                                color = if (isSelected) WaspadAIDarkBlue else WaspadAIMuted,
+                                fontWeight = if (isSelected) {
                                     FontWeight.Bold
                                 } else {
                                     FontWeight.Normal
                                 },
                             )
                         },
+                        trailingIcon = {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = WaspadAIBlue,
+                                    modifier = Modifier.size(19.dp),
+                                )
+                            }
+                        },
                         onClick = { onAction(CommunityAction.FilterSelected(filter)) },
+                        modifier = Modifier.background(
+                            if (isSelected) WaspadAIBlue.copy(alpha = .09f) else Color.White,
+                        ),
                     )
                 }
             }

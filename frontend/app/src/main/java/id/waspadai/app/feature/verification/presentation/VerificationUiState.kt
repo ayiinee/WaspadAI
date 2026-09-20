@@ -45,6 +45,8 @@ sealed interface VerificationConversationItem {
         val text: String,
         val hasAttachment: Boolean = false,
         val attachmentName: String? = null,
+        val attachmentBytes: ByteArray? = null,
+        val attachmentContentType: String? = null,
     ) : VerificationConversationItem
 
     data class Analysis(val result: VerificationResult, val isSample: Boolean = false) : VerificationConversationItem

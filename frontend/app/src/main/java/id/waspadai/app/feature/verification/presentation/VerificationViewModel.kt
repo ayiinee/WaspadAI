@@ -116,7 +116,9 @@ class VerificationViewModel(
                     conversation = current.conversation + VerificationConversationItem.UserMessage(
                         text = userMessage,
                         hasAttachment = true,
-                        attachmentName = action.fileName
+                        attachmentName = action.fileName,
+                        attachmentBytes = action.imageBytes,
+                        attachmentContentType = action.contentType,
                     ),
                     phase = VerificationPhase.Submitting
                 )
@@ -153,7 +155,11 @@ class VerificationViewModel(
             stopOverlayMode()
         } else {
             _state.update { current ->
-                current.copy(isOverlayPrivacyDialogVisible = true, phase = VerificationPhase.Idle)
+                current.copy(
+                    isOverlayModeEnabled = true,
+                    isOverlayPrivacyDialogVisible = true,
+                    phase = VerificationPhase.Idle,
+                )
             }
         }
     }
