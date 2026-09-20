@@ -194,12 +194,13 @@ async def verify_image(
     if operation["state"] == "COMPLETED" and cached_response is not None:
         return VerificationEnvelope.model_validate(cached_response)
 
+    input_asset_object_path: str | None = None
     if settings.store_screenshots_enabled:
         if http_client is None:
             raise ProductAPIError(
                 503, "STORAGE_UNAVAILABLE", "Storage Supabase belum dapat dihubungi.", True
             )
-        await upload_verification_input(
+        input_asset_object_path = await upload_verification_input(
             http_client,
             settings,
             user_id=user_id,
@@ -250,6 +251,9 @@ async def verify_image(
             result=result,
             execution_mode=execution_mode,
             input_type="IMAGE",
+            input_asset_object_path=input_asset_object_path,
+            input_asset_content_type=content_type,
+            input_asset_size_bytes=len(image_bytes),
         )
     except ProductAPIError:
         raise
@@ -436,6 +440,9 @@ async def _persist_terminal_result(
     result: AIResult,
     execution_mode: str,
     input_type: str,
+    input_asset_object_path: str | None = None,
+    input_asset_content_type: str | None = None,
+    input_asset_size_bytes: int | None = None,
 ) -> VerificationEnvelope:
     eligible = requires_history(result, settings)
     reason = save_reason(result, settings) if eligible else "NOT_REQUIRED"
@@ -480,6 +487,26 @@ async def _persist_terminal_result(
                     settings.history_retention_days,
                 ),
             )
+            if input_asset_object_path is not None and input_asset_content_type is not None:
+                await connection.execute(
+                    """insert into private.stored_assets
+                           (user_id, case_id, bucket, object_path, purpose, mime_type,
+                            size_bytes, sha256, expires_at)
+                       values (%s, %s, 'verification-inputs', %s, 'SCREENSHOT_OPT_IN',
+                               %s, %s, %s, now() + make_interval(hours => %s))
+                       on conflict (bucket, object_path) do update
+                           set case_id = excluded.case_id,
+                               deleted_at = null""",
+                    (
+                        user_id,
+                        case_id,
+                        input_asset_object_path,
+                        input_asset_content_type,
+                        input_asset_size_bytes or 0,
+                        digest,
+                        settings.screenshot_retention_hours,
+                    ),
+                )
             dimensions = result.dimensions
             await connection.execute(
                 """insert into public.verification_results

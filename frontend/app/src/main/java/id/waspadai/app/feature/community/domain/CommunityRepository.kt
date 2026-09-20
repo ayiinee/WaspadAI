@@ -54,6 +54,7 @@ data class CommunityFeedPost(
     val redactedText: String,
     val status: CommunityPostStatus,
     val publishedAt: String,
+    val hasImage: Boolean = false,
     val counts: CommunityVoteCounts,
     val userVote: CommunityVote?,
 )

@@ -186,6 +186,7 @@ private fun CommunityItemDto.toDomain(): CommunityFeedPost = CommunityFeedPost(
     redactedText = redactedText,
     status = status.toStatus(),
     publishedAt = publishedAt,
+    hasImage = hasImage,
     counts = counts.toDomain(),
     userVote = userVote.toVoteOrNull(),
 )

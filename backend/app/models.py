@@ -194,6 +194,7 @@ class CommunityItem(BaseModel):
     redacted_text: str
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
     published_at: str
+    has_image: bool = False
     counts: CommunityVoteCounts
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None = None
 
@@ -221,6 +222,7 @@ class CommunityDetail(BaseModel):
     redacted_text: str
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
     published_at: str
+    has_image: bool = False
     counts: CommunityVoteCounts
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
     result: AIResult

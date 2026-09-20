@@ -59,6 +59,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,6 +89,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.feature.community.domain.CommunityRepository
+import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
@@ -109,6 +111,8 @@ fun CommunityRoute(
     viewModel: CommunityViewModel = viewModel(
         factory = CommunityViewModel.Factory(
             repository = repository,
+            accessTokenProvider = StaticAccessTokenProvider(defaultAccessToken),
+            communityBaseUrl = defaultBaseUrl,
             defaultBaseUrl = defaultBaseUrl,
             defaultAccessToken = defaultAccessToken,
         ),
@@ -119,9 +123,15 @@ fun CommunityRoute(
     var selectedPostId by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
 
+    // Trigger auto-refresh saat layar pertama kali ditampilkan
+    LaunchedEffect(Unit) {
+        viewModel.onAction(CommunityAction.InitScreen)
+    }
+
     if (selectedPost != null) {
         CommunityDetailScreen(
             post = selectedPost,
+            accessToken = uiState.accessTokenDraft,
             onBack = { selectedPostId = null },
             onSupportClick = { viewModel.onAction(CommunityAction.SupportClicked(selectedPost.id)) },
             onVerdictClick = { verdict -> viewModel.onAction(CommunityAction.VerdictSelected(selectedPost.id, verdict)) },
@@ -215,6 +225,7 @@ fun CommunityScreen(
                 ) { post ->
                     CommunityPostCard(
                         post = post,
+                        accessToken = uiState.accessTokenDraft,
                         onSupportClick = {
                             onAction(CommunityAction.SupportClicked(post.id))
                         },
@@ -626,6 +637,7 @@ private fun CommunitySearchBar(
 @Composable
 private fun CommunityPostCard(
     post: CommunityPost,
+    accessToken: String,
     onSupportClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
     onShareClick: () -> Unit,
@@ -700,7 +712,8 @@ private fun CommunityPostCard(
             )
             Spacer(Modifier.height(7.dp))
             CommunityEvidenceImage(
-                evidenceRes = post.evidenceRes,
+                imageUrl = post.imageUrl,
+                accessToken = accessToken,
                 author = post.author,
             )
             Spacer(Modifier.height(9.dp))

@@ -110,6 +110,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.ktor3)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

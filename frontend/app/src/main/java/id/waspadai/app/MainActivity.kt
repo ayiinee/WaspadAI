@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import id.waspadai.app.feature.community.presentation.CommunityRoute
+import id.waspadai.app.feature.community.presentation.CommunityViewModel
 import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
@@ -115,6 +116,15 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                 defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
                 defaultAccessToken = accessToken,
                 onBack = { navController.popBackStack() },
+                viewModel = viewModel(
+                    factory = CommunityViewModel.Factory(
+                        repository = app.communityRepository,
+                        accessTokenProvider = app.authRepository,
+                        communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+                        defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+                        defaultAccessToken = accessToken,
+                    ),
+                ),
                 onDestinationSelected = { destination ->
                     if (destination == "Periksa" && currentRoute != VerificationRouteName) {
                         navController.navigate(VerificationRouteName) {

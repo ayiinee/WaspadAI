@@ -1,7 +1,6 @@
 package id.waspadai.app.feature.community.presentation
 
 import androidx.annotation.DrawableRes
-import id.waspadai.app.R
 
 enum class CommunityVerdict(val label: String) {
     Hoaks("Hoaks"),
@@ -23,7 +22,8 @@ data class CommunityPost(
     val body: String,
     val statusLabel: String = "Belum diverifikasi",
     @DrawableRes val avatarRes: Int,
-    @DrawableRes val evidenceRes: Int,
+    @DrawableRes val evidenceRes: Int? = null,
+    val imageUrl: String? = null,
     val hoaksCount: Int = 0,
     val waspadaCount: Int = 0,
     val validCount: Int = 0,
@@ -59,14 +59,10 @@ data class CommunityUiState(
     val baseUrlDraft: String = "",
     val accessTokenDraft: String = "",
     val backendPhase: CommunityBackendPhase = CommunityBackendPhase.Sample,
-    val backendMessage: String = "Mode sample lokal. Isi base URL dan token untuk mencoba Product API.",
+    val backendMessage: String = "Memuat feed Koneksi dari Product API.",
     val isVoteSubmitting: Boolean = false,
-    val summary: CommunitySummary = CommunitySummary(
-        assessmentsCount = sampleCommunityPosts.sumOf { if (it.selectedVerdict != null) 1 else 0 },
-        evidenceAddedCount = 0,
-        resolvedCasesCount = 0,
-    ),
-    val posts: List<CommunityPost> = sampleCommunityPosts,
+    val summary: CommunitySummary = CommunitySummary(),
+    val posts: List<CommunityPost> = emptyList(),
 ) {
     val visiblePosts: List<CommunityPost>
         get() = posts.filter { post ->
@@ -92,6 +88,7 @@ sealed interface CommunityAction {
     data class BaseUrlChanged(val value: String) : CommunityAction
     data class AccessTokenChanged(val value: String) : CommunityAction
     data object RefreshBackend : CommunityAction
+    data object InitScreen : CommunityAction
     data object FilterClicked : CommunityAction
     data object FilterDismissed : CommunityAction
     data class FilterSelected(val filter: CommunityFeedFilter) : CommunityAction
@@ -101,38 +98,3 @@ sealed interface CommunityAction {
         val verdict: CommunityVerdict,
     ) : CommunityAction
 }
-
-private val sampleCommunityPosts = listOf(
-    CommunityPost(
-        id = "prabowo-video",
-        author = "Putu Alvin Mahendra",
-        timestamp = "10 Agustus 2026 | 10.17 WITA",
-        title = "Potongan video mengatasnamakan presiden",
-        body = "Beredar potongan video yang mengatasnamakan Presiden Prabowo di media sosial. " +
-            "Komunitas sedang melakukan pengecekan terhadap sumber asli dan konteks informasi " +
-            "untuk memastikan apakah informasi tersebut benar atau menyesatkan.",
-        avatarRes = R.drawable.community_avatar_putu,
-        evidenceRes = R.drawable.community_post_prabowo,
-        hoaksCount = 2,
-        waspadaCount = 6,
-        validCount = 2,
-        supportCount = 96,
-        commentCount = 23,
-    ),
-    CommunityPost(
-        id = "gibran-position",
-        author = "Rifqi Aditya Nugroho",
-        timestamp = "10 Agustus 2026 | 10.17 WITA",
-        title = "Klaim pencopotan jabatan wakil presiden",
-        body = "Beredar unggahan yang menyebutkan adanya pencopotan Gibran dari jabatannya " +
-            "sebagai Wakil Presiden. Informasi ini masih perlu diperiksa dengan membandingkan " +
-            "sumber resmi dan konteks pemberitaan untuk memastikan kebenarannya.",
-        avatarRes = R.drawable.community_avatar_rifqi,
-        evidenceRes = R.drawable.community_post_gibran,
-        hoaksCount = 1,
-        waspadaCount = 7,
-        validCount = 2,
-        supportCount = 74,
-        commentCount = 18,
-    ),
-)

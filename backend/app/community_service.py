@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import UUID, uuid4
 
+import httpx
 from psycopg.errors import UniqueViolation
 from psycopg.rows import DictRow
 from psycopg_pool import AsyncConnectionPool
@@ -42,6 +43,7 @@ async def list_community(
         query = await connection.execute(
             """
             select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
+                   (p.redacted_asset_id is not null) as has_image,
                    coalesce(counts.hoaks, 0)::int as hoaks,
                    coalesce(counts.waspada, 0)::int as waspada,
                    coalesce(counts.valid, 0)::int as valid,
@@ -152,6 +154,75 @@ async def get_community_detail(
     return _community_detail(row)
 
 
+async def get_community_image(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    case_id: UUID,
+    http_client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(
+            503,
+            "STORAGE_UNAVAILABLE",
+            "Gambar komunitas belum dapat dimuat.",
+            retryable=True,
+        )
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select asset.bucket, asset.object_path, asset.mime_type
+              from public.community_posts p
+              join private.stored_assets asset on asset.id = p.redacted_asset_id
+             where p.case_id = %s
+               and p.withdrawn_at is null
+               and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+               and p.publication_consent_id is not null
+               and asset.deleted_at is null
+               and exists (
+                   select 1 from private.consent_records consent
+                    where consent.id = p.publication_consent_id
+                      and consent.scope = 'COMMUNITY_PUBLICATION'
+                      and consent.revoked_at is null
+                      and (consent.expires_at is null or consent.expires_at > now())
+               )
+            """,
+            (case_id,),
+        )
+        asset = await query.fetchone()
+    if asset is None:
+        raise ProductAPIError(404, "COMMUNITY_IMAGE_NOT_FOUND", "Gambar komunitas tidak ditemukan.")
+
+    service_role_key = settings.supabase_service_role_key.get_secret_value()
+    storage_url = (
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/"
+        f"{asset['bucket']}/{asset['object_path']}"
+    )
+    try:
+        response = await http_client.get(
+            storage_url,
+            headers={
+                "Authorization": f"Bearer {service_role_key}",
+                "apikey": service_role_key,
+            },
+        )
+    except httpx.RequestError as error:
+        raise ProductAPIError(
+            503,
+            "STORAGE_UNAVAILABLE",
+            "Gambar komunitas belum dapat dimuat.",
+            retryable=True,
+        ) from error
+    if response.is_error:
+        raise ProductAPIError(
+            503,
+            "STORAGE_UNAVAILABLE",
+            "Storage menolak pembacaan gambar komunitas.",
+            retryable=True,
+        )
+    return response.content, asset["mime_type"]
+
+
 async def cast_community_vote(
     pool: AsyncConnectionPool,
     settings: Settings,
@@ -206,10 +277,15 @@ async def create_community_preview(
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
             """
-            select id, revision, headline, sanitized_text
-              from public.verification_cases
-             where id = %s and user_id = %s and deleted_at is null
-               and community_state = 'PRIVATE'
+            select c.id, c.revision, c.headline, c.sanitized_text,
+                   asset.id as asset_id
+              from public.verification_cases c
+              left join private.stored_assets asset
+                on asset.case_id = c.id
+               and asset.purpose = 'SCREENSHOT_OPT_IN'
+               and asset.deleted_at is null
+             where c.id = %s and c.user_id = %s and c.deleted_at is null
+               and c.community_state = 'PRIVATE'
             """,
             (case_id, user_id),
         )
@@ -230,8 +306,9 @@ async def create_community_preview(
             """
             insert into public.community_previews
                 (id, case_id, user_id, case_revision, redacted_text,
-                    content_hash, redaction_version, redactions, state, expires_at)
-            values (%s, %s, %s, %s, %s, %s, 'server-v1', '[]'::jsonb, 'READY',
+                    redacted_asset_id, content_hash, redaction_version,
+                    redactions, state, expires_at)
+            values (%s, %s, %s, %s, %s, %s, %s, 'server-v1', '[]'::jsonb, 'READY',
                     %s + make_interval(secs => %s))
             returning expires_at
             """,
@@ -241,6 +318,7 @@ async def create_community_preview(
                 user_id,
                 case["revision"],
                 redacted_text,
+                case["asset_id"],
                 content_hash,
                 expires_at,
                 settings.preview_ttl_seconds,
@@ -271,7 +349,7 @@ async def publish_community_case(
         ) as connection:
             query = await connection.execute(
                 """
-                select p.id as preview_id, p.redacted_text, p.content_hash,
+                select p.id as preview_id, p.redacted_text, p.redacted_asset_id, p.content_hash,
                        p.case_revision, p.expires_at, p.state,
                        c.headline, c.revision
                   from public.community_previews p
@@ -321,9 +399,9 @@ async def publish_community_case(
             await connection.execute(
                 """
                 insert into public.community_posts
-                    (case_id, owner_id, preview_id, title, redacted_text, status,
+                    (case_id, owner_id, preview_id, title, redacted_text, redacted_asset_id, status,
                      publication_consent_id, rag_consent_id, content_hash, revision)
-                values (%s, %s, %s, %s, %s, 'PUBLISHED_UNVERIFIED', %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, 'PUBLISHED_UNVERIFIED', %s, %s, %s, %s)
                 """,
                 (
                     case_id,
@@ -331,6 +409,7 @@ async def publish_community_case(
                     request.preview_id,
                     preview["headline"],
                     preview["redacted_text"],
+                    preview["redacted_asset_id"],
                     publication_row["id"],
                     rag_consent_id,
                     content_hash,
@@ -450,6 +529,7 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
     query = await connection.execute(  # type: ignore[attr-defined]
         """
         select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
+               (p.redacted_asset_id is not null) as has_image,
                r.result_json, r.execution_mode,
                coalesce(counts.hoaks, 0)::int as hoaks,
                coalesce(counts.waspada, 0)::int as waspada,
@@ -549,6 +629,7 @@ def _community_item(row: DictRow) -> CommunityItem:
         redacted_text=row["redacted_text"],
         status=row["status"],
         published_at=_iso8601(row["published_at"]),
+        has_image=bool(row["has_image"]),
         counts=_counts(row),
         user_vote=row["user_vote"],
     )
@@ -561,6 +642,7 @@ def _community_detail(row: DictRow) -> CommunityDetail:
         redacted_text=row["redacted_text"],
         status=row["status"],
         published_at=_iso8601(row["published_at"]),
+        has_image=bool(row["has_image"]),
         counts=_counts(row),
         user_vote=row["user_vote"],
         result=AIResult.model_validate(row["result_json"]),

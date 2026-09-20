@@ -16,6 +16,7 @@ data class CommunityItemDto(
     @SerialName("redacted_text") val redactedText: String = "",
     val status: String = "",
     @SerialName("published_at") val publishedAt: String = "",
+    @SerialName("has_image") val hasImage: Boolean = false,
     val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
     @SerialName("user_vote") val userVote: String? = null,
 )

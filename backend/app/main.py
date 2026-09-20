@@ -21,13 +21,14 @@ from fastapi import (
     status,
 )
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.auth import AuthenticatedUser, get_current_user
 from app.community_service import (
     cast_community_vote,
     create_community_preview,
     get_community_detail,
+    get_community_image,
     get_community_user_summary,
     list_community,
     publish_community_case,
@@ -315,6 +316,29 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         return await get_community_detail(pool, app.state.settings, user.id, case_id)
+
+    @app.get("/api/v1/community/{case_id}/image", tags=["Community"])
+    async def get_community_image_endpoint(
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        content, content_type = await get_community_image(
+            pool,
+            app.state.settings,
+            user.id,
+            case_id,
+            app.state.http_client,
+        )
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "private, max-age=60"},
+        )
 
     @app.post(
         "/api/v1/history/{case_id}/community-preview",

@@ -13,14 +13,21 @@ import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
 import id.waspadai.app.feature.community.domain.CommunityVoteCounts
 import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
+import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class CommunityViewModel(
     private val repository: CommunityRepository? = null,
+    private val accessTokenProvider: AccessTokenProvider? = null,
+    private val communityBaseUrl: String = "",
     defaultBaseUrl: String = "",
     defaultAccessToken: String = "",
 ) : ViewModel() {
@@ -45,6 +52,8 @@ class CommunityViewModel(
             is CommunityAction.AccessTokenChanged -> _uiState.update {
                 it.copy(accessTokenDraft = action.value)
             }
+
+            CommunityAction.InitScreen -> initScreen()
 
             CommunityAction.RefreshBackend -> refreshBackend()
 
@@ -83,6 +92,49 @@ class CommunityViewModel(
         }
     }
 
+    /**
+     * Dipanggil saat layar Koneksi pertama kali dibuka.
+     * Jika AccessTokenProvider tersedia, secara otomatis mengisi token dan memuat feed live.
+     * Jika tidak, tetap menggunakan mode sample/manual seperti sebelumnya.
+     */
+    private fun initScreen() {
+        val provider = accessTokenProvider ?: return
+        val baseUrl = communityBaseUrl.takeIf(String::isNotBlank) ?: return
+
+        // Jika sudah dalam Connected/Loading, jangan trigger refresh ulang
+        val currentPhase = uiState.value.backendPhase
+        if (currentPhase == CommunityBackendPhase.Connected ||
+            currentPhase == CommunityBackendPhase.Loading
+        ) return
+
+        _uiState.update {
+            it.copy(
+                backendPhase = CommunityBackendPhase.Loading,
+                backendMessage = "Memuat feed Koneksi...",
+            )
+        }
+        viewModelScope.launch {
+            val token = provider.currentAccessToken()
+            if (token.isNullOrBlank()) {
+                _uiState.update {
+                    it.copy(
+                        backendPhase = CommunityBackendPhase.Failure,
+                        backendMessage = "Sesi Supabase belum tersedia. Login ulang lalu coba lagi.",
+                    )
+                }
+                return@launch
+            }
+            // Simpan ke draft agar panel debug juga ter-update
+            _uiState.update {
+                it.copy(
+                    baseUrlDraft = baseUrl,
+                    accessTokenDraft = token,
+                )
+            }
+            doLoadCommunity(baseUrl, token)
+        }
+    }
+
     private fun refreshBackend() {
         val current = uiState.value
         val baseUrl = current.baseUrlDraft.trim()
@@ -113,14 +165,19 @@ class CommunityViewModel(
             )
         }
         viewModelScope.launch {
-            when (val result = communityRepository.loadCommunity(baseUrl, accessToken)) {
-                is AppResult.Success -> applySnapshot(result.value)
-                is AppResult.Failure -> _uiState.update {
-                    it.copy(
-                        backendPhase = CommunityBackendPhase.Failure,
-                        backendMessage = result.message,
-                    )
-                }
+            doLoadCommunity(baseUrl, accessToken)
+        }
+    }
+
+    private suspend fun doLoadCommunity(baseUrl: String, accessToken: String) {
+        val communityRepository = repository ?: return
+        when (val result = communityRepository.loadCommunity(baseUrl, accessToken)) {
+            is AppResult.Success -> applySnapshot(result.value)
+            is AppResult.Failure -> _uiState.update {
+                it.copy(
+                    backendPhase = CommunityBackendPhase.Failure,
+                    backendMessage = result.message,
+                )
             }
         }
     }
@@ -157,10 +214,10 @@ class CommunityViewModel(
                 backendMessage = if (snapshot.posts.isEmpty()) {
                     "Backend terhubung. Feed komunitas masih kosong."
                 } else {
-                    "Backend terhubung. Feed sanitized siap diuji."
+                    "Backend terhubung. ${snapshot.posts.size} postingan dimuat."
                 },
                 summary = snapshot.summary.toPresentation(),
-                posts = snapshot.posts.mapIndexed { index, post -> post.toPresentation(index) },
+                posts = snapshot.posts.map { post -> post.toPresentation(communityBaseUrl) },
             )
         }
     }
@@ -202,21 +259,49 @@ class CommunityViewModel(
 
     class Factory(
         private val repository: CommunityRepository,
+        private val accessTokenProvider: AccessTokenProvider,
+        private val communityBaseUrl: String,
         private val defaultBaseUrl: String,
         private val defaultAccessToken: String,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             check(modelClass.isAssignableFrom(CommunityViewModel::class.java))
-            return CommunityViewModel(repository, defaultBaseUrl, defaultAccessToken) as T
+            return CommunityViewModel(
+                repository = repository,
+                accessTokenProvider = accessTokenProvider,
+                communityBaseUrl = communityBaseUrl,
+                defaultBaseUrl = defaultBaseUrl,
+                defaultAccessToken = defaultAccessToken,
+            ) as T
         }
     }
 }
 
-private fun CommunityFeedPost.toPresentation(index: Int): CommunityPost = CommunityPost(
+private val isoFormatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+private val displayFormatter = DateTimeFormatter
+    .ofPattern("d MMMM yyyy | HH.mm z", Locale("id", "ID"))
+
+/**
+ * Format timestamp ISO 8601 dari backend menjadi string ramah pengguna.
+ * Contoh: "2026-09-18T07:30:00Z" -> "18 September 2026 | 14.30 WIB"
+ * Jika parsing gagal, kembalikan string asli.
+ */
+private fun formatPublishedAt(raw: String): String {
+    if (raw.isBlank()) return "Waktu publikasi belum tersedia"
+    return try {
+        val instant = Instant.from(isoFormatter.parse(raw))
+        val zoned = instant.atZone(ZoneId.of("Asia/Jakarta"))
+        displayFormatter.format(zoned)
+    } catch (_: Exception) {
+        raw
+    }
+}
+
+private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = CommunityPost(
     id = caseId,
     author = "Komunitas WaspadAI",
-    timestamp = publishedAt.ifBlank { "Waktu publikasi belum tersedia" },
+    timestamp = formatPublishedAt(publishedAt),
     title = title,
     body = redactedText,
     statusLabel = when (status) {
@@ -224,8 +309,12 @@ private fun CommunityFeedPost.toPresentation(index: Int): CommunityPost = Commun
         CommunityPostStatus.VerifiedEvidence -> "Evidence terverifikasi"
         CommunityPostStatus.Unknown -> "Status belum dikenali"
     },
-    avatarRes = if (index % 2 == 0) R.drawable.community_avatar_putu else R.drawable.community_avatar_rifqi,
-    evidenceRes = if (index % 2 == 0) R.drawable.community_post_prabowo else R.drawable.community_post_gibran,
+    avatarRes = R.drawable.community_avatar_putu,
+    imageUrl = if (hasImage) {
+        "${baseUrl.trimEnd('/')}/api/v1/community/$caseId/image"
+    } else {
+        null
+    },
     hoaksCount = counts.hoaks,
     waspadaCount = counts.waspada,
     validCount = counts.valid,

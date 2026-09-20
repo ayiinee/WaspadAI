@@ -54,6 +54,7 @@ import id.waspadai.app.ui.theme.WaspadAIValid
 @Composable
 fun CommunityDetailScreen(
     post: CommunityPost,
+    accessToken: String,
     onBack: () -> Unit,
     onSupportClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
@@ -87,7 +88,8 @@ fun CommunityDetailScreen(
                     Text(post.body, color = Color.Black, fontSize = 15.sp, lineHeight = 22.sp)
                     Spacer(Modifier.height(12.dp))
                     CommunityEvidenceImage(
-                        evidenceRes = post.evidenceRes,
+                        imageUrl = post.imageUrl,
+                        accessToken = accessToken,
                         author = post.author,
                     )
                     Spacer(Modifier.height(12.dp))
