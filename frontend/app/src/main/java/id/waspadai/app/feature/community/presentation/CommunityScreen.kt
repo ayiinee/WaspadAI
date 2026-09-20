@@ -1,10 +1,15 @@
-package id.waspadai.app.feature.community.presentation
+﻿package id.waspadai.app.feature.community.presentation
 
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -82,6 +87,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -164,17 +172,7 @@ fun CommunityRoute(
             context.startActivity(Intent.createChooser(sendIntent, "Bagikan kasus"))
         },
         onOpenPost = { selectedPostId = it.id },
-        onDestinationSelected = { label ->
-            if (label == "Periksa") {
-                onDestinationSelected(label)
-            } else if (label != "Koneksi") {
-                Toast.makeText(
-                    context,
-                    "$label belum tersedia pada slicing ini",
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
-        },
+        onDestinationSelected = onDestinationSelected,
     )
 }
 
@@ -188,6 +186,15 @@ fun CommunityScreen(
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var isSearchVisible by rememberSaveable {
+        mutableStateOf(uiState.searchQuery.isNotBlank())
+    }
+    val closeSearch: () -> Unit = {
+        isSearchVisible = false
+        onAction(CommunityAction.SearchChanged(""))
+        onAction(CommunityAction.FilterSelected(CommunityFeedFilter.Semua))
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = WaspadAIBackground,
@@ -206,21 +213,45 @@ fun CommunityScreen(
                 .padding(innerPadding),
         ) {
             // Header tetap terlihat saat daftar koneksi digulir.
-            CommunityPageHeader(title = "Koneksi", onBack = onBack)
+            CommunityPageHeader(
+                title = "Koneksi",
+                onBack = onBack,
+                isSearchVisible = isSearchVisible,
+                onSearchClick = {
+                    if (isSearchVisible) closeSearch() else isSearchVisible = true
+                },
+            )
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                item {
-                    CommunitySearchBar(
-                        query = uiState.searchQuery,
-                        selectedFilter = uiState.selectedFilter,
-                        isFilterMenuVisible = uiState.isFilterMenuVisible,
-                        onAction = onAction,
-                    )
+                item(key = "community-search") {
+                    AnimatedVisibility(
+                        visible = isSearchVisible,
+                        enter = fadeIn(animationSpec = tween(180)) +
+                            slideInVertically(
+                                initialOffsetY = { fullHeight -> -fullHeight / 3 },
+                                animationSpec = tween(220),
+                            ),
+                        exit = fadeOut(animationSpec = tween(120)) +
+                            slideOutVertically(
+                                targetOffsetY = { fullHeight -> -fullHeight / 4 },
+                                animationSpec = tween(160),
+                            ),
+                    ) {
+                        Column {
+                            CommunitySearchBar(
+                                query = uiState.searchQuery,
+                                selectedFilter = uiState.selectedFilter,
+                                isFilterMenuVisible = uiState.isFilterMenuVisible,
+                                onAction = onAction,
+                                requestFocus = isSearchVisible,
+                            )
+                            Spacer(Modifier.height(14.dp))
+                        }
+                    }
                 }
-                item { Spacer(Modifier.height(14.dp)) }
                 if (uiState.visiblePosts.isEmpty()) {
                     item {
                         EmptyCommunityResult(modifier = Modifier.animateItem())
@@ -257,29 +288,58 @@ internal fun CommunityPageHeader(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isSearchVisible: Boolean = false,
+    onSearchClick: (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(WaspadAIBlue)
-            .statusBarsPadding()
-            .height(64.dp),
+            .background(WaspadAIBlue),
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 16.dp),
-        ) {
-            Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-        }
-        Text(
-            text = title,
-            modifier = Modifier.align(Alignment.Center),
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
+        Image(
+            painter = painterResource(id = R.drawable.community_header_background),
+            contentDescription = null,
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Crop,
+            alpha = .6f,
         )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(64.dp),
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 16.dp),
+            ) {
+                Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+            }
+            Text(
+                text = title,
+                modifier = Modifier.align(Alignment.Center),
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            if (onSearchClick != null) {
+                IconButton(
+                    onClick = onSearchClick,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 16.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                        contentDescription = if (isSearchVisible) "Tutup pencarian" else "Buka pencarian",
+                        tint = if (isSearchVisible) WaspadAICaution else Color.White,
+                        modifier = Modifier.size(25.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -531,7 +591,18 @@ private fun CommunitySearchBar(
     isFilterMenuVisible: Boolean,
     onAction: (CommunityAction) -> Unit,
     modifier: Modifier = Modifier,
+    requestFocus: Boolean = false,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(requestFocus) {
+        if (requestFocus) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -551,6 +622,7 @@ private fun CommunitySearchBar(
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp)
+                .focusRequester(focusRequester)
                 .border(1.5.dp, WaspadAILightBlue, RoundedCornerShape(28.dp)),
             decorationBox = { innerTextField ->
                 Row(
@@ -602,13 +674,21 @@ private fun CommunitySearchBar(
             DropdownMenu(
                 expanded = isFilterMenuVisible,
                 onDismissRequest = { onAction(CommunityAction.FilterDismissed) },
+                modifier = Modifier
+                    .widthIn(min = 180.dp)
+                    .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White,
+                shadowElevation = 10.dp,
             ) {
                 CommunityFeedFilter.entries.forEach { filter ->
+                    val isSelected = filter == selectedFilter
                     DropdownMenuItem(
                         text = {
                             Text(
                                 text = filter.label,
-                                fontWeight = if (filter == selectedFilter) {
+                                color = if (isSelected) WaspadAIDarkBlue else WaspadAIMuted,
+                                fontWeight = if (isSelected) {
                                     FontWeight.Bold
                                 } else {
                                     FontWeight.Normal
@@ -616,6 +696,9 @@ private fun CommunitySearchBar(
                             )
                         },
                         onClick = { onAction(CommunityAction.FilterSelected(filter)) },
+                        modifier = Modifier.background(
+                            if (isSelected) WaspadAIBlue.copy(alpha = .09f) else Color.White,
+                        ),
                     )
                 }
             }
@@ -706,7 +789,7 @@ private fun CommunityPostCard(
                 accessToken = accessToken,
                 author = post.author,
             )
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -718,14 +801,14 @@ private fun CommunityPostCard(
             ) {
                 Text("Beri penilaian", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.height(5.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = "Agregat: Hoaks ${post.hoaksCount} - Waspada ${post.waspadaCount} - Valid ${post.validCount}",
                 color = WaspadAIMuted,
                 fontSize = 10.sp,
                 lineHeight = 12.sp,
             )
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -847,13 +930,13 @@ fun CommunityAssessmentPanel(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                         .background(WaspadAIBlue)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         "Beri penilaian",
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )
@@ -862,9 +945,9 @@ fun CommunityAssessmentPanel(
                             onClick = onToggle,
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .size(36.dp),
+                                .size(32.dp),
                         ) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Tutup formulir", tint = Color.White)
+                            Icon(Icons.Rounded.Close, contentDescription = "Tutup formulir", tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -915,7 +998,7 @@ fun CommunityAssessmentPanel(
                             enabled = submissionState == AssessmentSubmissionState.Editing,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, WaspadAIBlue, RoundedCornerShape(8.dp)),
+                                .border(1.dp, WaspadAILightBlue, RoundedCornerShape(8.dp)),
                             placeholder = {
                                 Text(
                                     "Jelaskan sumber, konteks, atau alasan penilaian Anda.",
@@ -956,14 +1039,14 @@ fun CommunityAssessmentPanel(
                                     .fillMaxWidth()
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .border(1.dp, WaspadAIBlue, RoundedCornerShape(8.dp))
+                                    .border(1.dp, WaspadAILightBlue, RoundedCornerShape(8.dp))
                                     .clickable(enabled = submissionState == AssessmentSubmissionState.Editing) {
                                         evidencePicker.launch(arrayOf("*/*"))
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
-                                    text = "* Pilih file bukti (wajib)",
+                                    text = "+ Tambahkan bukti",
                                     color = WaspadAIBlue,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,

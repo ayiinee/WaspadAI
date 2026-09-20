@@ -18,6 +18,8 @@ sealed interface VerificationAction {
 
     data object DismissImagePreview : VerificationAction
 
+    data class RemovePendingAttachment(val index: Int) : VerificationAction
+
     data class ImageSelectionFailed(val message: String) : VerificationAction
 
     data object RequestOverlayMode : VerificationAction

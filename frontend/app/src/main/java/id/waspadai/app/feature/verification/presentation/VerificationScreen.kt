@@ -3,7 +3,10 @@ package id.waspadai.app.feature.verification.presentation
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color as AndroidColor
+import android.graphics.pdf.PdfRenderer
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -14,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,10 +25,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -40,16 +45,15 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +70,7 @@ import id.waspadai.app.feature.verification.presentation.component.VerificationC
 import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeader
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.ui.theme.WaspadAITheme
+import java.io.ByteArrayOutputStream
 
 @Composable
 fun VerificationRoute(
@@ -88,7 +93,6 @@ fun VerificationScreen(
 ) {
     val listState = rememberLazyListState()
     val context = LocalContext.current
-    var activeTab by rememberSaveable { mutableStateOf("Periksa") }
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
     val mediaProjectionManager = context.getSystemService(MediaProjectionManager::class.java)
     val mediaProjectionConsent = rememberLauncherForActivityResult(
@@ -243,13 +247,24 @@ fun VerificationScreen(
             )
         }
     }
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        onAction(
-            VerificationAction.ImageSelectionFailed(
-                "File dipilih, tetapi pemeriksaan file belum didukung. Pilih Foto untuk JPG, PNG, atau WEBP."
+        val selection = runCatching { context.readPdfSelection(uri) }.getOrNull()
+        if (selection == null) {
+            onAction(
+                VerificationAction.ImageSelectionFailed(
+                    "File belum dapat dipreview. Pilih PDF yang tidak terkunci dan coba lagi."
+                )
             )
-        )
+        } else {
+            onAction(
+                VerificationAction.ImageSelected(
+                    imageBytes = selection.bytes,
+                    contentType = selection.contentType,
+                    fileName = selection.fileName,
+                )
+            )
+        }
     }
 
     LaunchedEffect(state.conversation.size, state.phase) {
@@ -258,21 +273,63 @@ fun VerificationScreen(
         }
     }
 
-    Column(
+    val density = LocalDensity.current
+    val keyboardBottom = WindowInsets.ime.getBottom(density)
+    val composerBottomPadding = with(density) {
+        if (keyboardBottom > 0) keyboardBottom.toDp() + 12.dp else 102.dp
+    }
+    val verificationComposer: @Composable (Modifier) -> Unit = { composerModifier ->
+        VerificationComposer(
+            value = state.draft,
+            enabled = !isSubmitting,
+            modifier = composerModifier,
+            onValueChange = { onAction(VerificationAction.InputChanged(it)) },
+            onSubmit = {
+                onAction(
+                    if (state.pendingAttachments.isNotEmpty()) {
+                        VerificationAction.SubmitPendingImage
+                    } else {
+                        VerificationAction.SubmitText
+                    }
+                )
+            },
+            pendingAttachments = state.pendingAttachments,
+            onRemovePendingAttachment = { index ->
+                onAction(VerificationAction.RemovePendingAttachment(index))
+            },
+            onRequestImageCapture = {
+                onAction(VerificationAction.RequestImageCapture)
+                imagePicker.launch("image/*")
+            },
+            onRequestFileCapture = {
+                onAction(VerificationAction.RequestImageCapture)
+                filePicker.launch(arrayOf("application/pdf"))
+            },
+        )
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
-        WaspadAiHeader(
-            overlayModeEnabled = state.isOverlayModeEnabled,
-            onToggleOverlayMode = { onAction(VerificationAction.RequestOverlayMode) },
-        )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            WaspadAiHeader(
+                overlayModeEnabled = state.isOverlayModeEnabled,
+                enabled = !isSubmitting,
+                onToggleOverlayMode = {
+                    if (state.isOverlayModeEnabled && !state.isOverlayPrivacyDialogVisible) {
+                        FloatingVerifyService.stop(context)
+                    }
+                    onAction(VerificationAction.RequestOverlayMode)
+                },
+            )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 126.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             if (state.isHistoryVisible) {
                 item {
                     HistoryPanel(
@@ -283,18 +340,16 @@ fun VerificationScreen(
                     )
                 }
             }
-            state.pendingImagePreview?.let { preview ->
-                item {
-                    ImageVerificationPreviewCard(
-                        preview = preview,
-                        onDismiss = { onAction(VerificationAction.DismissImagePreview) },
-                    )
-                }
-            }
             items(state.conversation) { item ->
                 when (item) {
                     is VerificationConversationItem.UserMessage -> {
-                        UserMessage(item.text, item.hasAttachment, item.attachmentName)
+                        UserMessage(
+                            text = item.text,
+                            hasAttachment = item.hasAttachment,
+                            attachmentName = item.attachmentName,
+                            attachmentBytes = item.attachmentBytes,
+                            attachmentContentType = item.attachmentContentType,
+                        )
                     }
                     is VerificationConversationItem.Analysis -> AnalysisCard(
                         result = item.result,
@@ -314,35 +369,21 @@ fun VerificationScreen(
                 else -> Unit
             }
             item { Spacer(Modifier.padding(bottom = 1.dp)) }
-        }
-        androidx.compose.foundation.layout.Box(Modifier.imePadding()) {
-            VerificationComposer(
-                value = state.draft,
-                enabled = !isSubmitting,
-                onValueChange = { onAction(VerificationAction.InputChanged(it)) },
-                onSubmit = {
-                    onAction(
-                        if (state.pendingImagePreview != null) {
-                            VerificationAction.SubmitPendingImage
-                        } else {
-                            VerificationAction.SubmitText
-                        }
-                    )
-                },
-                onRequestImageCapture = {
-                    onAction(VerificationAction.RequestImageCapture)
-                    imagePicker.launch("image/*")
-                },
-                onRequestFileUpload = { filePicker.launch("*/*") },
+            }
+            WaspadAIBottomNavigation(
+                selectedDestination = "Periksa",
+                onDestinationSelected = onDestinationSelected,
+                modifier = Modifier.navigationBarsPadding(),
             )
         }
-        WaspadAIBottomNavigation(
-            selectedDestination = activeTab,
-            onDestinationSelected = {
-                activeTab = it
-                onDestinationSelected(it)
-            },
-            modifier = Modifier.navigationBarsPadding(),
+        verificationComposer(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .padding(
+                    start = 20.dp,
+                    end = 20.dp,
+                    bottom = composerBottomPadding,
+                ),
         )
     }
 }
@@ -445,11 +486,18 @@ private fun ImageVerificationPreviewCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Preview gambar pemeriksaan", color = Color(0xFF153A52))
+            Text(
+                if (preview.fileName.endsWith(".pdf", ignoreCase = true)) {
+                    "Preview halaman pertama PDF"
+                } else {
+                    "Preview gambar pemeriksaan"
+                },
+                color = Color(0xFF153A52),
+            )
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Preview tangkapan layar overlay",
+                        contentDescription = "Preview ${preview.fileName}",
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(260.dp)
@@ -458,11 +506,11 @@ private fun ImageVerificationPreviewCard(
                     contentScale = ContentScale.Fit,
                 )
             } else {
-                Text("Preview belum dapat dibuka. Ambil ulang screenshot.", color = Color(0xFFA52219))
+                Text("Preview belum dapat dibuka. Pilih ulang lampiran.", color = Color(0xFFA52219))
             }
             Text(
-                "Gambar belum dikirim. Tulis pesan atau konteks di kolom bawah, " +
-                    "lalu tekan kirim untuk memeriksa gambar ini.",
+                "Lampiran belum dikirim. Tulis pesan atau konteks di kolom bawah, " +
+                    "lalu tekan kirim untuk memeriksanya.",
                 color = Color(0xFF557383),
             )
             androidx.compose.foundation.layout.Row(
@@ -470,7 +518,7 @@ private fun ImageVerificationPreviewCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Hapus gambar")
+                    Text("Hapus lampiran")
                 }
             }
         }
@@ -494,6 +542,43 @@ private fun Context.readImageSelection(uri: Uri): ImageSelection? {
         bytes = bytes,
         contentType = contentType,
         fileName = queryDisplayName(uri) ?: defaultFileName(contentType),
+    )
+}
+
+private fun Context.readPdfSelection(uri: Uri): ImageSelection? {
+    val mimeType = contentResolver.getType(uri)?.lowercase()
+    if (mimeType != "application/pdf") return null
+    val displayName = queryDisplayName(uri) ?: "dokumen-verifikasi.pdf"
+    val bytes = contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
+        PdfRenderer(descriptor).use rendererUse@ { renderer ->
+            if (renderer.pageCount == 0) return@rendererUse null
+            renderer.openPage(0).use { page ->
+                val scale = minOf(
+                    1f,
+                    1600f / page.width,
+                    2200f / page.height,
+                )
+                val targetWidth = (page.width * scale).toInt().coerceAtLeast(1)
+                val targetHeight = (page.height * scale)
+                    .toInt()
+                    .coerceAtLeast(1)
+                val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(AndroidColor.WHITE)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                ByteArrayOutputStream().use { output ->
+                    if (bitmap.compress(Bitmap.CompressFormat.PNG, 95, output)) {
+                        output.toByteArray()
+                    } else {
+                        null
+                    }
+                }.also { bitmap.recycle() }
+            }
+        }
+    } ?: return null
+    return ImageSelection(
+        bytes = bytes,
+        contentType = "image/png",
+        fileName = displayName,
     )
 }
 

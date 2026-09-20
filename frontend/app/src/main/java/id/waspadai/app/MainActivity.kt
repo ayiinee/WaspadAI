@@ -1,4 +1,4 @@
-package id.waspadai.app
+﻿package id.waspadai.app
 
 import android.graphics.Color
 import android.os.Bundle
@@ -20,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import id.waspadai.app.feature.community.presentation.CommunityRoute
 import id.waspadai.app.feature.community.presentation.CommunityViewModel
 import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
+import id.waspadai.app.feature.learning.presentation.LearningScreen
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
@@ -32,16 +33,15 @@ import id.waspadai.app.ui.theme.WaspadAITheme
 
 private const val VerificationRouteName = "verification"
 private const val CommunityRouteName = "community"
+private const val LearningRouteName = "learning"
 private const val WelcomeRouteName = "welcome"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
-            // The verification header is edge-to-edge, so its system bar must use
-            // the same dark blue and light status icons on every Android device.
-            statusBarStyle = SystemBarStyle.dark(Color.rgb(0, 92, 158)),
-            navigationBarStyle = SystemBarStyle.light(Color.WHITE, Color.WHITE),
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         val app = application as WaspadAIApplication
         setContent {
@@ -57,6 +57,33 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val navigateToTopLevel: (String) -> Unit = { destination ->
+        val targetRoute = when (destination) {
+            "Periksa" -> VerificationRouteName
+            "Koneksi" -> CommunityRouteName
+            "Pelajari" -> LearningRouteName
+            else -> null
+        }
+        if (targetRoute != null && targetRoute != currentRoute) {
+            if (targetRoute == VerificationRouteName) {
+                val returnedToVerification = navController.popBackStack(
+                    route = VerificationRouteName,
+                    inclusive = false,
+                )
+                if (!returnedToVerification) {
+                    navController.navigate(VerificationRouteName) {
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                navController.navigate(targetRoute) {
+                    popUpTo(VerificationRouteName) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = WelcomeRouteName) {
         composable(WelcomeRouteName) {
@@ -93,17 +120,7 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
             )
             VerificationRoute(
                 viewModel = viewModel,
-                onDestinationSelected = { destination ->
-                    when {
-                        destination == "Koneksi" && currentRoute != CommunityRouteName ->
-                            navController.navigate(CommunityRouteName)
-                        destination == "Periksa" && currentRoute != VerificationRouteName ->
-                            navController.navigate(VerificationRouteName) {
-                                popUpTo(VerificationRouteName) { inclusive = false }
-                                launchSingleTop = true
-                            }
-                    }
-                },
+                onDestinationSelected = navigateToTopLevel,
             )
         }
         composable(CommunityRouteName) {
@@ -125,14 +142,12 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                         defaultAccessToken = accessToken,
                     ),
                 ),
-                onDestinationSelected = { destination ->
-                    if (destination == "Periksa" && currentRoute != VerificationRouteName) {
-                        navController.navigate(VerificationRouteName) {
-                            popUpTo(VerificationRouteName) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    }
-                },
+                onDestinationSelected = navigateToTopLevel,
+            )
+        }
+        composable(LearningRouteName) {
+            LearningScreen(
+                onDestinationSelected = navigateToTopLevel,
             )
         }
     }

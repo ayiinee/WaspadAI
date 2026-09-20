@@ -3,6 +3,7 @@ package id.waspadai.app.core.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +44,8 @@ fun WaspadAIBottomNavigation(
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isCenterSelected = selectedDestination == "Periksa"
+    val centerNavigationInteraction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -94,9 +98,16 @@ fun WaspadAIBottomNavigation(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .size(72.dp)
-                .background(WaspadAIBlue, CircleShape)
+                .background(
+                    if (isCenterSelected) WaspadAIBlue else Color(0xFFAAB4BC),
+                    CircleShape,
+                )
                 .border(4.dp, Color.White, CircleShape)
-                .clickable { onDestinationSelected("Periksa") },
+                .clickable(
+                    interactionSource = centerNavigationInteraction,
+                    indication = null,
+                    onClick = { onDestinationSelected("Periksa") },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -118,10 +129,15 @@ private fun BottomDestination(
     selected: Boolean = false,
 ) {
     val color = if (selected) WaspadAIBlue else WaspadAILightBlue
+    val navigationInteraction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
             .fillMaxSize()
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = navigationInteraction,
+                indication = null,
+                onClick = onClick,
+            )
             .padding(top = 12.dp, bottom = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
