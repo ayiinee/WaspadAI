@@ -120,6 +120,14 @@ class VerificationViewModel(
                         attachmentName = action.fileName,
                         attachmentBytes = action.imageBytes,
                         attachmentContentType = action.contentType,
+                        attachmentGroup = listOf(
+                            ImageVerificationPreview(
+                                imageBytes = action.imageBytes,
+                                contentType = action.contentType,
+                                fileName = action.fileName,
+                                overlayModeEnabled = overlayModeEnabled,
+                            )
+                        ),
                     ),
                     phase = VerificationPhase.Submitting
                 )
@@ -238,20 +246,21 @@ class VerificationViewModel(
             current.copy(pendingAttachments = emptyList(), phase = VerificationPhase.Validating)
         }
         viewModelScope.launch {
+            val userMessage = question ?: "Lampiran dikirim untuk diperiksa."
+            _state.update { current ->
+                current.copy(
+                    conversation = current.conversation + VerificationConversationItem.UserMessage(
+                        text = userMessage,
+                        hasAttachment = true,
+                        attachmentName = attachments.first().fileName,
+                        attachmentBytes = attachments.first().imageBytes,
+                        attachmentContentType = attachments.first().contentType,
+                        attachmentGroup = attachments,
+                    ),
+                    phase = VerificationPhase.Submitting,
+                )
+            }
             attachments.forEach { attachment ->
-                val userMessage = question ?: "Lampiran dikirim untuk diperiksa."
-                _state.update { current ->
-                    current.copy(
-                        conversation = current.conversation + VerificationConversationItem.UserMessage(
-                            text = userMessage,
-                            hasAttachment = true,
-                            attachmentName = attachment.fileName,
-                            attachmentBytes = attachment.imageBytes,
-                            attachmentContentType = attachment.contentType,
-                        ),
-                        phase = VerificationPhase.Submitting,
-                    )
-                }
                 when (val result = submitImageVerification(
                     imageBytes = attachment.imageBytes,
                     contentType = attachment.contentType,

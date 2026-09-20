@@ -71,6 +71,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import id.waspadai.app.R
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
@@ -241,6 +243,7 @@ fun UserMessage(
     attachmentName: String? = null,
     attachmentBytes: ByteArray? = null,
     attachmentContentType: String? = null,
+    attachmentGroup: List<ImageVerificationPreview> = emptyList(),
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -248,9 +251,15 @@ fun UserMessage(
     ) {
         if (hasAttachment) {
             AttachmentPreview(
-                fileName = attachmentName ?: "Gambar verifikasi",
-                imageBytes = attachmentBytes,
-                contentType = attachmentContentType,
+                attachments = attachmentGroup.ifEmpty {
+                    listOf(
+                        ImageVerificationPreview(
+                            imageBytes = attachmentBytes ?: byteArrayOf(),
+                            contentType = attachmentContentType.orEmpty(),
+                            fileName = attachmentName ?: "Gambar verifikasi",
+                        )
+                    )
+                },
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -270,71 +279,164 @@ fun UserMessage(
 
 @Composable
 private fun AttachmentPreview(
-    fileName: String,
-    imageBytes: ByteArray?,
-    contentType: String?,
+    attachments: List<ImageVerificationPreview>,
 ) {
-    val isDocument = fileName.endsWith(".pdf", ignoreCase = true)
-    val bitmap = remember(imageBytes) {
-        imageBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+    var selectedAttachment by remember { mutableStateOf<ImageVerificationPreview?>(null) }
+    when (attachments.size) {
+        1 -> SingleAttachmentPreview(
+            attachment = attachments.first(),
+            onClick = { selectedAttachment = attachments.first() },
+        )
+        else -> AttachmentCollage(
+            attachments = attachments,
+            onClick = { selectedAttachment = it },
+        )
     }
-    Card(
-        modifier = Modifier.widthIn(max = 350.dp),
-        shape = RoundedCornerShape(17.dp),
-        colors = CardDefaults.cardColors(containerColor = BrandBlue)
+    selectedAttachment?.let { attachment ->
+        AttachmentPreviewDialog(attachment = attachment, onDismiss = { selectedAttachment = null })
+    }
+}
+
+@Composable
+private fun SingleAttachmentPreview(
+    attachment: ImageVerificationPreview,
+    onClick: () -> Unit,
+) {
+    val isDocument = attachment.fileName.endsWith(".pdf", ignoreCase = true)
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    if (isDocument) {
+        Row(
+            modifier = Modifier
+                .widthIn(max = 350.dp)
+                .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFE8493F)),
+                contentAlignment = Alignment.Center,
+            ) { Text("PDF", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = attachment.fileName,
+                color = Ink,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Preview ${attachment.fileName}",
+            modifier = Modifier
+                .widthIn(max = 350.dp)
+                .heightIn(max = 260.dp)
+                .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+@Composable
+private fun AttachmentCollage(
+    attachments: List<ImageVerificationPreview>,
+    onClick: (ImageVerificationPreview) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 350.dp)
+            .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .padding(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Column(Modifier.padding(9.dp)) {
-            Column(
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF2F6F8))
+        attachments.chunked(2).forEach { rowAttachments ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                if (bitmap != null && !isDocument) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Preview $fileName",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(190.dp),
-                        contentScale = ContentScale.Fit,
+                rowAttachments.forEach { attachment ->
+                    CollageTile(
+                        attachment = attachment,
+                        onClick = { onClick(attachment) },
+                        modifier = Modifier.weight(1f),
                     )
                 }
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (isDocument) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFE8493F)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("PDF", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    Column(Modifier.weight(1f)) {
-                    Text(
-                        fileName,
-                        color = Ink,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        if (isDocument) {
-                            "Dokumen terlampir"
-                        } else {
-                            "Preview gambar verifikasi"
-                        },
-                        color = Color(0xFF71808A),
-                        fontSize = 10.sp,
-                    )
-                    }
-                }
+                if (rowAttachments.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollageTile(
+    attachment: ImageVerificationPreview,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isDocument = attachment.fileName.endsWith(".pdf", ignoreCase = true)
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    Box(
+        modifier = modifier
+            .height(112.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF2F6F8))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!isDocument && bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Preview ${attachment.fileName}",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(if (isDocument) "PDF" else "Gambar", color = WaspadAIBlue, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AttachmentPreviewDialog(
+    attachment: ImageVerificationPreview,
+    onDismiss: () -> Unit,
+) {
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = .9f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Preview besar ${attachment.fileName}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Text(attachment.fileName, color = Color.White)
             }
         }
     }
@@ -483,6 +585,7 @@ fun VerificationComposer(
         modifier = Modifier
             .fillMaxWidth()
             .then(modifier)
+            .background(Color.White, RoundedCornerShape(28.dp))
             .border(1.5.dp, WaspadAILightBlue, RoundedCornerShape(28.dp))
             .clip(RoundedCornerShape(28.dp)),
     ) {

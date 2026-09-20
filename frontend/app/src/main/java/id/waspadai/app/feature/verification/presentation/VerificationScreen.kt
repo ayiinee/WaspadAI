@@ -14,6 +14,8 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -275,9 +277,14 @@ fun VerificationScreen(
 
     val density = LocalDensity.current
     val keyboardBottom = WindowInsets.ime.getBottom(density)
-    val composerBottomPadding = with(density) {
-        if (keyboardBottom > 0) keyboardBottom.toDp() + 12.dp else 102.dp
+    val composerBottomTarget = with(density) {
+        if (keyboardBottom > 0) keyboardBottom.toDp() + 12.dp else 154.dp
     }
+    val composerBottomPadding by animateDpAsState(
+        targetValue = composerBottomTarget,
+        animationSpec = tween(durationMillis = 180),
+        label = "composerKeyboardOffset",
+    )
     val verificationComposer: @Composable (Modifier) -> Unit = { composerModifier ->
         VerificationComposer(
             value = state.draft,
@@ -327,7 +334,7 @@ fun VerificationScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 126.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 166.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
             if (state.isHistoryVisible) {
@@ -349,6 +356,7 @@ fun VerificationScreen(
                             attachmentName = item.attachmentName,
                             attachmentBytes = item.attachmentBytes,
                             attachmentContentType = item.attachmentContentType,
+                            attachmentGroup = item.attachmentGroup,
                         )
                     }
                     is VerificationConversationItem.Analysis -> AnalysisCard(
