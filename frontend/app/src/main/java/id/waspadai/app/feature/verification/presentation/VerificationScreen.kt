@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -275,7 +274,39 @@ fun VerificationScreen(
     }
 
     val density = LocalDensity.current
-    val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    val keyboardBottom = WindowInsets.ime.getBottom(density)
+    val composerBottomPadding = with(density) {
+        if (keyboardBottom > 0) keyboardBottom.toDp() + 12.dp else 102.dp
+    }
+    val verificationComposer: @Composable (Modifier) -> Unit = { composerModifier ->
+        VerificationComposer(
+            value = state.draft,
+            enabled = !isSubmitting,
+            modifier = composerModifier,
+            onValueChange = { onAction(VerificationAction.InputChanged(it)) },
+            onSubmit = {
+                onAction(
+                    if (state.pendingAttachments.isNotEmpty()) {
+                        VerificationAction.SubmitPendingImage
+                    } else {
+                        VerificationAction.SubmitText
+                    }
+                )
+            },
+            pendingAttachments = state.pendingAttachments,
+            onRemovePendingAttachment = { index ->
+                onAction(VerificationAction.RemovePendingAttachment(index))
+            },
+            onRequestImageCapture = {
+                onAction(VerificationAction.RequestImageCapture)
+                imagePicker.launch("image/*")
+            },
+            onRequestFileCapture = {
+                onAction(VerificationAction.RequestImageCapture)
+                filePicker.launch(arrayOf("application/pdf"))
+            },
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -339,47 +370,20 @@ fun VerificationScreen(
             }
             item { Spacer(Modifier.padding(bottom = 1.dp)) }
             }
+            WaspadAIBottomNavigation(
+                selectedDestination = "Periksa",
+                onDestinationSelected = onDestinationSelected,
+                modifier = Modifier.navigationBarsPadding(),
+            )
         }
-        VerificationComposer(
-            value = state.draft,
-            enabled = !isSubmitting,
-            modifier = Modifier
+        verificationComposer(
+            Modifier
                 .align(Alignment.BottomCenter)
-                .imePadding()
                 .padding(
                     start = 20.dp,
                     end = 20.dp,
-                    bottom = if (isKeyboardVisible) 12.dp else 88.dp,
+                    bottom = composerBottomPadding,
                 ),
-            onValueChange = { onAction(VerificationAction.InputChanged(it)) },
-            onSubmit = {
-                onAction(
-                    if (state.pendingAttachments.isNotEmpty()) {
-                        VerificationAction.SubmitPendingImage
-                    } else {
-                        VerificationAction.SubmitText
-                    }
-                )
-            },
-            pendingAttachments = state.pendingAttachments,
-            onRemovePendingAttachment = { index ->
-                onAction(VerificationAction.RemovePendingAttachment(index))
-            },
-            onRequestImageCapture = {
-                onAction(VerificationAction.RequestImageCapture)
-                imagePicker.launch("image/*")
-            },
-            onRequestFileCapture = {
-                onAction(VerificationAction.RequestImageCapture)
-                filePicker.launch(arrayOf("application/pdf"))
-            },
-        )
-        WaspadAIBottomNavigation(
-            selectedDestination = "Periksa",
-            onDestinationSelected = onDestinationSelected,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding(),
         )
     }
 }
