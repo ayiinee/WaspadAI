@@ -585,9 +585,9 @@ fun VerificationComposer(
         modifier = Modifier
             .fillMaxWidth()
             .then(modifier)
-            .background(Color.White, RoundedCornerShape(28.dp))
-            .border(1.5.dp, WaspadAILightBlue, RoundedCornerShape(28.dp))
-            .clip(RoundedCornerShape(28.dp)),
+            .background(Color.White, RoundedCornerShape(29.dp))
+            .border(2.dp, WaspadAILightBlue, RoundedCornerShape(29.dp))
+            .clip(RoundedCornerShape(29.dp)),
     ) {
         if (pendingAttachments.isNotEmpty()) {
             PendingAttachmentDrafts(
@@ -604,14 +604,14 @@ fun VerificationComposer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 54.dp)
-                .padding(horizontal = 6.dp, vertical = 5.dp),
+                .heightIn(min = 58.dp)
+                .padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(42.dp)
                         .clip(CircleShape)
                         .background(BrandBlue)
                         .clickable(enabled = enabled) { isAttachmentMenuVisible = true },
@@ -621,7 +621,7 @@ fun VerificationComposer(
                         imageVector = Icons.Rounded.Add,
                         contentDescription = "Tambah lampiran",
                         tint = Color.White,
-                        modifier = Modifier.size(26.dp),
+                        modifier = Modifier.size(28.dp),
                     )
                 }
                 DropdownMenu(
@@ -638,7 +638,7 @@ fun VerificationComposer(
                     text = {
                         Column {
                             Text("File", color = DeepBlue, fontWeight = FontWeight.SemiBold)
-                            Text("PDF • preview halaman pertama", color = Color(0xFF71808A), fontSize = 11.sp)
+                            Text("PDF, DOCX, dan lainnya", color = Color(0xFF71808A), fontSize = 11.sp)
                         }
                     },
                     leadingIcon = {
@@ -695,7 +695,7 @@ fun VerificationComposer(
             Spacer(Modifier.width(8.dp))
             Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(46.dp)
                 .clip(CircleShape)
                 .background(sendColor)
                 .clickable(enabled = enabled, onClick = onSubmit),
@@ -705,7 +705,7 @@ fun VerificationComposer(
                 imageVector = Icons.Rounded.ArrowUpward,
                 contentDescription = "Kirim pemeriksaan",
                 tint = Color.White,
-                modifier = Modifier.size(25.dp),
+                modifier = Modifier.size(27.dp),
                 )
             }
         }

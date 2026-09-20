@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +69,7 @@ fun CommunityDetailScreen(
     onDestinationSelected: (String) -> Unit,
 ) {
     var assessmentExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
+    val contentGutter = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 28.dp
     val responses = remember(post.id) {
         mutableStateListOf(*sampleResponses(post).toTypedArray())
     }
@@ -95,7 +97,7 @@ fun CommunityDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item {
-                    Column(Modifier.padding(horizontal = 28.dp)) {
+                    Column(Modifier.padding(horizontal = contentGutter)) {
                     DetailAuthor(post)
                     Spacer(Modifier.height(12.dp))
                     Row(

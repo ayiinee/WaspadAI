@@ -14,8 +14,6 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
@@ -55,6 +54,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -71,6 +71,7 @@ import id.waspadai.app.feature.verification.presentation.component.UserMessage
 import id.waspadai.app.feature.verification.presentation.component.VerificationComposer
 import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeader
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.WaspadAIBottomNavigationHeight
 import id.waspadai.app.ui.theme.WaspadAITheme
 import java.io.ByteArrayOutputStream
 
@@ -276,15 +277,28 @@ fun VerificationScreen(
     }
 
     val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
     val keyboardBottom = WindowInsets.ime.getBottom(density)
-    val composerBottomTarget = with(density) {
-        if (keyboardBottom > 0) keyboardBottom.toDp() + 12.dp else 154.dp
+    val navigationBottom = WindowInsets.navigationBars.getBottom(density)
+    val contentGutter = if (configuration.screenWidthDp < 360) 16.dp else 20.dp
+    val restingGap = if (configuration.screenHeightDp < 700) 8.dp else 12.dp
+    val restingBottomPadding = with(density) {
+        WaspadAIBottomNavigationHeight + navigationBottom.toDp() + restingGap
     }
-    val composerBottomPadding by animateDpAsState(
-        targetValue = composerBottomTarget,
-        animationSpec = tween(durationMillis = 180),
-        label = "composerKeyboardOffset",
-    )
+    // Follow the IME directly, then ease its last 36 dp into the resting position.
+    // This keeps the keyboard's speed while avoiding an abrupt stop or navbar overlap.
+    val composerBottomPadding = with(density) {
+        val remainingTravel = (keyboardBottom.toDp() + 12.dp - restingBottomPadding)
+            .coerceAtLeast(0.dp)
+        val settleDistance = 36.dp
+        val easedTravel = if (remainingTravel < settleDistance) {
+            val fraction = remainingTravel.value / settleDistance.value
+            settleDistance * (2f * fraction * fraction - fraction * fraction * fraction)
+        } else {
+            remainingTravel
+        }
+        restingBottomPadding + easedTravel
+    }
     val verificationComposer: @Composable (Modifier) -> Unit = { composerModifier ->
         VerificationComposer(
             value = state.draft,
@@ -334,7 +348,12 @@ fun VerificationScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 166.dp),
+                contentPadding = PaddingValues(
+                    start = contentGutter,
+                    end = contentGutter,
+                    top = 8.dp,
+                    bottom = WaspadAIBottomNavigationHeight + restingGap + 12.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
             if (state.isHistoryVisible) {
@@ -388,8 +407,8 @@ fun VerificationScreen(
             Modifier
                 .align(Alignment.BottomCenter)
                 .padding(
-                    start = 20.dp,
-                    end = 20.dp,
+                    start = contentGutter,
+                    end = contentGutter,
                     bottom = composerBottomPadding,
                 ),
         )
