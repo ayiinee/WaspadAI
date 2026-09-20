@@ -250,6 +250,7 @@ class VerificationViewModelTest {
         override suspend fun loadCommunity(
             baseUrl: String,
             accessToken: String,
+            forceRefresh: Boolean,
         ): AppResult<CommunitySnapshot> = AppResult.Failure("not used")
 
         override suspend fun castVote(

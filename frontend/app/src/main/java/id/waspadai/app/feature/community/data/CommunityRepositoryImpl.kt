@@ -1,6 +1,7 @@
 package id.waspadai.app.feature.community.data
 
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.feature.community.data.dto.CommunityBootstrapDto
 import id.waspadai.app.feature.community.data.dto.CommunityItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityPageDto
 import id.waspadai.app.feature.community.data.dto.CommunityPreviewDto
@@ -37,21 +38,107 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class CommunityRepositoryImpl(
     private val client: HttpClient,
 ) : CommunityRepository {
+    private val cacheMutex = Mutex()
+    private var cachedCommunity: CachedCommunity? = null
+    private var inFlightCommunity: Deferred<AppResult<CommunitySnapshot>>? = null
+    private var inFlightKey: CommunityCacheKey? = null
+
     override suspend fun loadCommunity(
         baseUrl: String,
         accessToken: String,
+        forceRefresh: Boolean,
+    ): AppResult<CommunitySnapshot> = coroutineScope {
+        val key = CommunityCacheKey(baseUrl.normalized(), accessToken.trim())
+        if (!forceRefresh) {
+            cacheMutex.withLock {
+                cachedCommunity?.takeIf { cached ->
+                    cached.key == key && !cached.isExpired()
+                }?.snapshot
+            }?.let { snapshot ->
+                return@coroutineScope AppResult.Success(snapshot)
+            }
+        }
+
+        val request = cacheMutex.withLock {
+            if (!forceRefresh && inFlightKey == key) {
+                inFlightCommunity
+            } else {
+                async { fetchCommunity(key.baseUrl, key.accessToken) }.also { deferred ->
+                    inFlightKey = key
+                    inFlightCommunity = deferred
+                }
+            }
+        } ?: async { fetchCommunity(key.baseUrl, key.accessToken) }
+
+        val result = request.await()
+        cacheMutex.withLock {
+            if (inFlightCommunity == request) {
+                inFlightCommunity = null
+                inFlightKey = null
+            }
+            if (result is AppResult.Success) {
+                cachedCommunity = CachedCommunity(
+                    key = key,
+                    snapshot = result.value,
+                    storedAtMillis = System.currentTimeMillis(),
+                )
+            }
+        }
+        result
+    }
+
+    private suspend fun fetchCommunity(
+        baseUrl: String,
+        accessToken: String,
     ): AppResult<CommunitySnapshot> = runCommunityRequest {
-        val summary = client.get("${baseUrl.normalized()}/api/v1/community/me/summary") {
+        fetchCommunityBootstrap(baseUrl, accessToken) ?: fetchCommunityLegacy(baseUrl, accessToken)
+    }
+
+    private suspend fun fetchCommunityBootstrap(
+        baseUrl: String,
+        accessToken: String,
+    ): CommunitySnapshot? {
+        val response = client.get("$baseUrl/api/v1/community/bootstrap") {
             authorize(accessToken)
         }
-        val feed = client.get("${baseUrl.normalized()}/api/v1/community") {
-            authorize(accessToken)
+        if (response.status.isSuccess()) {
+            val bootstrapDto = response.body<CommunityBootstrapDto>()
+            return bootstrapDto.toDomain()
+        }
+        if (response.status !in setOf(HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity)) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+        return null
+    }
+
+    private suspend fun fetchCommunityLegacy(
+        baseUrl: String,
+        accessToken: String,
+    ): CommunitySnapshot {
+        val normalizedBaseUrl = baseUrl.normalized()
+        val (summary, feed) = coroutineScope {
+            val summaryRequest = async {
+                client.get("$normalizedBaseUrl/api/v1/community/me/summary") {
+                    authorize(accessToken)
+                }
+            }
+            val feedRequest = async {
+                client.get("$normalizedBaseUrl/api/v1/community") {
+                    authorize(accessToken)
+                }
+            }
+            summaryRequest.await() to feedRequest.await()
         }
         if (!summary.status.isSuccess()) {
             throw CommunityApiException(summary.status, summary.safeError())
@@ -61,7 +148,7 @@ class CommunityRepositoryImpl(
         }
         val summaryDto = summary.body<CommunityUserSummaryDto>()
         val pageDto = feed.body<CommunityPageDto>()
-        CommunitySnapshot(
+        return CommunitySnapshot(
             summary = summaryDto.toDomain(),
             posts = pageDto.items.map(CommunityItemDto::toDomain),
             nextCursor = pageDto.nextCursor,
@@ -172,7 +259,29 @@ class CommunityRepositoryImpl(
     }
 }
 
+private data class CommunityCacheKey(
+    val baseUrl: String,
+    val accessToken: String,
+)
+
+private data class CachedCommunity(
+    val key: CommunityCacheKey,
+    val snapshot: CommunitySnapshot,
+    val storedAtMillis: Long,
+) {
+    fun isExpired(): Boolean =
+        System.currentTimeMillis() - storedAtMillis > COMMUNITY_CACHE_TTL_MILLIS
+}
+
+private const val COMMUNITY_CACHE_TTL_MILLIS = 30_000L
+
 private fun String.normalized(): String = trim().trimEnd('/')
+
+private fun CommunityBootstrapDto.toDomain(): CommunitySnapshot = CommunitySnapshot(
+    summary = summary.toDomain(),
+    posts = feed.items.map(CommunityItemDto::toDomain),
+    nextCursor = feed.nextCursor,
+)
 
 private fun CommunityUserSummaryDto.toDomain(): CommunityUserSummary = CommunityUserSummary(
     assessmentsCount = assessmentsCount,

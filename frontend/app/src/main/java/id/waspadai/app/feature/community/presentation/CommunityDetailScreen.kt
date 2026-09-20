@@ -114,12 +114,14 @@ fun CommunityDetailScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(post.body, color = Color.Black, fontSize = 15.sp, lineHeight = 22.sp)
-                    Spacer(Modifier.height(12.dp))
-                    CommunityEvidenceImage(
-                        imageUrl = post.imageUrl,
-                        accessToken = accessToken,
-                        author = post.author,
-                    )
+                    post.imageUrl?.takeIf(String::isNotBlank)?.let { imageUrl ->
+                        Spacer(Modifier.height(12.dp))
+                        CommunityEvidenceImage(
+                            imageUrl = imageUrl,
+                            accessToken = accessToken,
+                            author = post.author,
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     CommunityInsight(post)
                     Spacer(Modifier.height(8.dp))

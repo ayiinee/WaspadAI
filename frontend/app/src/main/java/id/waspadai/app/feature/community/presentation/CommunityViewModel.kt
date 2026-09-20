@@ -55,6 +55,8 @@ class CommunityViewModel(
 
             CommunityAction.InitScreen -> initScreen()
 
+            CommunityAction.PrefetchBackend -> prefetchBackend()
+
             CommunityAction.RefreshBackend -> refreshBackend()
 
             CommunityAction.FilterClicked -> _uiState.update {
@@ -94,19 +96,37 @@ class CommunityViewModel(
      * Jika tidak, tetap menggunakan mode sample/manual seperti sebelumnya.
      */
     private fun initScreen() {
+        loadFromAccessTokenProvider(
+            loadingMessage = "Memuat feed Koneksi...",
+            forceRefresh = false,
+        )
+    }
+
+    private fun prefetchBackend() {
+        loadFromAccessTokenProvider(
+            loadingMessage = "Menyiapkan feed Koneksi...",
+            forceRefresh = false,
+        )
+    }
+
+    private fun loadFromAccessTokenProvider(
+        loadingMessage: String,
+        forceRefresh: Boolean,
+    ) {
         val provider = accessTokenProvider ?: return
         val baseUrl = communityBaseUrl.takeIf(String::isNotBlank) ?: return
 
-        // Jika sudah dalam Connected/Loading, jangan trigger refresh ulang
         val currentPhase = uiState.value.backendPhase
-        if (currentPhase == CommunityBackendPhase.Connected ||
-            currentPhase == CommunityBackendPhase.Loading
-        ) return
+        if (!forceRefresh && (currentPhase == CommunityBackendPhase.Connected ||
+                currentPhase == CommunityBackendPhase.Loading)
+        ) {
+            return
+        }
 
         _uiState.update {
             it.copy(
                 backendPhase = CommunityBackendPhase.Loading,
-                backendMessage = "Memuat feed Koneksi...",
+                backendMessage = loadingMessage,
             )
         }
         viewModelScope.launch {
@@ -127,7 +147,7 @@ class CommunityViewModel(
                     accessTokenDraft = token,
                 )
             }
-            doLoadCommunity(baseUrl, token)
+            doLoadCommunity(baseUrl, token, forceRefresh)
         }
     }
 
@@ -157,17 +177,25 @@ class CommunityViewModel(
         _uiState.update {
             it.copy(
                 backendPhase = CommunityBackendPhase.Loading,
-                backendMessage = "Memuat feed Koneksi dari Product API...",
+                backendMessage = if (it.posts.isEmpty()) {
+                    "Memuat feed Koneksi dari Product API..."
+                } else {
+                    "Memperbarui feed Koneksi..."
+                },
             )
         }
         viewModelScope.launch {
-            doLoadCommunity(baseUrl, accessToken)
+            doLoadCommunity(baseUrl, accessToken, forceRefresh = true)
         }
     }
 
-    private suspend fun doLoadCommunity(baseUrl: String, accessToken: String) {
+    private suspend fun doLoadCommunity(
+        baseUrl: String,
+        accessToken: String,
+        forceRefresh: Boolean,
+    ) {
         val communityRepository = repository ?: return
-        when (val result = communityRepository.loadCommunity(baseUrl, accessToken)) {
+        when (val result = communityRepository.loadCommunity(baseUrl, accessToken, forceRefresh)) {
             is AppResult.Success -> applySnapshot(result.value)
             is AppResult.Failure -> _uiState.update {
                 it.copy(

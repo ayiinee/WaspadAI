@@ -92,6 +92,7 @@ sealed interface CommunityAction {
     data class AccessTokenChanged(val value: String) : CommunityAction
     data object RefreshBackend : CommunityAction
     data object InitScreen : CommunityAction
+    data object PrefetchBackend : CommunityAction
     data object FilterClicked : CommunityAction
     data object FilterDismissed : CommunityAction
     data class FilterSelected(val filter: CommunityFeedFilter) : CommunityAction

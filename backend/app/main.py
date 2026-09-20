@@ -27,6 +27,7 @@ from app.auth import AuthenticatedUser, get_current_user
 from app.community_service import (
     cast_community_vote,
     create_community_preview,
+    get_community_bootstrap,
     get_community_detail,
     get_community_image,
     get_community_user_summary,
@@ -47,6 +48,7 @@ from app.learning_service import (
     submit_quiz_attempt,
 )
 from app.models import (
+    CommunityBootstrap,
     CommunityDetail,
     CommunityPage,
     CommunityPreviewResponse,
@@ -285,6 +287,23 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         return await list_community(pool, app.state.settings, user.id, limit, cursor)
+
+    @app.get(
+        "/api/v1/community/bootstrap",
+        tags=["Community"],
+        response_model=CommunityBootstrap,
+    )
+    async def get_community_bootstrap_endpoint(
+        limit: int = Query(default=20, ge=1, le=100),
+        cursor: str | None = Query(default=None, max_length=2048),
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunityBootstrap:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await get_community_bootstrap(pool, app.state.settings, user.id, limit, cursor)
 
     @app.get(
         "/api/v1/community/me/summary",

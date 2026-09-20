@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from hashlib import sha256
 from uuid import UUID, uuid4
@@ -15,6 +16,7 @@ from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.models import (
     AIResult,
+    CommunityBootstrap,
     CommunityDetail,
     CommunityItem,
     CommunityPage,
@@ -100,6 +102,20 @@ async def list_community(
             secret,
         )
     return CommunityPage(items=items, next_cursor=next_cursor)
+
+
+async def get_community_bootstrap(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    limit: int,
+    cursor_value: str | None,
+) -> CommunityBootstrap:
+    summary, feed = await asyncio.gather(
+        get_community_user_summary(pool, settings, user_id),
+        list_community(pool, settings, user_id, limit, cursor_value),
+    )
+    return CommunityBootstrap(summary=summary, feed=feed)
 
 
 async def get_community_user_summary(

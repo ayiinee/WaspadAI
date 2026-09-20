@@ -10,6 +10,12 @@ data class CommunityPageDto(
 )
 
 @Serializable
+data class CommunityBootstrapDto(
+    val summary: CommunityUserSummaryDto = CommunityUserSummaryDto(),
+    val feed: CommunityPageDto = CommunityPageDto(),
+)
+
+@Serializable
 data class CommunityItemDto(
     @SerialName("case_id") val caseId: String = "",
     val title: String = "",

@@ -9,9 +9,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,6 +27,7 @@ import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.presentation.VerificationRoute
 import id.waspadai.app.feature.verification.presentation.VerificationViewModel
 import id.waspadai.app.ui.theme.WaspadAITheme
+import id.waspadai.app.feature.community.presentation.CommunityAction
 
 private const val VerificationRouteName = "verification"
 private const val CommunityRouteName = "community"
@@ -57,6 +55,15 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val communityViewModel: CommunityViewModel = viewModel(
+        factory = CommunityViewModel.Factory(
+            repository = app.communityRepository,
+            accessTokenProvider = app.authRepository,
+            communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+            defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+            defaultAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
+        ),
+    )
     val navigateToTopLevel: (String) -> Unit = { destination ->
         val targetRoute = when (destination) {
             "Periksa" -> VerificationRouteName
@@ -82,6 +89,11 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                     restoreState = true
                 }
             }
+        }
+    }
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == VerificationRouteName) {
+            communityViewModel.onAction(CommunityAction.PrefetchBackend)
         }
     }
 
@@ -124,24 +136,12 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
             )
         }
         composable(CommunityRouteName) {
-            var accessToken by remember { mutableStateOf(BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN) }
-            LaunchedEffect(Unit) {
-                accessToken = app.authRepository.currentAccessToken().orEmpty()
-            }
             CommunityRoute(
                 repository = app.communityRepository,
                 defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
-                defaultAccessToken = accessToken,
+                defaultAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
                 onBack = { navController.popBackStack() },
-                viewModel = viewModel(
-                    factory = CommunityViewModel.Factory(
-                        repository = app.communityRepository,
-                        accessTokenProvider = app.authRepository,
-                        communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
-                        defaultBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
-                        defaultAccessToken = accessToken,
-                    ),
-                ),
+                viewModel = communityViewModel,
                 onDestinationSelected = navigateToTopLevel,
             )
         }

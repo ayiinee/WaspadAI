@@ -214,6 +214,13 @@ class CommunityUserSummary(BaseModel):
     resolved_cases_count: int = Field(ge=0)
 
 
+class CommunityBootstrap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: CommunityUserSummary
+    feed: CommunityPage
+
+
 class CommunityDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

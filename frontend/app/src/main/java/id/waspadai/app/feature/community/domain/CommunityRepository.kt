@@ -6,6 +6,7 @@ interface CommunityRepository {
     suspend fun loadCommunity(
         baseUrl: String,
         accessToken: String,
+        forceRefresh: Boolean = false,
     ): AppResult<CommunitySnapshot>
 
     suspend fun castVote(

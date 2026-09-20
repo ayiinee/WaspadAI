@@ -783,12 +783,14 @@ private fun CommunityPostCard(
                 fontSize = 12.sp,
                 lineHeight = 15.sp,
             )
-            Spacer(Modifier.height(7.dp))
-            CommunityEvidenceImage(
-                imageUrl = post.imageUrl,
-                accessToken = accessToken,
-                author = post.author,
-            )
+            post.imageUrl?.takeIf(String::isNotBlank)?.let { imageUrl ->
+                Spacer(Modifier.height(7.dp))
+                CommunityEvidenceImage(
+                    imageUrl = imageUrl,
+                    accessToken = accessToken,
+                    author = post.author,
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier

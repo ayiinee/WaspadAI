@@ -193,6 +193,7 @@ class CommunityViewModelTest {
         override suspend fun loadCommunity(
             baseUrl: String,
             accessToken: String,
+            forceRefresh: Boolean,
         ): AppResult<CommunitySnapshot> {
             loadCommunityCallCount++
             return if (failLoad) {
@@ -240,4 +241,3 @@ class CommunityViewModelTest {
         ): AppResult<CommunityState> = AppResult.Failure("not used")
     }
 }
-
