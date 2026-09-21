@@ -13,6 +13,8 @@ from app.database import user_transaction
 from app.errors import ProductAPIError
 from app.models import (
     LearningLesson,
+    LearningCase,
+    LearningMedia,
     LearningModuleDetail,
     LearningModuleItem,
     LearningProgressItem,
@@ -36,13 +38,15 @@ async def list_learning_modules(
         query = await connection.execute(
             """
             select m.id, m.slug, m.title, m.summary, m.difficulty, m.version,
+                   t.title as topic,
                    count(l.id)::int as total_lessons,
                    count(lp.lesson_id)::int as completed_lessons
               from public.published_learning_modules m
+              left join public.learning_topics t on t.id = m.topic_id
               left join public.published_learning_lessons l on l.module_id = m.id
               left join public.lesson_progress lp
                 on lp.lesson_id = l.id and lp.user_id = %s
-             group by m.id, m.slug, m.title, m.summary, m.difficulty,
+             group by m.id, m.slug, m.title, m.summary, m.difficulty, t.title,
                       m.display_order, m.version
              order by m.display_order, m.id
             """,
@@ -75,6 +79,16 @@ async def get_learning_module_detail(
             (user_id, module_id),
         )
         lesson_rows = await lessons_query.fetchall()
+        cases_query = await connection.execute(
+            "select id, title, description, reference_url from public.learning_cases where module_id = %s order by display_order, id",
+            (module_id,),
+        )
+        media_query = await connection.execute(
+            "select id, media_type, url, title, alt_text from public.learning_media where module_id = %s order by display_order, id",
+            (module_id,),
+        )
+        case_rows = await cases_query.fetchall()
+        media_rows = await media_query.fetchall()
     item = _module_item(module)
     return LearningModuleDetail(
         module_id=item.module_id,
@@ -86,6 +100,8 @@ async def get_learning_module_detail(
         total_lessons=item.total_lessons,
         completed_lessons=item.completed_lessons,
         progress_percent=item.progress_percent,
+        topic=item.topic,
+        cover_image_url=item.cover_image_url,
         lessons=[
             LearningLesson(
                 lesson_id=row["id"],
@@ -97,6 +113,8 @@ async def get_learning_module_detail(
             )
             for row in lesson_rows
         ],
+        cases=[LearningCase(case_id=row["id"], title=row["title"], description=row["description"], reference_url=row.get("reference_url")) for row in case_rows],
+        media=[LearningMedia(media_id=row["id"], media_type=row["media_type"], url=row["url"], title=row["title"], alt_text=row.get("alt_text") or "") for row in media_rows],
     )
 
 
@@ -253,7 +271,8 @@ async def get_learning_progress(
                    max(lp.completed_at) as last_lesson_completed_at,
                    latest.score::float as latest_score,
                    best.best_score::float as best_score,
-                   latest.completed_at as latest_quiz_completed_at
+                   latest.completed_at as latest_quiz_completed_at,
+                   module_progress.first_opened_at, module_progress.last_opened_at
               from public.published_learning_modules m
               left join public.published_learning_lessons l on l.module_id = m.id
               left join public.lesson_progress lp
@@ -270,7 +289,10 @@ async def get_learning_progress(
                     from public.quiz_attempts a
                    where a.user_id = %s and a.module_id = m.id
               ) best on true
-             group by m.id, m.display_order, latest.score, latest.completed_at, best.best_score
+              left join public.learning_module_progress module_progress
+                on module_progress.module_id = m.id and module_progress.user_id = (select auth.uid())
+             group by m.id, m.display_order, latest.score, latest.completed_at, best.best_score,
+                      module_progress.first_opened_at, module_progress.last_opened_at
              order by m.display_order, m.id
             """,
             (user_id, user_id, user_id),
@@ -279,20 +301,50 @@ async def get_learning_progress(
     return LearningProgressResponse(items=[_progress_item(row) for row in rows])
 
 
+async def open_learning_module(
+    pool: AsyncConnectionPool, settings: Settings, user_id: UUID, module_id: UUID
+) -> None:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        await connection.execute(
+            """insert into public.learning_module_progress(user_id, module_id)
+               values (%s, %s)
+               on conflict (user_id, module_id) do update set last_opened_at = now()""",
+            (user_id, module_id),
+        )
+
+
+async def get_module_cases(
+    pool: AsyncConnectionPool, settings: Settings, user_id: UUID, module_id: UUID
+) -> list[LearningCase]:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """select c.id, c.title, c.description, c.reference_url
+                 from public.learning_cases c
+                 join public.learning_modules m on m.id = c.module_id
+                where c.module_id = %s and m.status = 'PUBLISHED'
+                order by c.display_order, c.id""",
+            (module_id,),
+        )
+        rows = await query.fetchall()
+    return [LearningCase(case_id=row["id"], title=row["title"], description=row["description"], reference_url=row.get("reference_url")) for row in rows]
+
+
 async def _fetch_module_progress_row(
     connection: object, user_id: UUID, module_id: UUID
 ) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
         select m.id, m.slug, m.title, m.summary, m.difficulty, m.version,
+               t.title as topic,
                count(l.id)::int as total_lessons,
                count(lp.lesson_id)::int as completed_lessons
           from public.published_learning_modules m
+          left join public.learning_topics t on t.id = m.topic_id
           left join public.published_learning_lessons l on l.module_id = m.id
           left join public.lesson_progress lp
             on lp.lesson_id = l.id and lp.user_id = %s
          where m.id = %s
-         group by m.id, m.slug, m.title, m.summary, m.difficulty, m.version
+         group by m.id, m.slug, m.title, m.summary, m.difficulty, m.version, t.title
         """,
         (user_id, module_id),
     )
@@ -360,6 +412,8 @@ def _module_item(row: DictRow) -> LearningModuleItem:
         total_lessons=row["total_lessons"],
         completed_lessons=row["completed_lessons"],
         progress_percent=_progress_percent(row["completed_lessons"], row["total_lessons"]),
+        topic=row.get("topic"),
+        cover_image_url=row.get("cover_image_url"),
     )
 
 
@@ -483,6 +537,8 @@ def _progress_item(row: DictRow) -> LearningProgressItem:
         latest_score=float(row["latest_score"]) if row["latest_score"] is not None else None,
         best_score=float(row["best_score"]) if row["best_score"] is not None else None,
         updated_at=_iso8601(updated_at),
+        first_opened_at=_iso8601(row["first_opened_at"]) if row.get("first_opened_at") else None,
+        last_opened_at=_iso8601(row["last_opened_at"]) if row.get("last_opened_at") else None,
     )
 
 

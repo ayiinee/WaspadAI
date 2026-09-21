@@ -197,6 +197,11 @@ class CommunityItem(BaseModel):
     has_image: bool = False
     counts: CommunityVoteCounts
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None = None
+    like_count: int = Field(default=0, ge=0)
+    view_count: int = Field(default=0, ge=0)
+    comment_count: int = Field(default=0, ge=0)
+    share_count: int = Field(default=0, ge=0)
+    user_liked: bool = False
 
 
 class CommunityPage(BaseModel):
@@ -234,6 +239,23 @@ class CommunityDetail(BaseModel):
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
     result: AIResult
     execution_mode: Literal["MOCK", "REMOTE"]
+    responses: list["CommunityResponseItem"] = Field(default_factory=list)
+    like_count: int = Field(default=0, ge=0)
+    view_count: int = Field(default=0, ge=0)
+    comment_count: int = Field(default=0, ge=0)
+    share_count: int = Field(default=0, ge=0)
+    user_liked: bool = False
+
+
+class CommunityResponseItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    response_id: UUID
+    author: str
+    created_at: str
+    vote: Literal["HOAKS", "WASPADA", "VALID"]
+    reasoning: str
+    has_image: bool = False
 
 
 class CommunityVoteResult(BaseModel):
@@ -242,6 +264,18 @@ class CommunityVoteResult(BaseModel):
     case_id: UUID
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
     counts: CommunityVoteCounts
+
+
+class CommunitySocialResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    liked: bool
+    like_count: int = Field(ge=0)
+    view_count: int = Field(ge=0)
+    comment_count: int = Field(ge=0)
+    share_count: int = Field(ge=0)
+    share_url: str | None = None
 
 
 class CommunityPreviewResponse(BaseModel):
@@ -312,6 +346,8 @@ class LearningModuleItem(BaseModel):
     total_lessons: int = Field(ge=0)
     completed_lessons: int = Field(ge=0)
     progress_percent: float = Field(ge=0, le=100)
+    topic: str | None = None
+    cover_image_url: str | None = None
 
 
 class LearningLesson(BaseModel):
@@ -323,6 +359,25 @@ class LearningLesson(BaseModel):
     duration_minutes: int = Field(ge=1)
     display_order: int = Field(ge=0)
     completed: bool
+
+
+class LearningCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    title: str
+    description: str
+    reference_url: str | None = None
+
+
+class LearningMedia(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    media_id: UUID
+    media_type: Literal["IMAGE", "YOUTUBE"]
+    url: str
+    title: str
+    alt_text: str = ""
 
 
 class LearningModuleDetail(BaseModel):
@@ -338,6 +393,10 @@ class LearningModuleDetail(BaseModel):
     completed_lessons: int = Field(ge=0)
     progress_percent: float = Field(ge=0, le=100)
     lessons: list[LearningLesson]
+    topic: str | None = None
+    cover_image_url: str | None = None
+    cases: list[LearningCase] = Field(default_factory=list)
+    media: list[LearningMedia] = Field(default_factory=list)
 
 
 class LessonCompleteResponse(BaseModel):
@@ -423,6 +482,8 @@ class LearningProgressItem(BaseModel):
     latest_score: float | None = Field(default=None, ge=0, le=100)
     best_score: float | None = Field(default=None, ge=0, le=100)
     updated_at: str
+    first_opened_at: str | None = None
+    last_opened_at: str | None = None
 
 
 class LearningProgressResponse(BaseModel):

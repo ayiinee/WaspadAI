@@ -14,6 +14,7 @@ from app.config import Settings
 from app.database import user_transaction
 from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
+from app.supabase_storage import upload_verification_input
 from app.models import (
     AIResult,
     CommunityBootstrap,
@@ -21,6 +22,8 @@ from app.models import (
     CommunityItem,
     CommunityPage,
     CommunityPreviewResponse,
+    CommunityResponseItem,
+    CommunitySocialResult,
     CommunityPublishRequest,
     CommunityStateResponse,
     CommunityUserSummary,
@@ -49,7 +52,12 @@ async def list_community(
                    coalesce(counts.hoaks, 0)::int as hoaks,
                    coalesce(counts.waspada, 0)::int as waspada,
                    coalesce(counts.valid, 0)::int as valid,
-                   own.vote as user_vote
+                   own.vote as user_vote,
+                   coalesce(social.like_count, 0)::int as like_count,
+                   coalesce(social.view_count, 0)::int as view_count,
+                   coalesce(social.comment_count, 0)::int as comment_count,
+                   coalesce(social.share_count, 0)::int as share_count,
+                   coalesce(social.user_liked, false) as user_liked
               from public.community_posts p
               left join public.community_votes own
                 on own.post_id = p.id and own.user_id = %s
@@ -60,7 +68,19 @@ async def list_community(
                       count(*) filter (where v.vote = 'VALID') as valid
                     from public.community_votes v
                    where v.post_id = p.id
-              ) counts on true
+             ) counts on true
+             left join lateral (
+                 select (select count(*) from public.community_likes l
+                          where l.post_id = p.id) as like_count,
+                        (select count(*) from public.community_views v
+                          where v.post_id = p.id) as view_count,
+                        (select count(*) from public.community_votes comment
+                          where comment.post_id = p.id) as comment_count,
+                        (select count(*) from public.community_shares share
+                          where share.post_id = p.id) as share_count,
+                        exists (select 1 from public.community_likes mine
+                                where mine.post_id = p.id and mine.user_id = %s) as user_liked
+             ) social on true
              where p.withdrawn_at is null
                and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
                and p.publication_consent_id is not null
@@ -78,6 +98,7 @@ async def list_community(
              limit %s
             """,
             (
+                user_id,
                 user_id,
                 cursor.created_at if cursor else None,
                 cursor.created_at if cursor else None,
@@ -165,9 +186,102 @@ async def get_community_detail(
 ) -> CommunityDetail:
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         row = await _fetch_detail_row(connection, user_id, case_id)
+        response_rows = await _fetch_response_rows(connection, case_id) if row else []
     if row is None:
         raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
-    return _community_detail(row)
+    return _community_detail(row, response_rows)
+
+
+async def submit_community_response(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    case_id: UUID,
+    vote: str,
+    reasoning: str,
+    evidence_bytes: bytes | None,
+    evidence_content_type: str | None,
+    http_client: httpx.AsyncClient,
+) -> CommunityVoteResult:
+    normalized_reasoning = reasoning.strip()
+    if len(normalized_reasoning) < 10:
+        raise ProductAPIError(422, "VALIDATION_ERROR", "Alasan penilaian minimal 10 karakter.")
+    if vote not in {"HOAKS", "WASPADA", "VALID"}:
+        raise ProductAPIError(422, "VALIDATION_ERROR", "Kategori penilaian tidak valid.")
+    request = CommunityVoteRequest(vote=vote)
+    digest = sha256(evidence_bytes).hexdigest() if evidence_bytes else None
+    object_path = None
+    if evidence_bytes is not None and evidence_content_type is not None:
+        object_path = await upload_verification_input(
+            http_client,
+            settings,
+            user_id=user_id,
+            idempotency_key=uuid4(),
+            digest=digest or sha256(evidence_bytes).hexdigest(),
+            image_bytes=evidence_bytes,
+            content_type=evidence_content_type,
+        )
+        if object_path is None:
+            raise ProductAPIError(
+                503,
+                "STORAGE_UNAVAILABLE",
+                "Gambar bukti belum dapat disimpan.",
+                retryable=True,
+            )
+
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        post = await _fetch_vote_target(connection, case_id)
+        _require_vote_target(post, user_id)
+        old = await connection.execute(
+            "select evidence_asset_id from public.community_votes where post_id = %s and user_id = %s",
+            (post["post_id"], user_id),
+        )
+        old_row = await old.fetchone()
+        evidence_asset_id = None
+        if object_path is not None and digest is not None:
+            asset = await connection.execute(
+                """
+                insert into private.stored_assets
+                    (user_id, case_id, bucket, object_path, purpose, mime_type,
+                     size_bytes, sha256, expires_at)
+                values (%s, %s, 'verification-inputs', %s, 'CONTRIBUTION_EVIDENCE',
+                        %s, %s, %s, now() + make_interval(hours => %s))
+                returning id
+                """,
+                (
+                    user_id,
+                    case_id,
+                    object_path,
+                    evidence_content_type,
+                    len(evidence_bytes or b""),
+                    digest,
+                    settings.screenshot_retention_hours,
+                ),
+            )
+            evidence_asset_id = (await asset.fetchone())["id"]
+        await connection.execute(
+            """
+            insert into public.community_votes
+                (post_id, user_id, vote, reasoning, evidence_asset_id)
+            values (%s, %s, %s, %s, %s)
+            on conflict (post_id, user_id) do update
+                set vote = excluded.vote,
+                    reasoning = excluded.reasoning,
+                    evidence_asset_id = coalesce(excluded.evidence_asset_id,
+                                                 public.community_votes.evidence_asset_id),
+                    updated_at = now()
+            """,
+            (post["post_id"], user_id, request.vote, normalized_reasoning, evidence_asset_id),
+        )
+        if old_row and evidence_asset_id is not None and old_row["evidence_asset_id"]:
+            await connection.execute(
+                "update private.stored_assets set deleted_at = now() where id = %s",
+                (old_row["evidence_asset_id"],),
+            )
+        row = await _fetch_vote_result_row(connection, case_id, user_id)
+    if row is None:
+        raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+    return _vote_result(row)
 
 
 async def get_community_image(
@@ -236,6 +350,47 @@ async def get_community_image(
             "Storage menolak pembacaan gambar komunitas.",
             retryable=True,
         )
+    return response.content, asset["mime_type"]
+
+
+async def get_community_response_image(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    viewer_id: UUID,
+    case_id: UUID,
+    response_user_id: UUID,
+    http_client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Gambar tanggapan belum dapat dimuat.", True)
+    async with user_transaction(pool, viewer_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select asset.bucket, asset.object_path, asset.mime_type
+              from public.community_votes v
+              join public.community_posts p on p.id = v.post_id
+              join private.stored_assets asset on asset.id = v.evidence_asset_id
+             where p.case_id = %s and v.user_id = %s
+               and p.withdrawn_at is null
+               and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+               and asset.deleted_at is null
+            """,
+            (case_id, response_user_id),
+        )
+        asset = await query.fetchone()
+    if asset is None:
+        raise ProductAPIError(404, "COMMUNITY_RESPONSE_IMAGE_NOT_FOUND", "Gambar tanggapan tidak ditemukan.")
+    service_role_key = settings.supabase_service_role_key.get_secret_value()
+    storage_url = f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{asset['bucket']}/{asset['object_path']}"
+    try:
+        response = await http_client.get(
+            storage_url,
+            headers={"Authorization": f"Bearer {service_role_key}", "apikey": service_role_key},
+        )
+    except httpx.RequestError as error:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Gambar tanggapan belum dapat dimuat.", True) from error
+    if response.is_error:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Storage menolak pembacaan gambar tanggapan.")
     return response.content, asset["mime_type"]
 
 
@@ -550,7 +705,12 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
                coalesce(counts.hoaks, 0)::int as hoaks,
                coalesce(counts.waspada, 0)::int as waspada,
                coalesce(counts.valid, 0)::int as valid,
-               own.vote as user_vote
+               own.vote as user_vote,
+               coalesce(social.like_count, 0)::int as like_count,
+               coalesce(social.view_count, 0)::int as view_count,
+               coalesce(social.comment_count, 0)::int as comment_count,
+               coalesce(social.share_count, 0)::int as share_count,
+               coalesce(social.user_liked, false) as user_liked
           from public.community_posts p
           join public.verification_cases c on c.id = p.case_id and c.deleted_at is null
           join public.verification_results r on r.case_id = p.case_id
@@ -563,7 +723,19 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
                   count(*) filter (where v.vote = 'VALID') as valid
                 from public.community_votes v
                where v.post_id = p.id
-          ) counts on true
+         ) counts on true
+         left join lateral (
+             select (select count(*) from public.community_likes l
+                      where l.post_id = p.id) as like_count,
+                    (select count(*) from public.community_views v
+                      where v.post_id = p.id) as view_count,
+                    (select count(*) from public.community_votes comment
+                      where comment.post_id = p.id) as comment_count,
+                    (select count(*) from public.community_shares share
+                      where share.post_id = p.id) as share_count,
+                    exists (select 1 from public.community_likes mine
+                            where mine.post_id = p.id and mine.user_id = %s) as user_liked
+         ) social on true
          where p.case_id = %s
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
@@ -576,9 +748,29 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
                   and (consent.expires_at is null or consent.expires_at > now())
            )
         """,
-        (user_id, case_id),
+        (user_id, user_id, case_id),
     )
     return await query.fetchone()
+
+
+async def _fetch_response_rows(connection: object, case_id: UUID) -> list[DictRow]:
+    query = await connection.execute(  # type: ignore[attr-defined]
+        """
+        select v.user_id as response_id,
+               coalesce(nullif(btrim(profile.display_name), ''), 'Pengguna WaspadAI') as author,
+               v.created_at, v.vote, v.reasoning,
+               (v.evidence_asset_id is not null) as has_image
+          from public.community_votes v
+          join public.community_posts p on p.id = v.post_id
+          left join public.profiles profile on profile.id = v.user_id
+         where p.case_id = %s
+           and p.withdrawn_at is null
+           and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+         order by v.created_at desc
+        """,
+        (case_id,),
+    )
+    return await query.fetchall()
 
 
 async def _fetch_vote_target(connection: object, case_id: UUID) -> DictRow | None:
@@ -648,10 +840,15 @@ def _community_item(row: DictRow) -> CommunityItem:
         has_image=bool(row["has_image"]),
         counts=_counts(row),
         user_vote=row["user_vote"],
+        like_count=row["like_count"],
+        view_count=row["view_count"],
+        comment_count=row["comment_count"],
+        share_count=row["share_count"],
+        user_liked=bool(row["user_liked"]),
     )
 
 
-def _community_detail(row: DictRow) -> CommunityDetail:
+def _community_detail(row: DictRow, response_rows: list[DictRow]) -> CommunityDetail:
     return CommunityDetail(
         case_id=row["case_id"],
         title=row["title"],
@@ -663,6 +860,143 @@ def _community_detail(row: DictRow) -> CommunityDetail:
         user_vote=row["user_vote"],
         result=AIResult.model_validate(row["result_json"]),
         execution_mode=row["execution_mode"],
+        like_count=row["like_count"],
+        view_count=row["view_count"],
+        comment_count=row["comment_count"],
+        share_count=row["share_count"],
+        user_liked=bool(row["user_liked"]),
+        responses=[
+            CommunityResponseItem(
+                response_id=response["response_id"],
+                author=response["author"],
+                created_at=_iso8601(response["created_at"]),
+                vote=response["vote"],
+                reasoning=response["reasoning"] or "Penilaian komunitas tersimpan.",
+                has_image=bool(response["has_image"]),
+            )
+            for response in response_rows
+        ],
+    )
+
+
+async def like_community(
+    pool: AsyncConnectionPool, settings: Settings, user_id: UUID, case_id: UUID
+) -> CommunitySocialResult:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        post = await _fetch_social_target(connection, case_id)
+        if post is None:
+            raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+        await connection.execute(
+            "insert into public.community_likes(post_id, user_id) values (%s, %s) on conflict do nothing",
+            (post["post_id"], user_id),
+        )
+        row = await _fetch_social_row(connection, user_id, case_id)
+    return _social_result(row, case_id, liked=True)
+
+
+async def unlike_community(
+    pool: AsyncConnectionPool, settings: Settings, user_id: UUID, case_id: UUID
+) -> CommunitySocialResult:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        post = await _fetch_social_target(connection, case_id)
+        if post is None:
+            raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+        await connection.execute(
+            "delete from public.community_likes where post_id = %s and user_id = %s",
+            (post["post_id"], user_id),
+        )
+        row = await _fetch_social_row(connection, user_id, case_id)
+    return _social_result(row, case_id, liked=False)
+
+
+async def record_community_view(
+    pool: AsyncConnectionPool, settings: Settings, user_id: UUID, case_id: UUID
+) -> CommunitySocialResult:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        post = await _fetch_social_target(connection, case_id)
+        if post is None:
+            raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+        await connection.execute(
+            """insert into public.community_views(post_id, user_id) values (%s, %s)
+               on conflict (post_id, user_id) do update set last_seen_at = now()""",
+            (post["post_id"], user_id),
+        )
+        row = await _fetch_social_row(connection, user_id, case_id)
+    return _social_result(row, case_id)
+
+
+async def record_community_share(
+    pool: AsyncConnectionPool, settings: Settings, user_id: UUID, case_id: UUID
+) -> CommunitySocialResult:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        post = await _fetch_social_target(connection, case_id)
+        if post is None:
+            raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+        await connection.execute(
+            "insert into public.community_shares(post_id, user_id) values (%s, %s)",
+            (post["post_id"], user_id),
+        )
+        row = await _fetch_social_row(connection, user_id, case_id)
+    return _social_result(row, case_id, share_url=f"/community/{case_id}")
+
+
+async def _fetch_social_target(connection: object, case_id: UUID) -> DictRow | None:
+    query = await connection.execute(  # type: ignore[attr-defined]
+        """select p.id as post_id
+             from public.community_posts p
+            where p.case_id = %s
+              and p.withdrawn_at is null
+              and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+              and p.publication_consent_id is not null
+              and exists (
+                  select 1 from private.consent_records c
+                   where c.id = p.publication_consent_id
+                     and c.scope = 'COMMUNITY_PUBLICATION'
+                     and c.revoked_at is null
+                     and (c.expires_at is null or c.expires_at > now())
+              )""",
+        (case_id,),
+    )
+    return await query.fetchone()
+
+
+async def _fetch_social_row(
+    connection: object, user_id: UUID, case_id: UUID
+) -> DictRow | None:
+    query = await connection.execute(  # type: ignore[attr-defined]
+        """select p.case_id,
+                    exists (select 1 from public.community_likes l
+                            where l.post_id = p.id and l.user_id = %s) as liked,
+                    (select count(*) from public.community_likes l where l.post_id = p.id)::int as like_count,
+                    (select count(*) from public.community_views v where v.post_id = p.id)::int as view_count,
+                    (select count(*) from public.community_votes v where v.post_id = p.id)::int as comment_count,
+                    (select count(*) from public.community_shares s where s.post_id = p.id)::int as share_count
+               from public.community_posts p
+              where p.case_id = %s
+                and p.withdrawn_at is null
+                and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+                and p.publication_consent_id is not null""",
+        (user_id, case_id),
+    )
+    return await query.fetchone()
+
+
+def _social_result(
+    row: DictRow | None,
+    case_id: UUID,
+    liked: bool | None = None,
+    share_url: str | None = None,
+) -> CommunitySocialResult:
+    if row is None:
+        raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+    return CommunitySocialResult(
+        case_id=case_id,
+        liked=bool(row["liked"] if liked is None else liked),
+        like_count=row["like_count"],
+        view_count=row["view_count"],
+        comment_count=row["comment_count"],
+        share_count=row["share_count"],
+        share_url=share_url,
     )
 
 

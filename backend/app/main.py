@@ -30,10 +30,16 @@ from app.community_service import (
     get_community_bootstrap,
     get_community_detail,
     get_community_image,
+    get_community_response_image,
     get_community_user_summary,
+    like_community,
     list_community,
     publish_community_case,
     remove_community_vote,
+    submit_community_response,
+    record_community_share,
+    record_community_view,
+    unlike_community,
     withdraw_community_case,
 )
 from app.config import get_settings
@@ -43,6 +49,8 @@ from app.learning_service import (
     complete_lesson,
     get_learning_module_detail,
     get_learning_progress,
+    get_module_cases,
+    open_learning_module,
     get_module_quiz,
     list_learning_modules,
     submit_quiz_attempt,
@@ -53,12 +61,14 @@ from app.models import (
     CommunityPage,
     CommunityPreviewResponse,
     CommunityPublishRequest,
+    CommunitySocialResult,
     CommunityStateResponse,
     CommunityUserSummary,
     CommunityVoteRequest,
     CommunityVoteResult,
     HistoryPage,
     ImageVerificationRequest,
+    LearningCase,
     LearningModuleDetail,
     LearningModuleItem,
     LearningProgressResponse,
@@ -277,6 +287,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/community", tags=["Community"], response_model=CommunityPage)
     async def list_community_endpoint(
+        response: Response,
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None, max_length=2048),
         user: AuthenticatedUser = Depends(get_current_user),
@@ -286,6 +297,7 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
+        response.headers["Cache-Control"] = "no-store"
         return await list_community(pool, app.state.settings, user.id, limit, cursor)
 
     @app.get(
@@ -294,6 +306,7 @@ def create_app() -> FastAPI:
         response_model=CommunityBootstrap,
     )
     async def get_community_bootstrap_endpoint(
+        response: Response,
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None, max_length=2048),
         user: AuthenticatedUser = Depends(get_current_user),
@@ -303,6 +316,7 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
+        response.headers["Cache-Control"] = "no-store"
         return await get_community_bootstrap(pool, app.state.settings, user.id, limit, cursor)
 
     @app.get(
@@ -311,6 +325,7 @@ def create_app() -> FastAPI:
         response_model=CommunityUserSummary,
     )
     async def get_community_user_summary_endpoint(
+        response: Response,
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> CommunityUserSummary:
         pool = app.state.db_pool
@@ -318,6 +333,7 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
+        response.headers["Cache-Control"] = "no-store"
         return await get_community_user_summary(pool, app.state.settings, user.id)
 
     @app.get(
@@ -351,6 +367,71 @@ def create_app() -> FastAPI:
             app.state.settings,
             user.id,
             case_id,
+            app.state.http_client,
+        )
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "private, max-age=60"},
+        )
+
+    @app.post("/api/v1/community/{case_id}/like", tags=["Community"], response_model=CommunitySocialResult)
+    async def like_community_endpoint(
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunitySocialResult:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        return await like_community(pool, app.state.settings, user.id, case_id)
+
+    @app.delete("/api/v1/community/{case_id}/like", tags=["Community"], response_model=CommunitySocialResult)
+    async def unlike_community_endpoint(
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunitySocialResult:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        return await unlike_community(pool, app.state.settings, user.id, case_id)
+
+    @app.post("/api/v1/community/{case_id}/seen", tags=["Community"], response_model=CommunitySocialResult)
+    async def record_community_view_endpoint(
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunitySocialResult:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        return await record_community_view(pool, app.state.settings, user.id, case_id)
+
+    @app.post("/api/v1/community/{case_id}/share", tags=["Community"], response_model=CommunitySocialResult)
+    async def record_community_share_endpoint(
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunitySocialResult:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        return await record_community_share(pool, app.state.settings, user.id, case_id)
+
+    @app.get("/api/v1/community/{case_id}/responses/{response_user_id}/image", tags=["Community"])
+    async def get_community_response_image_endpoint(
+        case_id: UUID,
+        response_user_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        content, content_type = await get_community_response_image(
+            pool,
+            app.state.settings,
+            user.id,
+            case_id,
+            response_user_id,
             app.state.http_client,
         )
         return Response(
@@ -441,6 +522,53 @@ def create_app() -> FastAPI:
             )
         return await remove_community_vote(pool, app.state.settings, user.id, case_id)
 
+    @app.post(
+        "/api/v1/community/{case_id}/response",
+        tags=["Community"],
+        response_model=CommunityVoteResult,
+    )
+    async def submit_community_response_endpoint(
+        case_id: UUID,
+        vote: str = Form(...),
+        reasoning: str = Form(..., min_length=10, max_length=5000),
+        evidence: UploadFile | None = File(default=None),
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunityVoteResult:
+        evidence_bytes: bytes | None = None
+        evidence_content_type: str | None = None
+        if evidence is not None:
+            evidence_content_type = evidence.content_type
+            if evidence_content_type not in {"image/jpeg", "image/png", "image/webp"}:
+                raise ProductAPIError(
+                    415, "UNSUPPORTED_MEDIA_TYPE", "Bukti tanggapan harus berupa JPG, PNG, atau WEBP."
+                )
+            evidence_bytes = await evidence.read(app.state.settings.max_image_bytes + 1)
+            if len(evidence_bytes) > app.state.settings.max_image_bytes:
+                raise ProductAPIError(
+                    413, "PAYLOAD_TOO_LARGE", "Ukuran gambar bukti melebihi batas yang diizinkan."
+                )
+            if not evidence_bytes or not _matches_image_signature(evidence_bytes, evidence_content_type):
+                raise ProductAPIError(
+                    415, "UNSUPPORTED_MEDIA_TYPE", "Isi file tidak cocok dengan format gambar."
+                )
+            _validate_image_dimensions(evidence_bytes, evidence_content_type)
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await submit_community_response(
+            pool,
+            app.state.settings,
+            user.id,
+            case_id,
+            vote,
+            reasoning,
+            evidence_bytes,
+            evidence_content_type,
+            app.state.http_client,
+        )
+
     @app.get(
         "/api/v1/learning/modules",
         tags=["Learning"],
@@ -504,6 +632,26 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         return await get_module_quiz(pool, app.state.settings, user.id, module_id)
+
+    @app.get("/api/v1/learning/modules/{module_id}/cases", tags=["Learning"], response_model=list[LearningCase])
+    async def get_module_cases_endpoint(
+        module_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> list[LearningCase]:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        return await get_module_cases(pool, app.state.settings, user.id, module_id)
+
+    @app.post("/api/v1/learning/modules/{module_id}/open", tags=["Learning"], status_code=status.HTTP_204_NO_CONTENT)
+    async def open_learning_module_endpoint(
+        module_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> None:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        await open_learning_module(pool, app.state.settings, user.id, module_id)
 
     @app.post(
         "/api/v1/learning/modules/{module_id}/quiz-attempts",
