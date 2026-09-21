@@ -1,6 +1,7 @@
 package id.waspadai.app.feature.community.presentation
 
 import androidx.annotation.DrawableRes
+import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 
 enum class CommunityVerdict(val label: String) {
     Hoaks("Hoaks"),
@@ -29,6 +30,8 @@ data class CommunityPost(
     val validCount: Int = 0,
     val viewCount: Int = 0,
     val commentCount: Int = 0,
+    val likeCount: Int = 0,
+    val shareCount: Int = 0,
     val isSupported: Boolean = false,
     val selectedVerdict: CommunityVerdict? = null,
 ) {
@@ -64,8 +67,13 @@ data class CommunityUiState(
     val backendPhase: CommunityBackendPhase = CommunityBackendPhase.Sample,
     val backendMessage: String = "Memuat feed Koneksi dari Product API.",
     val isVoteSubmitting: Boolean = false,
+    val detailByPostId: Map<String, CommunityDetailSnapshot> = emptyMap(),
+    val detailLoadingPostId: String? = null,
+    val responseSubmittingPostId: String? = null,
+    val detailError: String? = null,
     val summary: CommunitySummary = CommunitySummary(),
     val posts: List<CommunityPost> = emptyList(),
+    val shareLink: String? = null,
 ) {
     val visiblePosts: List<CommunityPost>
         get() = posts.filter { post ->
@@ -97,8 +105,19 @@ sealed interface CommunityAction {
     data object FilterDismissed : CommunityAction
     data class FilterSelected(val filter: CommunityFeedFilter) : CommunityAction
     data class SupportClicked(val postId: String) : CommunityAction
+    data class ShareClicked(val postId: String) : CommunityAction
+    data object ShareLinkConsumed : CommunityAction
     data class VerdictSelected(
         val postId: String,
         val verdict: CommunityVerdict,
+    ) : CommunityAction
+    data class LoadPostDetail(val postId: String) : CommunityAction
+    data class SubmitCommunityResponse(
+        val postId: String,
+        val verdict: CommunityVerdict,
+        val reasoning: String,
+        val evidenceBytes: ByteArray? = null,
+        val evidenceFileName: String? = null,
+        val evidenceContentType: String? = null,
     ) : CommunityAction
 }

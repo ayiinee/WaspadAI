@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.data.AccessTokenProvider
@@ -24,6 +25,7 @@ class VerificationViewModel(
     private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
     private val requestCommunityPreview: RequestCommunityPreviewUseCase,
     private val publishCommunityCase: PublishCommunityCaseUseCase,
+    private val communityRepository: CommunityRepository? = null,
     private val communityBaseUrl: String,
     private val accessTokenProvider: AccessTokenProvider,
     isRemoteEnabled: Boolean
@@ -90,6 +92,7 @@ class VerificationViewModel(
             }
             when (val result = submitTextVerification(text)) {
                 is AppResult.Success -> _state.update { current ->
+                    communityRepository?.invalidateCommunityCache()
                     current.copy(
                         draft = "",
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
@@ -142,6 +145,7 @@ class VerificationViewModel(
                 )
             ) {
                 is AppResult.Success -> _state.update { current ->
+                    communityRepository?.invalidateCommunityCache()
                     current.copy(
                         draft = "",
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
@@ -390,6 +394,8 @@ class VerificationViewModel(
                 )
             ) {
                 is AppResult.Success -> _state.update {
+                    // Preview membuat state komunitas terkait kasus berubah di backend.
+                    communityRepository?.invalidateCommunityCache()
                     it.copy(
                         communityShare = it.communityShare.copy(
                             phase = CommunitySharePhase.PreviewReady(result.value)
@@ -439,6 +445,7 @@ class VerificationViewModel(
                 )
             ) {
                 is AppResult.Success -> _state.update { current ->
+                    communityRepository?.invalidateCommunityCache()
                     val updatedResult = result.copy(
                         communityState = published.value.communityState,
                         communityEligible = false,
@@ -486,6 +493,7 @@ class VerificationViewModel(
         private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
         private val requestCommunityPreview: RequestCommunityPreviewUseCase,
         private val publishCommunityCase: PublishCommunityCaseUseCase,
+        private val communityRepository: CommunityRepository? = null,
         private val communityBaseUrl: String,
         private val accessTokenProvider: AccessTokenProvider,
         private val isRemoteEnabled: Boolean
@@ -500,6 +508,7 @@ class VerificationViewModel(
                 loadHistoryDetail,
                 requestCommunityPreview,
                 publishCommunityCase,
+                communityRepository,
                 communityBaseUrl,
                 accessTokenProvider,
                 isRemoteEnabled

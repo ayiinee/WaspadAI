@@ -2,6 +2,7 @@ package id.waspadai.app.feature.community.data
 
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.community.data.dto.CommunityBootstrapDto
+import id.waspadai.app.feature.community.data.dto.CommunityDetailDto
 import id.waspadai.app.feature.community.data.dto.CommunityItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityPageDto
 import id.waspadai.app.feature.community.data.dto.CommunityPreviewDto
@@ -11,9 +12,12 @@ import id.waspadai.app.feature.community.data.dto.CommunityUserSummaryDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteCountsDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteResultDto
+import id.waspadai.app.feature.community.data.dto.CommunitySocialResultDto
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
+import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityPreview
+import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
@@ -21,6 +25,7 @@ import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
 import id.waspadai.app.feature.community.domain.CommunityVoteCounts
 import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
+import id.waspadai.app.feature.community.domain.CommunitySocialUpdate
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -30,11 +35,14 @@ import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Headers
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
@@ -50,9 +58,15 @@ class CommunityRepositoryImpl(
     private val client: HttpClient,
 ) : CommunityRepository {
     private val cacheMutex = Mutex()
+    @Volatile
     private var cachedCommunity: CachedCommunity? = null
     private var inFlightCommunity: Deferred<AppResult<CommunitySnapshot>>? = null
     private var inFlightKey: CommunityCacheKey? = null
+
+    override fun invalidateCommunityCache() {
+        // Mutation telah sukses di backend; snapshot lama tidak boleh dipakai lagi.
+        cachedCommunity = null
+    }
 
     override suspend fun loadCommunity(
         baseUrl: String,
@@ -172,6 +186,65 @@ class CommunityRepositoryImpl(
             throw CommunityApiException(response.status, response.safeError())
         }
         response.body<CommunityVoteResultDto>().toDomain()
+    }.also { result ->
+        if (result is AppResult.Success) invalidateCommunityCache()
+    }
+
+    override suspend fun loadCommunityDetail(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+    ): AppResult<CommunityDetailSnapshot> = runCommunityRequest {
+        val response = client.get("${baseUrl.normalized()}/api/v1/community/$caseId") {
+            authorize(accessToken)
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+        response.body<CommunityDetailDto>().toDomain()
+    }
+
+    override suspend fun submitCommunityResponse(
+        baseUrl: String,
+        accessToken: String,
+        caseId: String,
+        vote: CommunityVote,
+        reasoning: String,
+        evidenceBytes: ByteArray?,
+        evidenceFileName: String?,
+        evidenceContentType: String?,
+    ): AppResult<CommunityVoteUpdate> = runCommunityRequest {
+        val response = client.post("${baseUrl.normalized()}/api/v1/community/$caseId/response") {
+            headers { append(HttpHeaders.Authorization, "Bearer ${accessToken.trim()}") }
+            accept(ContentType.Application.Json)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append("vote", vote.wireValue)
+                        append("reasoning", reasoning)
+                        if (evidenceBytes != null && evidenceFileName != null && evidenceContentType != null) {
+                            append(
+                                key = "evidence",
+                                value = evidenceBytes,
+                                headers = Headers.build {
+                                    append(HttpHeaders.ContentType, evidenceContentType)
+                                    append(
+                                        HttpHeaders.ContentDisposition,
+                                        "form-data; name=\"evidence\"; filename=\"$evidenceFileName\"",
+                                    )
+                                },
+                            )
+                        }
+                    },
+                ),
+            )
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+        response.body<CommunityVoteResultDto>().toDomain()
+    }.also { result ->
+        if (result is AppResult.Success) invalidateCommunityCache()
     }
 
     override suspend fun removeVote(
@@ -186,6 +259,28 @@ class CommunityRepositoryImpl(
             throw CommunityApiException(response.status, response.safeError())
         }
         response.body<CommunityVoteResultDto>().toDomain()
+    }.also { result ->
+        if (result is AppResult.Success) invalidateCommunityCache()
+    }
+
+    override suspend fun likeCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        socialRequest("${baseUrl.normalized()}/api/v1/community/$caseId/like", accessToken, false)
+
+    override suspend fun unlikeCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        socialRequest("${baseUrl.normalized()}/api/v1/community/$caseId/like", accessToken, true)
+
+    override suspend fun markCommunitySeen(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        socialRequest("${baseUrl.normalized()}/api/v1/community/$caseId/seen", accessToken, false)
+
+    override suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        socialRequest("${baseUrl.normalized()}/api/v1/community/$caseId/share", accessToken, false)
+
+    private suspend fun socialRequest(url: String, accessToken: String, delete: Boolean): AppResult<CommunitySocialUpdate> = runCommunityRequest {
+        val response = if (delete) client.delete(url) { authorize(accessToken) } else client.post(url) { authorize(accessToken) }
+        if (!response.status.isSuccess()) throw CommunityApiException(response.status, response.safeError())
+        response.body<CommunitySocialResultDto>().toDomain()
+    }.also { result ->
+        if (result is AppResult.Success) invalidateCommunityCache()
     }
 
     override suspend fun requestPreview(
@@ -202,6 +297,8 @@ class CommunityRepositoryImpl(
             throw CommunityApiException(response.status, response.safeError())
         }
         response.body<CommunityPreviewDto>().toDomain()
+    }.also { result ->
+        if (result is AppResult.Success) invalidateCommunityCache()
     }
 
     override suspend fun publishCase(
@@ -228,6 +325,8 @@ class CommunityRepositoryImpl(
             throw CommunityApiException(response.status, response.safeError())
         }
         response.body<CommunityStateDto>().toDomain()
+    }.also { result ->
+        if (result is AppResult.Success) invalidateCommunityCache()
     }
 
     private suspend fun <T> runCommunityRequest(block: suspend () -> T): AppResult<T> = try {
@@ -298,6 +397,11 @@ private fun CommunityItemDto.toDomain(): CommunityFeedPost = CommunityFeedPost(
     hasImage = hasImage,
     counts = counts.toDomain(),
     userVote = userVote.toVoteOrNull(),
+    likeCount = likeCount,
+    viewCount = viewCount,
+    commentCount = commentCount,
+    shareCount = shareCount,
+    userLiked = userLiked,
 )
 
 private fun CommunityVoteResultDto.toDomain(): CommunityVoteUpdate = CommunityVoteUpdate(
@@ -312,6 +416,37 @@ private fun CommunityPreviewDto.toDomain(): CommunityPreview = CommunityPreview(
     redactedText = redactedText,
     redactedImageUrl = redactedImageUrl,
     redactions = redactions,
+)
+
+private fun CommunityDetailDto.toDomain(): CommunityDetailSnapshot = CommunityDetailSnapshot(
+    caseId = caseId,
+    counts = counts.toDomain(),
+    userVote = userVote.toVoteOrNull(),
+    likeCount = likeCount,
+    viewCount = viewCount,
+    commentCount = commentCount,
+    shareCount = shareCount,
+    userLiked = userLiked,
+    responses = responses.map { response ->
+        CommunityResponseItem(
+            responseId = response.responseId,
+            author = response.author,
+            createdAt = response.createdAt,
+            vote = response.vote.toVoteOrNull() ?: CommunityVote.Valid,
+            reasoning = response.reasoning,
+            hasImage = response.hasImage,
+        )
+    },
+)
+
+private fun CommunitySocialResultDto.toDomain(): CommunitySocialUpdate = CommunitySocialUpdate(
+    caseId = caseId,
+    liked = liked,
+    likeCount = likeCount,
+    viewCount = viewCount,
+    commentCount = commentCount,
+    shareCount = shareCount,
+    shareUrl = shareUrl,
 )
 
 private fun CommunityStateDto.toDomain(): CommunityState = CommunityState(

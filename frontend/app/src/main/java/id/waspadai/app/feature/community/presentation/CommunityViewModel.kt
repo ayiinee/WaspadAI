@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import id.waspadai.app.R
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
+import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
@@ -74,9 +75,11 @@ class CommunityViewModel(
                 )
             }
 
-            is CommunityAction.SupportClicked -> updatePost(action.postId) { post ->
-                post.copy(isSupported = !post.isSupported)
-            }
+            is CommunityAction.SupportClicked -> submitLike(action.postId)
+
+            is CommunityAction.ShareClicked -> sharePost(action.postId)
+
+            CommunityAction.ShareLinkConsumed -> _uiState.update { it.copy(shareLink = null) }
 
             is CommunityAction.VerdictSelected -> updatePost(action.postId) { post ->
                 if (uiState.value.backendPhase == CommunityBackendPhase.Connected) {
@@ -87,6 +90,10 @@ class CommunityViewModel(
                     post.withLocalVote(nextVerdict)
                 }
             }
+
+            is CommunityAction.LoadPostDetail -> loadPostDetail(action.postId)
+
+            is CommunityAction.SubmitCommunityResponse -> submitCommunityResponse(action)
         }
     }
 
@@ -116,19 +123,6 @@ class CommunityViewModel(
         val provider = accessTokenProvider ?: return
         val baseUrl = communityBaseUrl.takeIf(String::isNotBlank) ?: return
 
-        val currentPhase = uiState.value.backendPhase
-        if (!forceRefresh && (currentPhase == CommunityBackendPhase.Connected ||
-                currentPhase == CommunityBackendPhase.Loading)
-        ) {
-            return
-        }
-
-        _uiState.update {
-            it.copy(
-                backendPhase = CommunityBackendPhase.Loading,
-                backendMessage = loadingMessage,
-            )
-        }
         viewModelScope.launch {
             val token = provider.currentAccessToken()
             if (token.isNullOrBlank()) {
@@ -139,6 +133,23 @@ class CommunityViewModel(
                     )
                 }
                 return@launch
+            }
+            // The ViewModel survives navigation. A different account must not
+            // inherit the previous account's in-memory snapshot.
+            val current = uiState.value
+            if (!forceRefresh &&
+                current.baseUrlDraft == baseUrl &&
+                current.accessTokenDraft == token &&
+                (current.backendPhase == CommunityBackendPhase.Connected ||
+                    current.backendPhase == CommunityBackendPhase.Loading)
+            ) {
+                return@launch
+            }
+            _uiState.update {
+                it.copy(
+                    backendPhase = CommunityBackendPhase.Loading,
+                    backendMessage = loadingMessage,
+                )
             }
             // Simpan ke draft agar panel debug juga ter-update
             _uiState.update {
@@ -152,6 +163,13 @@ class CommunityViewModel(
     }
 
     private fun refreshBackend() {
+        if (accessTokenProvider != null) {
+            loadFromAccessTokenProvider(
+                loadingMessage = "Memperbarui feed Koneksi...",
+                forceRefresh = true,
+            )
+            return
+        }
         val current = uiState.value
         val baseUrl = current.baseUrlDraft.trim()
         val accessToken = current.accessTokenDraft.trim()
@@ -231,6 +249,131 @@ class CommunityViewModel(
         }
     }
 
+    private fun loadPostDetail(postId: String) {
+        val communityRepository = repository ?: return
+        val current = uiState.value
+        if (current.detailLoadingPostId == postId) return
+        val baseUrl = current.baseUrlDraft.trim()
+        val accessToken = current.accessTokenDraft.trim()
+        _uiState.update { it.copy(detailLoadingPostId = postId, detailError = null) }
+        viewModelScope.launch {
+            // A detail open is the canonical "seen" event. It is idempotent
+            // per user and post, so retries do not inflate the view counter.
+            communityRepository.markCommunitySeen(baseUrl, accessToken, postId)
+            when (val result = communityRepository.loadCommunityDetail(baseUrl, accessToken, postId)) {
+                is AppResult.Success -> _uiState.update {
+                    it.copy(
+                        detailByPostId = it.detailByPostId + (postId to result.value),
+                        posts = it.posts.map { post ->
+                            if (post.id == postId) post.copy(
+                                likeCount = result.value.likeCount,
+                                viewCount = result.value.viewCount,
+                                commentCount = result.value.commentCount,
+                                shareCount = result.value.shareCount,
+                                isSupported = result.value.userLiked,
+                            ) else post
+                        },
+                        detailLoadingPostId = null,
+                        detailError = null,
+                    )
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(detailLoadingPostId = null, detailError = result.message)
+                }
+            }
+        }
+    }
+
+    private fun submitCommunityResponse(action: CommunityAction.SubmitCommunityResponse) {
+        val communityRepository = repository ?: return
+        val current = uiState.value
+        val baseUrl = current.baseUrlDraft.trim()
+        val accessToken = current.accessTokenDraft.trim()
+        _uiState.update {
+            it.copy(
+                responseSubmittingPostId = action.postId,
+                detailError = null,
+                backendMessage = "Menyimpan tanggapan...",
+            )
+        }
+        viewModelScope.launch {
+            when (
+                val result = communityRepository.submitCommunityResponse(
+                    baseUrl = baseUrl,
+                    accessToken = accessToken,
+                    caseId = action.postId,
+                    vote = action.verdict.toDomain(),
+                    reasoning = action.reasoning,
+                    evidenceBytes = action.evidenceBytes,
+                    evidenceFileName = action.evidenceFileName,
+                    evidenceContentType = action.evidenceContentType,
+                )
+            ) {
+                is AppResult.Success -> {
+                    applyVoteUpdate(result.value)
+                    _uiState.update {
+                        it.copy(
+                            responseSubmittingPostId = null,
+                            backendMessage = "Tanggapan tersimpan. Polling diperbarui.",
+                        )
+                    }
+                    refreshPostDetail(action.postId, baseUrl, accessToken)
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(
+                        responseSubmittingPostId = null,
+                        detailError = result.message,
+                        backendPhase = CommunityBackendPhase.Failure,
+                        backendMessage = result.message,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun submitLike(postId: String) {
+        val communityRepository = repository ?: return
+        val current = uiState.value
+        val post = current.posts.firstOrNull { it.id == postId } ?: return
+        val baseUrl = current.baseUrlDraft.trim()
+        val accessToken = current.accessTokenDraft.trim()
+        _uiState.update { it.copy(isVoteSubmitting = true, backendMessage = "Memperbarui like...") }
+        viewModelScope.launch {
+            val result = if (post.isSupported) {
+                communityRepository.unlikeCommunity(baseUrl, accessToken, postId)
+            } else {
+                communityRepository.likeCommunity(baseUrl, accessToken, postId)
+            }
+            when (result) {
+                is AppResult.Success -> applySocialUpdate(result.value)
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(isVoteSubmitting = false, backendPhase = CommunityBackendPhase.Failure, backendMessage = result.message)
+                }
+            }
+        }
+    }
+
+    private fun sharePost(postId: String) {
+        val communityRepository = repository ?: return
+        val current = uiState.value
+        viewModelScope.launch {
+            when (val result = communityRepository.shareCommunity(current.baseUrlDraft.trim(), current.accessTokenDraft.trim(), postId)) {
+                is AppResult.Success -> _uiState.update { it.copy(shareLink = result.value.shareUrl ?: "/community/$postId") }
+                is AppResult.Failure -> _uiState.update { it.copy(detailError = result.message, backendMessage = result.message) }
+            }
+        }
+    }
+
+    private suspend fun refreshPostDetail(postId: String, baseUrl: String, accessToken: String) {
+        val communityRepository = repository ?: return
+        when (val result = communityRepository.loadCommunityDetail(baseUrl, accessToken, postId)) {
+            is AppResult.Success -> _uiState.update {
+                it.copy(detailByPostId = it.detailByPostId + (postId to result.value))
+            }
+            is AppResult.Failure -> _uiState.update { it.copy(detailError = result.message) }
+        }
+    }
+
     private fun applySnapshot(snapshot: CommunitySnapshot) {
         _uiState.update {
             it.copy(
@@ -263,6 +406,25 @@ class CommunityViewModel(
                 ),
                 posts = state.posts.map { post ->
                     if (post.id == update.caseId) post.withBackendVote(update.counts, next) else post
+                },
+            )
+        }
+    }
+
+    private fun applySocialUpdate(update: id.waspadai.app.feature.community.domain.CommunitySocialUpdate) {
+        _uiState.update { state ->
+            state.copy(
+                isVoteSubmitting = false,
+                backendPhase = CommunityBackendPhase.Connected,
+                backendMessage = if (update.liked) "Like tersimpan." else "Like dibatalkan.",
+                posts = state.posts.map { post ->
+                    if (post.id == update.caseId) post.copy(
+                        likeCount = update.likeCount,
+                        viewCount = update.viewCount,
+                        commentCount = update.commentCount,
+                        shareCount = update.shareCount,
+                        isSupported = update.liked,
+                    ) else post
                 },
             )
         }
@@ -343,6 +505,11 @@ private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = C
     waspadaCount = counts.waspada,
     validCount = counts.valid,
     selectedVerdict = userVote.toPresentation(),
+    likeCount = likeCount,
+    viewCount = viewCount,
+    commentCount = commentCount,
+    shareCount = shareCount,
+    isSupported = userLiked,
 )
 
 private fun CommunityUserSummary.toPresentation(): CommunitySummary = CommunitySummary(

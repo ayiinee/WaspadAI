@@ -92,8 +92,9 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
         }
     }
     LaunchedEffect(currentRoute) {
-        if (currentRoute == VerificationRouteName) {
-            communityViewModel.onAction(CommunityAction.PrefetchBackend)
+        when (currentRoute) {
+            VerificationRouteName -> communityViewModel.onAction(CommunityAction.PrefetchBackend)
+            CommunityRouteName -> communityViewModel.onAction(CommunityAction.RefreshBackend)
         }
     }
 
@@ -125,6 +126,7 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                     loadHistoryDetail = LoadVerificationHistoryDetailUseCase(app.verificationRepository),
                     requestCommunityPreview = RequestCommunityPreviewUseCase(app.communityRepository),
                     publishCommunityCase = PublishCommunityCaseUseCase(app.communityRepository),
+                    communityRepository = app.communityRepository,
                     communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
                     accessTokenProvider = app.authRepository,
                     isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED,

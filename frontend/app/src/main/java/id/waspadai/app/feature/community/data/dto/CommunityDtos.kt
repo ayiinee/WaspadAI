@@ -25,6 +25,11 @@ data class CommunityItemDto(
     @SerialName("has_image") val hasImage: Boolean = false,
     val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
     @SerialName("user_vote") val userVote: String? = null,
+    @SerialName("like_count") val likeCount: Int = 0,
+    @SerialName("view_count") val viewCount: Int = 0,
+    @SerialName("comment_count") val commentCount: Int = 0,
+    @SerialName("share_count") val shareCount: Int = 0,
+    @SerialName("user_liked") val userLiked: Boolean = false,
 )
 
 @Serializable
@@ -44,6 +49,40 @@ data class CommunityVoteResultDto(
     @SerialName("case_id") val caseId: String = "",
     @SerialName("user_vote") val userVote: String? = null,
     val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
+)
+
+@Serializable
+data class CommunityDetailDto(
+    @SerialName("case_id") val caseId: String = "",
+    val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
+    @SerialName("user_vote") val userVote: String? = null,
+    @SerialName("like_count") val likeCount: Int = 0,
+    @SerialName("view_count") val viewCount: Int = 0,
+    @SerialName("comment_count") val commentCount: Int = 0,
+    @SerialName("share_count") val shareCount: Int = 0,
+    @SerialName("user_liked") val userLiked: Boolean = false,
+    val responses: List<CommunityResponseItemDto> = emptyList(),
+)
+
+@Serializable
+data class CommunitySocialResultDto(
+    @SerialName("case_id") val caseId: String = "",
+    val liked: Boolean = false,
+    @SerialName("like_count") val likeCount: Int = 0,
+    @SerialName("view_count") val viewCount: Int = 0,
+    @SerialName("comment_count") val commentCount: Int = 0,
+    @SerialName("share_count") val shareCount: Int = 0,
+    @SerialName("share_url") val shareUrl: String? = null,
+)
+
+@Serializable
+data class CommunityResponseItemDto(
+    @SerialName("response_id") val responseId: String = "",
+    val author: String = "Pengguna WaspadAI",
+    @SerialName("created_at") val createdAt: String = "",
+    val vote: String = "VALID",
+    val reasoning: String = "",
+    @SerialName("has_image") val hasImage: Boolean = false,
 )
 
 @Serializable

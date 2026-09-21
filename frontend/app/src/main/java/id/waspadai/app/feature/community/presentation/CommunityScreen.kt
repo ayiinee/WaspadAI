@@ -150,6 +150,22 @@ fun CommunityRoute(
     LaunchedEffect(Unit) {
         viewModel.onAction(CommunityAction.InitScreen)
     }
+    LaunchedEffect(selectedPostId, uiState.accessTokenDraft) {
+        selectedPostId?.let { postId ->
+            viewModel.onAction(CommunityAction.LoadPostDetail(postId))
+        }
+    }
+    LaunchedEffect(uiState.shareLink) {
+        val sharePath = uiState.shareLink ?: return@LaunchedEffect
+        val sharedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
+            ?: uiState.posts.firstOrNull()
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "${sharedPost?.body.orEmpty()}\n\n${defaultBaseUrl.trimEnd('/')}$sharePath")
+        }
+        context.startActivity(Intent.createChooser(shareIntent, "Bagikan kasus"))
+        viewModel.onAction(CommunityAction.ShareLinkConsumed)
+    }
 
     if (selectedPost != null) {
         CommunityDetailScreen(
@@ -158,6 +174,24 @@ fun CommunityRoute(
             onBack = { selectedPostId = null },
             onSupportClick = { viewModel.onAction(CommunityAction.SupportClicked(selectedPost.id)) },
             onVerdictClick = { verdict -> viewModel.onAction(CommunityAction.VerdictSelected(selectedPost.id, verdict)) },
+            detail = uiState.detailByPostId[selectedPost.id],
+            imageBaseUrl = defaultBaseUrl,
+            isDetailLoading = uiState.detailLoadingPostId == selectedPost.id,
+            isResponseSubmitting = uiState.responseSubmittingPostId == selectedPost.id,
+            detailError = uiState.detailError,
+            onRetryDetail = { viewModel.onAction(CommunityAction.LoadPostDetail(selectedPost.id)) },
+            onSubmitResponse = { verdict, reasoning, bytes, fileName, contentType ->
+                viewModel.onAction(
+                    CommunityAction.SubmitCommunityResponse(
+                        postId = selectedPost.id,
+                        verdict = verdict,
+                        reasoning = reasoning,
+                        evidenceBytes = bytes,
+                        evidenceFileName = fileName,
+                        evidenceContentType = contentType,
+                    )
+                )
+            },
             onDestinationSelected = onDestinationSelected,
         )
         return
@@ -167,13 +201,7 @@ fun CommunityRoute(
         uiState = uiState,
         onAction = viewModel::onAction,
         onBack = onBack,
-        onSharePost = { post ->
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "${post.body}\n\nDibagikan dari WaspadAI")
-            }
-            context.startActivity(Intent.createChooser(sendIntent, "Bagikan kasus"))
-        },
+        onSharePost = { post -> viewModel.onAction(CommunityAction.ShareClicked(post.id)) },
         onOpenPost = { selectedPostId = it.id },
         onDestinationSelected = onDestinationSelected,
     )
@@ -832,7 +860,7 @@ private fun CommunityPostCard(
                     } else {
                         Icons.Rounded.FavoriteBorder
                     },
-                    label = post.totalVoteCount.toString(),
+                    label = post.likeCount.toString(),
                     contentDescription = "Total penilaian komunitas",
                     tint = if (post.isSupported) WaspadAIHoax else WaspadAIDarkBlue,
                     containerColor = if (post.isSupported) {
@@ -878,7 +906,9 @@ fun CommunityAssessmentPanel(
     post: CommunityPost,
     expanded: Boolean,
     onToggle: () -> Unit,
-    onSubmit: (CommunityVerdict, String) -> Unit,
+    onSubmit: (CommunityVerdict, String, ByteArray?, String?, String?) -> Unit,
+    isSubmitting: Boolean = false,
+    submitError: String? = null,
 ) {
     val context = LocalContext.current
     var reason by rememberSaveable(post.id) { mutableStateOf("") }
@@ -908,7 +938,24 @@ fun CommunityAssessmentPanel(
             evidenceMessage = "$fileName berhasil dilampirkan."
         }
     }
-    val isFormValid = selectedVerdict != null && reason.trim().length >= 10 && evidenceNames.isNotEmpty()
+    val imageIndex = evidenceMimeTypes.indexOfFirst { it.startsWith("image/") }
+    val isFormValid = selectedVerdict != null && reason.trim().length >= 10 && imageIndex >= 0
+
+    LaunchedEffect(isSubmitting, submitError) {
+        submissionState = when {
+            isSubmitting -> AssessmentSubmissionState.Saving
+            submitError != null -> AssessmentSubmissionState.Editing
+            submissionState == AssessmentSubmissionState.Saving -> {
+                reason = ""
+                evidenceKeys = emptyList()
+                evidenceNames = emptyList()
+                evidenceMimeTypes = emptyList()
+                evidenceMessage = null
+                AssessmentSubmissionState.Success
+            }
+            else -> submissionState
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -1050,7 +1097,7 @@ fun CommunityAssessmentPanel(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clickable(enabled = submissionState == AssessmentSubmissionState.Editing) {
-                                        evidencePicker.launch(arrayOf("*/*"))
+                                        evidencePicker.launch(arrayOf("image/*"))
                                     },
                             )
                         }
@@ -1062,7 +1109,7 @@ fun CommunityAssessmentPanel(
                                     .clip(RoundedCornerShape(8.dp))
                                     .border(1.dp, WaspadAILightBlue, RoundedCornerShape(8.dp))
                                     .clickable(enabled = submissionState == AssessmentSubmissionState.Editing) {
-                                        evidencePicker.launch(arrayOf("*/*"))
+                                    evidencePicker.launch(arrayOf("image/*"))
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -1121,22 +1168,34 @@ fun CommunityAssessmentPanel(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        submitError?.let { error ->
+                            Text(text = error, color = WaspadAIHoax, fontSize = 11.sp)
+                        }
                         Button(
                             onClick = {
                                 val verdict = selectedVerdict ?: return@Button
                                 val submittedReason = reason.trim()
+                                if (imageIndex < 0) {
+                                    evidenceMessage = "Lampirkan gambar bukti terlebih dahulu."
+                                    return@Button
+                                }
+                                val imageUri = Uri.parse(evidenceKeys[imageIndex])
+                                val imageBytes = runCatching {
+                                    context.contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
+                                }.getOrNull()
+                                if (imageBytes == null || imageBytes.isEmpty()) {
+                                    evidenceMessage = "Gambar bukti tidak dapat dibaca."
+                                    return@Button
+                                }
                                 scope.launch {
                                     submissionState = AssessmentSubmissionState.Saving
-                                    delay(900)
-                                    submissionState = AssessmentSubmissionState.Success
-                                    delay(750)
-                                    onSubmit(verdict, submittedReason)
-                                    reason = ""
-                                    evidenceKeys = emptyList()
-                                    evidenceNames = emptyList()
-                                    evidenceMimeTypes = emptyList()
-                                    evidenceMessage = null
-                                    submissionState = AssessmentSubmissionState.Editing
+                                    onSubmit(
+                                        verdict,
+                                        submittedReason,
+                                        imageBytes,
+                                        evidenceNames[imageIndex],
+                                        evidenceMimeTypes[imageIndex],
+                                    )
                                 }
                             },
                             enabled = isFormValid && submissionState == AssessmentSubmissionState.Editing,

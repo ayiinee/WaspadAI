@@ -28,12 +28,14 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +54,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
+import id.waspadai.app.feature.community.domain.CommunityResponseItem
+import id.waspadai.app.feature.community.domain.CommunityVote
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
@@ -67,13 +72,25 @@ fun CommunityDetailScreen(
     onBack: () -> Unit,
     onSupportClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
+    detail: CommunityDetailSnapshot? = null,
+    imageBaseUrl: String = "",
+    isDetailLoading: Boolean = false,
+    isResponseSubmitting: Boolean = false,
+    detailError: String? = null,
+    onRetryDetail: () -> Unit = {},
+    onSubmitResponse: (CommunityVerdict, String, ByteArray?, String?, String?) -> Unit = { _, _, _, _, _ -> },
     onDestinationSelected: (String) -> Unit,
 ) {
     var assessmentExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
     val contentGutter = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 28.dp
-    val responses = remember(post.id) {
-        mutableStateListOf(*sampleResponses(post).toTypedArray())
-    }
+    val displayPost = detail?.let { snapshot ->
+        post.copy(
+            hoaksCount = snapshot.counts.hoaks,
+            waspadaCount = snapshot.counts.waspada,
+            validCount = snapshot.counts.valid,
+            selectedVerdict = snapshot.userVote?.toPresentation(),
+        )
+    } ?: post
     Scaffold(
         containerColor = WaspadAIBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -125,31 +142,44 @@ fun CommunityDetailScreen(
                         )
                     }
                     Spacer(Modifier.height(12.dp))
-                    CommunityInsight(post)
+                    if (isDetailLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = WaspadAIBlue,
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                    detailError?.let { error ->
+                        Text(
+                            text = "$error  Ketuk untuk mencoba lagi.",
+                            color = WaspadAIHoax,
+                            fontSize = 12.sp,
+                            modifier = Modifier.clickable(onClick = onRetryDetail),
+                        )
+                    }
+                    CommunityInsight(displayPost)
                     Spacer(Modifier.height(8.dp))
                     CommunityAssessmentPanel(
-                        post = post,
+                        post = displayPost,
                         expanded = assessmentExpanded,
                         onToggle = { assessmentExpanded = !assessmentExpanded },
-                        onSubmit = { verdict, reason ->
-                            onVerdictClick(verdict)
-                            responses.add(
-                                0,
-                                CommunityResponse(
-                                    author = "Anda",
-                                    timestamp = "Baru saja",
-                                    verdict = verdict,
-                                    message = reason,
-                                    avatarRes = post.avatarRes,
-                                ),
-                            )
-                            assessmentExpanded = false
+                        onSubmit = { verdict, reason, bytes, fileName, contentType ->
+                            onSubmitResponse(verdict, reason, bytes, fileName, contentType)
                         },
+                        isSubmitting = isResponseSubmitting,
+                        submitError = detailError,
                     )
                     Spacer(Modifier.height(10.dp))
-                    DetailActions(post, responses.size, onSupportClick)
+                    val responses = detail?.responses.orEmpty()
+                    DetailActions(displayPost, responses.size, onSupportClick)
                     Spacer(Modifier.height(14.dp))
-                    CommunityResponses(responses)
+                    CommunityResponses(
+                        responses = responses,
+                        avatarRes = displayPost.avatarRes,
+                        caseId = displayPost.id,
+                        imageBaseUrl = imageBaseUrl,
+                        accessToken = accessToken,
+                    )
                     Spacer(Modifier.height(18.dp))
                     }
                 }
@@ -274,7 +304,7 @@ private fun DetailActions(post: CommunityPost, responseCount: Int, onSupportClic
     ) {
         DetailActionPill(
             icon = if (post.isSupported) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-            label = post.totalVoteCount.toString(),
+            label = post.likeCount.toString(),
             contentDescription = "Total penilaian komunitas",
             tint = if (post.isSupported) Color(0xFFD82A0C) else WaspadAIDarkBlue,
             containerColor = if (post.isSupported) Color(0x22D82A0C) else Color(0xFFE6F0F7),
@@ -299,40 +329,14 @@ private fun DetailActions(post: CommunityPost, responseCount: Int, onSupportClic
     }
 }
 
-private data class CommunityResponse(
-    val author: String,
-    val timestamp: String,
-    val verdict: CommunityVerdict,
-    val message: String,
-    val avatarRes: Int,
-)
-
-private fun sampleResponses(post: CommunityPost) = listOf(
-    CommunityResponse(
-        author = "Nadia Putri",
-        timestamp = "12 menit lalu",
-        verdict = CommunityVerdict.Waspada,
-        message = "Konteks unggahan belum lengkap. Sebaiknya tunggu konfirmasi dari sumber resmi.",
-        avatarRes = post.avatarRes,
-    ),
-    CommunityResponse(
-        author = "Ardi Saputra",
-        timestamp = "28 menit lalu",
-        verdict = CommunityVerdict.Hoaks,
-        message = "Saya menemukan unggahan serupa yang sudah dibantah oleh kanal pemeriksa fakta.",
-        avatarRes = post.avatarRes,
-    ),
-    CommunityResponse(
-        author = "Siti Rahma",
-        timestamp = "45 menit lalu",
-        verdict = CommunityVerdict.Valid,
-        message = "Informasi utamanya sesuai, tetapi potongan gambar perlu dilihat bersama konteks aslinya.",
-        avatarRes = post.avatarRes,
-    ),
-)
-
 @Composable
-private fun CommunityResponses(responses: List<CommunityResponse>) {
+private fun CommunityResponses(
+    responses: List<CommunityResponseItem>,
+    avatarRes: Int,
+    caseId: String,
+    imageBaseUrl: String,
+    accessToken: String,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Text(
             text = "Tanggapan komunitas (${responses.size})",
@@ -345,7 +349,7 @@ private fun CommunityResponses(responses: List<CommunityResponse>) {
             Column(modifier = Modifier.padding(vertical = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
-                        painter = painterResource(response.avatarRes),
+                        painter = painterResource(avatarRes),
                         contentDescription = "Foto ${response.author}",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(40.dp).clip(CircleShape),
@@ -358,10 +362,10 @@ private fun CommunityResponses(responses: List<CommunityResponse>) {
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        Text(response.timestamp, color = Color(0xFF7B8790), fontSize = 11.sp)
+                        Text(response.createdAt, color = Color(0xFF7B8790), fontSize = 11.sp)
                     }
                     Text(
-                        response.verdict.label,
+                        response.vote.toPresentation()?.label ?: "Penilaian",
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
                             .background(Color(0xFFE7F3FC))
@@ -372,7 +376,17 @@ private fun CommunityResponses(responses: List<CommunityResponse>) {
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(response.message, color = Color(0xFF202A32), fontSize = 13.sp, lineHeight = 18.sp)
+                Text(response.reasoning, color = Color(0xFF202A32), fontSize = 13.sp, lineHeight = 18.sp)
+                if (response.hasImage) {
+                    CommunityEvidenceImage(
+                        imageUrl = "${imageBaseUrl.trimEnd('/')}/api/v1/community/$caseId/responses/${response.responseId}/image",
+                        accessToken = accessToken,
+                        author = response.author,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp),
+                    )
+                }
             }
             HorizontalDivider(color = Color(0xFFDCE5EB), thickness = 1.dp)
         }
@@ -382,6 +396,13 @@ private fun CommunityResponses(responses: List<CommunityResponse>) {
 fun CommunityPost.statusTextColor(): Color = when (statusLabel) {
     "Evidence terverifikasi" -> Color(0xFF10B981)
     else -> Color(0xFFF59E0B)
+}
+
+private fun CommunityVote?.toPresentation(): CommunityVerdict? = when (this) {
+    CommunityVote.Hoaks -> CommunityVerdict.Hoaks
+    CommunityVote.Waspada -> CommunityVerdict.Waspada
+    CommunityVote.Valid -> CommunityVerdict.Valid
+    null -> null
 }
 
 @Composable
