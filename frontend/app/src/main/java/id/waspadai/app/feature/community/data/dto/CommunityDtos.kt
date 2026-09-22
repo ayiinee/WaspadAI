@@ -23,6 +23,8 @@ data class CommunityItemDto(
     val status: String = "",
     @SerialName("published_at") val publishedAt: String = "",
     @SerialName("has_image") val hasImage: Boolean = false,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val media: List<CommunityMediaDto> = emptyList(),
     val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
     @SerialName("user_vote") val userVote: String? = null,
     @SerialName("like_count") val likeCount: Int = 0,
@@ -30,6 +32,17 @@ data class CommunityItemDto(
     @SerialName("comment_count") val commentCount: Int = 0,
     @SerialName("share_count") val shareCount: Int = 0,
     @SerialName("user_liked") val userLiked: Boolean = false,
+)
+
+@Serializable
+data class CommunityMediaDto(
+    val id: String = "",
+    @SerialName("media_type") val mediaType: String = "IMAGE",
+    val url: String = "",
+    @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val position: Int = 0,
 )
 
 @Serializable
@@ -88,6 +101,8 @@ data class CommunityDetailDto(
     @SerialName("comment_count") val commentCount: Int = 0,
     @SerialName("share_count") val shareCount: Int = 0,
     @SerialName("user_liked") val userLiked: Boolean = false,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val media: List<CommunityMediaDto> = emptyList(),
     val responses: List<CommunityResponseItemDto> = emptyList(),
 )
 
@@ -125,6 +140,7 @@ data class CommunityPreviewDto(
     @SerialName("expires_at") val expiresAt: String = "",
     @SerialName("redacted_text") val redactedText: String = "",
     @SerialName("redacted_image_url") val redactedImageUrl: String? = null,
+    val media: List<CommunityMediaDto> = emptyList(),
     val redactions: List<String> = emptyList(),
     @SerialName("confirmation_required") val confirmationRequired: Boolean = true,
 )

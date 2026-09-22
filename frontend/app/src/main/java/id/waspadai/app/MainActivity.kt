@@ -97,7 +97,7 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
     LaunchedEffect(currentRoute) {
         when (currentRoute) {
             VerificationRouteName -> communityViewModel.onAction(CommunityAction.PrefetchBackend)
-            CommunityRouteName -> communityViewModel.onAction(CommunityAction.RefreshBackend)
+            CommunityRouteName -> communityViewModel.onAction(CommunityAction.InitScreen)
         }
     }
 

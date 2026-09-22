@@ -2,6 +2,7 @@ package id.waspadai.app.feature.community.domain
 
 import id.waspadai.app.core.common.AppResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 interface CommunityRepository {
     /**
@@ -46,15 +47,19 @@ interface CommunityRepository {
         caseId: String,
     ): AppResult<CommunityVoteUpdate>
 
-    suspend fun likeCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate>
+    suspend fun likeCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        AppResult.Failure("Like komunitas belum tersedia.")
 
-    suspend fun unlikeCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate>
+    suspend fun unlikeCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        AppResult.Failure("Unlike komunitas belum tersedia.")
 
-    suspend fun markCommunitySeen(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate>
+    suspend fun markCommunitySeen(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        AppResult.Failure("Seen komunitas belum tersedia.")
 
-    suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate>
+    suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
+        AppResult.Failure("Share komunitas belum tersedia.")
 
-    fun observeCommunityEvents(baseUrl: String, accessToken: String): Flow<CommunityRealtimeEvent>
+    fun observeCommunityEvents(baseUrl: String, accessToken: String): Flow<CommunityRealtimeEvent> = emptyFlow()
 
     suspend fun requestPreview(
         baseUrl: String,
@@ -87,6 +92,7 @@ data class CommunityDetailSnapshot(
     val commentCount: Int = 0,
     val shareCount: Int = 0,
     val userLiked: Boolean = false,
+    val media: List<CommunityMedia> = emptyList(),
 )
 
 data class CommunityResponseItem(
@@ -118,6 +124,17 @@ data class CommunityFeedPost(
     val commentCount: Int = 0,
     val shareCount: Int = 0,
     val userLiked: Boolean = false,
+    val media: List<CommunityMedia> = emptyList(),
+)
+
+data class CommunityMedia(
+    val id: String,
+    val mediaType: String = "IMAGE",
+    val url: String,
+    val thumbnailUrl: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val position: Int = 0,
 )
 
 data class CommunityVoteCounts(
@@ -166,6 +183,7 @@ data class CommunityPreview(
     val redactedText: String,
     val redactedImageUrl: String?,
     val redactions: List<String>,
+    val media: List<CommunityMedia> = emptyList(),
 )
 
 data class CommunityState(

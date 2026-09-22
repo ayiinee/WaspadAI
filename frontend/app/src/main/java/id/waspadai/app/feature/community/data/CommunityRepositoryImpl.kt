@@ -4,6 +4,7 @@ import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.community.data.dto.CommunityBootstrapDto
 import id.waspadai.app.feature.community.data.dto.CommunityDetailDto
 import id.waspadai.app.feature.community.data.dto.CommunityItemDto
+import id.waspadai.app.feature.community.data.dto.CommunityMediaDto
 import id.waspadai.app.feature.community.data.dto.CommunityPageDto
 import id.waspadai.app.feature.community.data.dto.CommunityPreviewDto
 import id.waspadai.app.feature.community.data.dto.CommunityRealtimeEventDto
@@ -17,6 +18,7 @@ import id.waspadai.app.feature.community.data.dto.CommunityVoteRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteResultDto
 import id.waspadai.app.feature.community.data.dto.CommunitySocialResultDto
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
+import id.waspadai.app.feature.community.domain.CommunityMedia
 import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityPreview
@@ -143,7 +145,7 @@ class CommunityRepositoryImpl(
         }
         if (response.status.isSuccess()) {
             val bootstrapDto = response.body<CommunityBootstrapDto>()
-            return bootstrapDto.toDomain()
+            return bootstrapDto.toDomain(baseUrl)
         }
         if (response.status !in setOf(HttpStatusCode.NotFound, HttpStatusCode.UnprocessableEntity)) {
             throw CommunityApiException(response.status, response.safeError())
@@ -179,7 +181,7 @@ class CommunityRepositoryImpl(
         val pageDto = feed.body<CommunityPageDto>()
         return CommunitySnapshot(
             summary = summaryDto.toDomain(),
-            posts = pageDto.items.map(CommunityItemDto::toDomain),
+            posts = pageDto.items.map { it.toDomain(normalizedBaseUrl) },
             nextCursor = pageDto.nextCursor,
         )
     }
@@ -216,7 +218,7 @@ class CommunityRepositoryImpl(
         if (!response.status.isSuccess()) {
             throw CommunityApiException(response.status, response.safeError())
         }
-        response.body<CommunityDetailDto>().toDomain()
+        response.body<CommunityDetailDto>().toDomain(baseUrl.normalized())
     }
 
     override suspend fun submitCommunityResponse(
@@ -340,7 +342,7 @@ class CommunityRepositoryImpl(
         if (!response.status.isSuccess()) {
             throw CommunityApiException(response.status, response.safeError())
         }
-        response.body<CommunityPreviewDto>().toDomain()
+        response.body<CommunityPreviewDto>().toDomain(baseUrl.normalized())
     }.also { result ->
         if (result is AppResult.Success) invalidateCommunityCache()
     }
@@ -420,9 +422,9 @@ private const val COMMUNITY_CACHE_TTL_MILLIS = 30_000L
 
 private fun String.normalized(): String = trim().trimEnd('/')
 
-private fun CommunityBootstrapDto.toDomain(): CommunitySnapshot = CommunitySnapshot(
+private fun CommunityBootstrapDto.toDomain(baseUrl: String): CommunitySnapshot = CommunitySnapshot(
     summary = summary.toDomain(),
-    posts = feed.items.map(CommunityItemDto::toDomain),
+    posts = feed.items.map { it.toDomain(baseUrl) },
     nextCursor = feed.nextCursor,
 )
 
@@ -432,7 +434,7 @@ private fun CommunityUserSummaryDto.toDomain(): CommunityUserSummary = Community
     resolvedCasesCount = resolvedCasesCount,
 )
 
-private fun CommunityItemDto.toDomain(): CommunityFeedPost = CommunityFeedPost(
+private fun CommunityItemDto.toDomain(baseUrl: String): CommunityFeedPost = CommunityFeedPost(
     caseId = caseId,
     title = title,
     redactedText = redactedText,
@@ -446,6 +448,7 @@ private fun CommunityItemDto.toDomain(): CommunityFeedPost = CommunityFeedPost(
     commentCount = commentCount,
     shareCount = shareCount,
     userLiked = userLiked,
+    media = canonicalMedia(baseUrl),
 )
 
 private fun CommunityVoteResultDto.toDomain(): CommunityVoteUpdate = CommunityVoteUpdate(
@@ -454,12 +457,13 @@ private fun CommunityVoteResultDto.toDomain(): CommunityVoteUpdate = CommunityVo
     counts = counts.toDomain(),
 )
 
-private fun CommunityPreviewDto.toDomain(): CommunityPreview = CommunityPreview(
+private fun CommunityPreviewDto.toDomain(baseUrl: String): CommunityPreview = CommunityPreview(
     previewId = previewId,
     expiresAt = expiresAt,
     redactedText = redactedText,
     redactedImageUrl = redactedImageUrl,
     redactions = redactions,
+    media = media.map { it.toDomain(baseUrl) },
 )
 
 private fun CommunityResponseResultDto.toDomain(): CommunityResponseUpdate = CommunityResponseUpdate(
@@ -495,7 +499,7 @@ private fun CommunityResponseItemDto.toDomain(): CommunityResponseItem = Communi
     hasImage = hasImage,
 )
 
-private fun CommunityDetailDto.toDomain(): CommunityDetailSnapshot = CommunityDetailSnapshot(
+private fun CommunityDetailDto.toDomain(baseUrl: String): CommunityDetailSnapshot = CommunityDetailSnapshot(
     caseId = caseId,
     counts = counts.toDomain(),
     userVote = userVote.toVoteOrNull(),
@@ -504,6 +508,7 @@ private fun CommunityDetailDto.toDomain(): CommunityDetailSnapshot = CommunityDe
     commentCount = commentCount,
     shareCount = shareCount,
     userLiked = userLiked,
+    media = canonicalMedia(baseUrl),
     responses = responses.map { response ->
         CommunityResponseItem(
             responseId = response.responseId,
@@ -515,6 +520,36 @@ private fun CommunityDetailDto.toDomain(): CommunityDetailSnapshot = CommunityDe
         )
     },
 )
+
+private fun CommunityItemDto.canonicalMedia(baseUrl: String): List<CommunityMedia> =
+    media.take(4).map { it.toDomain(baseUrl) }.ifEmpty {
+        imageUrl?.takeIf(String::isNotBlank)?.let { url ->
+            listOf(CommunityMedia(id = "$caseId-legacy", url = url.resolveAgainst(baseUrl)))
+        }.orEmpty()
+    }
+
+private fun CommunityDetailDto.canonicalMedia(baseUrl: String): List<CommunityMedia> =
+    media.take(4).map { it.toDomain(baseUrl) }.ifEmpty {
+        imageUrl?.takeIf(String::isNotBlank)?.let { url ->
+            listOf(CommunityMedia(id = "$caseId-legacy", url = url.resolveAgainst(baseUrl)))
+        }.orEmpty()
+    }
+
+private fun CommunityMediaDto.toDomain(baseUrl: String): CommunityMedia = CommunityMedia(
+    id = id,
+    mediaType = mediaType,
+    url = url.resolveAgainst(baseUrl),
+    thumbnailUrl = thumbnailUrl?.resolveAgainst(baseUrl),
+    width = width,
+    height = height,
+    position = position,
+)
+
+private fun String.resolveAgainst(baseUrl: String): String = when {
+    startsWith("http://") || startsWith("https://") -> this
+    baseUrl.isBlank() -> this
+    else -> "${baseUrl.normalized()}/${trimStart('/')}"
+}
 
 private fun CommunitySocialResultDto.toDomain(): CommunitySocialUpdate = CommunitySocialUpdate(
     caseId = caseId,

@@ -35,7 +35,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -89,6 +88,13 @@ fun CommunityDetailScreen(
             waspadaCount = snapshot.counts.waspada,
             validCount = snapshot.counts.valid,
             selectedVerdict = snapshot.userVote?.toPresentation(),
+            likeCount = snapshot.likeCount,
+            viewCount = snapshot.viewCount,
+            commentCount = snapshot.commentCount,
+            shareCount = snapshot.shareCount,
+            isSupported = snapshot.userLiked,
+            media = snapshot.media.ifEmpty { post.media },
+            imageUrl = snapshot.media.firstOrNull()?.url ?: post.imageUrl,
         )
     } ?: post
     Scaffold(
@@ -133,16 +139,19 @@ fun CommunityDetailScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(post.body, color = Color.Black, fontSize = 15.sp, lineHeight = 22.sp)
-                    post.imageUrl?.takeIf(String::isNotBlank)?.let { imageUrl ->
+                    if (displayPost.media.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
-                        CommunityEvidenceImage(
-                            imageUrl = imageUrl,
+                        CommunityMediaCarousel(
+                            media = displayPost.media,
                             accessToken = accessToken,
-                            author = post.author,
+                            author = displayPost.author,
                         )
+                    } else displayPost.imageUrl?.takeIf(String::isNotBlank)?.let { imageUrl ->
+                        Spacer(Modifier.height(12.dp))
+                        CommunityEvidenceImage(imageUrl, accessToken, displayPost.author)
                     }
                     Spacer(Modifier.height(12.dp))
-                    if (isDetailLoading) {
+                    if (isDetailLoading && detail == null) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
                             color = WaspadAIBlue,

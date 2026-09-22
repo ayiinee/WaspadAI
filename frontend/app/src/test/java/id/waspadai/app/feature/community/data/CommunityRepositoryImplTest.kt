@@ -21,6 +21,38 @@ import org.junit.Test
 
 class CommunityRepositoryImplTest {
     @Test
+    fun `feed maps one to four ordered media with absolute stable URLs`() = runTest {
+        for (count in 1..4) {
+            val mediaJson = (0 until count).joinToString(",") { index ->
+                """{"id":"media-$index","url":"/api/v1/community/case-1/media/media-$index","position":$index}"""
+            }
+            val repository = repositoryWith(MockEngine {
+                respond(
+                    """
+                    {
+                      "summary":{"assessments_count":0,"evidence_added_count":0,"resolved_cases_count":0},
+                      "feed":{"items":[{
+                        "case_id":"case-1","title":"Kasus","redacted_text":"Aman",
+                        "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-22T00:00:00Z",
+                        "has_image":true,"counts":{},"media":[$mediaJson]
+                      }],"next_cursor":null}
+                    }
+                    """.trimIndent(),
+                    headers = jsonHeaders(),
+                )
+            })
+
+            val result = repository.loadCommunity("https://api.example.test", "token")
+            val post = (result as AppResult.Success).value.posts.single()
+            assertEquals(count, post.media.size)
+            assertEquals(
+                "https://api.example.test/api/v1/community/case-1/media/media-0",
+                post.media.first().url,
+            )
+        }
+    }
+
+    @Test
     fun `request preview sends authenticated case endpoint`() = runTest {
         val repository = repositoryWith(MockEngine { request ->
             assertEquals(

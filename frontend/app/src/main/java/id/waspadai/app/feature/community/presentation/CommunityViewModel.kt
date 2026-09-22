@@ -27,6 +27,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private data class LikeMutationState(
+    var confirmedServerState: Boolean,
+    var confirmedServerCount: Int,
+    var desiredLocalState: Boolean,
+    var requestInFlight: Boolean = false,
+    var mutationVersion: Long = 0,
+)
+
 class CommunityViewModel(
     private val repository: CommunityRepository? = null,
     private val accessTokenProvider: AccessTokenProvider? = null,
@@ -43,6 +51,8 @@ class CommunityViewModel(
     val uiState: StateFlow<CommunityUiState> = _uiState.asStateFlow()
     private var realtimeJob: Job? = null
     private var realtimeKey: String? = null
+    private val detailJobs = mutableMapOf<String, Job>()
+    private val likeMutations = mutableMapOf<String, LikeMutationState>()
 
     fun onAction(action: CommunityAction) {
         when (action) {
@@ -168,14 +178,14 @@ class CommunityViewModel(
     }
 
     private fun refreshBackend() {
-        if (accessTokenProvider != null) {
+        val current = uiState.value
+        if (accessTokenProvider != null && current.accessTokenDraft.isBlank()) {
             loadFromAccessTokenProvider(
                 loadingMessage = "Memperbarui feed Koneksi...",
                 forceRefresh = true,
             )
             return
         }
-        val current = uiState.value
         val baseUrl = current.baseUrlDraft.trim()
         val accessToken = current.accessTokenDraft.trim()
         val communityRepository = repository
@@ -257,14 +267,25 @@ class CommunityViewModel(
     private fun loadPostDetail(postId: String) {
         val communityRepository = repository ?: return
         val current = uiState.value
-        if (current.detailLoadingPostId == postId) return
+        if (detailJobs[postId]?.isActive == true) return
+        val feedPost = current.posts.firstOrNull { it.id == postId }
         val baseUrl = current.baseUrlDraft.trim()
         val accessToken = current.accessTokenDraft.trim()
-        _uiState.update { it.copy(detailLoadingPostId = postId, detailError = null) }
-        viewModelScope.launch {
+        if (baseUrl.isBlank() || accessToken.isBlank()) return
+        _uiState.update { state ->
+            val cached = state.detailByPostId[postId]
+            state.copy(
+                detailByPostId = if (cached == null && feedPost != null) {
+                    state.detailByPostId + (postId to feedPost.toDetailSnapshot())
+                } else state.detailByPostId,
+                detailLoadingPostId = if (cached == null && feedPost == null) postId else null,
+                detailError = null,
+            )
+        }
+        detailJobs[postId] = viewModelScope.launch {
             // A detail open is the canonical "seen" event. It is idempotent
-            // per user and post, so retries do not inflate the view counter.
-            communityRepository.markCommunitySeen(baseUrl, accessToken, postId)
+            // per user and post. It must not delay the detail refresh.
+            launch { communityRepository.markCommunitySeen(baseUrl, accessToken, postId) }
             when (val result = communityRepository.loadCommunityDetail(baseUrl, accessToken, postId)) {
                 is AppResult.Success -> _uiState.update {
                     it.copy(
@@ -276,16 +297,26 @@ class CommunityViewModel(
                                 commentCount = result.value.commentCount,
                                 shareCount = result.value.shareCount,
                                 isSupported = result.value.userLiked,
+                                media = result.value.media.ifEmpty { post.media },
+                                imageUrl = result.value.media.firstOrNull()?.url ?: post.imageUrl,
                             ) else post
                         },
                         detailLoadingPostId = null,
                         detailError = null,
                     )
+                }.also {
+                    likeMutations[postId]?.takeIf { mutation -> mutation.requestInFlight }?.let { mutation ->
+                        applyDesiredLike(postId, mutation, uiState.value.backendMessage)
+                    }
                 }
                 is AppResult.Failure -> _uiState.update {
-                    it.copy(detailLoadingPostId = null, detailError = result.message)
+                    it.copy(
+                        detailLoadingPostId = null,
+                        detailError = result.message.takeIf { _ -> it.detailByPostId[postId] == null },
+                    )
                 }
             }
+            detailJobs.remove(postId)
         }
     }
 
@@ -322,7 +353,6 @@ class CommunityViewModel(
                             backendMessage = "Tanggapan tersimpan. Polling diperbarui.",
                         )
                     }
-                    refreshPostDetail(action.postId, baseUrl, accessToken)
                 }
                 is AppResult.Failure -> _uiState.update {
                     it.copy(
@@ -342,39 +372,106 @@ class CommunityViewModel(
         val post = current.posts.firstOrNull { it.id == postId } ?: return
         val baseUrl = current.baseUrlDraft.trim()
         val accessToken = current.accessTokenDraft.trim()
-        if (current.isVoteSubmitting) return
-        val previousLiked = post.isSupported
-        val previousCount = post.likeCount
-        val optimisticLiked = !previousLiked
-        val optimisticCount = (previousCount + if (optimisticLiked) 1 else -1).coerceAtLeast(0)
-        _uiState.update {
-            it.copy(
-                isVoteSubmitting = true,
-                backendMessage = "Memperbarui like...",
-                posts = it.posts.map { item ->
-                    if (item.id == postId) item.copy(isSupported = optimisticLiked, likeCount = optimisticCount) else item
-                },
+        if (baseUrl.isBlank() || accessToken.isBlank()) return
+        val mutation = likeMutations.getOrPut(postId) {
+            LikeMutationState(
+                confirmedServerState = post.isSupported,
+                confirmedServerCount = post.likeCount,
+                desiredLocalState = post.isSupported,
             )
         }
+        if (!mutation.requestInFlight) {
+            mutation.confirmedServerState = post.isSupported
+            mutation.confirmedServerCount = post.likeCount
+        }
+        mutation.desiredLocalState = !post.isSupported
+        mutation.mutationVersion += 1
+        applyDesiredLike(postId, mutation, "Memperbarui like...")
+        if (mutation.requestInFlight) return
+        mutation.requestInFlight = true
         viewModelScope.launch {
-            val result = if (post.isSupported) {
-                communityRepository.unlikeCommunity(baseUrl, accessToken, postId)
-            } else {
+            reconcileLike(postId, baseUrl, accessToken, communityRepository, mutation)
+        }
+    }
+
+    private suspend fun reconcileLike(
+        postId: String,
+        baseUrl: String,
+        accessToken: String,
+        communityRepository: CommunityRepository,
+        mutation: LikeMutationState,
+    ) {
+        while (true) {
+            val requestedState = mutation.desiredLocalState
+            val requestVersion = mutation.mutationVersion
+            val result = if (requestedState) {
                 communityRepository.likeCommunity(baseUrl, accessToken, postId)
+            } else {
+                communityRepository.unlikeCommunity(baseUrl, accessToken, postId)
             }
             when (result) {
-                is AppResult.Success -> applySocialUpdate(result.value)
-                is AppResult.Failure -> _uiState.update {
-                    it.copy(
-                        isVoteSubmitting = false,
-                        backendPhase = CommunityBackendPhase.Failure,
-                        backendMessage = result.message,
-                        posts = it.posts.map { item ->
-                            if (item.id == postId) item.copy(isSupported = previousLiked, likeCount = previousCount) else item
-                        },
-                    )
+                is AppResult.Success -> {
+                    mutation.confirmedServerState = result.value.liked
+                    mutation.confirmedServerCount = result.value.likeCount
+                    applySocialMetadata(result.value)
+                    if (mutation.mutationVersion == requestVersion &&
+                        mutation.desiredLocalState == requestedState
+                    ) {
+                        applyDesiredLike(
+                            postId,
+                            mutation,
+                            if (requestedState) "Like tersimpan." else "Like dibatalkan.",
+                        )
+                    }
+                }
+                is AppResult.Failure -> {
+                    if (mutation.mutationVersion == requestVersion) {
+                        mutation.desiredLocalState = mutation.confirmedServerState
+                        mutation.requestInFlight = false
+                        applyDesiredLike(postId, mutation, result.message, failure = true)
+                        return
+                    }
                 }
             }
+
+            if (mutation.desiredLocalState == mutation.confirmedServerState) {
+                mutation.requestInFlight = false
+                applyDesiredLike(postId, mutation, uiState.value.backendMessage)
+                return
+            }
+        }
+    }
+
+    private fun applyDesiredLike(
+        postId: String,
+        mutation: LikeMutationState,
+        message: String,
+        failure: Boolean = false,
+    ) {
+        val desiredCount = (
+            mutation.confirmedServerCount + when {
+                mutation.desiredLocalState && !mutation.confirmedServerState -> 1
+                !mutation.desiredLocalState && mutation.confirmedServerState -> -1
+                else -> 0
+            }
+        ).coerceAtLeast(0)
+        _uiState.update { state ->
+            state.copy(
+                backendPhase = if (failure) CommunityBackendPhase.Failure else state.backendPhase,
+                backendMessage = message,
+                posts = state.posts.map { post ->
+                    if (post.id == postId) post.copy(
+                        isSupported = mutation.desiredLocalState,
+                        likeCount = desiredCount,
+                    ) else post
+                },
+                detailByPostId = state.detailByPostId.mapValues { (id, detail) ->
+                    if (id == postId) detail.copy(
+                        userLiked = mutation.desiredLocalState,
+                        likeCount = desiredCount,
+                    ) else detail
+                },
+            )
         }
     }
 
@@ -386,16 +483,6 @@ class CommunityViewModel(
                 is AppResult.Success -> _uiState.update { it.copy(shareLink = result.value.shareUrl ?: "/community/$postId") }
                 is AppResult.Failure -> _uiState.update { it.copy(detailError = result.message, backendMessage = result.message) }
             }
-        }
-    }
-
-    private suspend fun refreshPostDetail(postId: String, baseUrl: String, accessToken: String) {
-        val communityRepository = repository ?: return
-        when (val result = communityRepository.loadCommunityDetail(baseUrl, accessToken, postId)) {
-            is AppResult.Success -> _uiState.update {
-                it.copy(detailByPostId = it.detailByPostId + (postId to result.value))
-            }
-            is AppResult.Failure -> _uiState.update { it.copy(detailError = result.message) }
         }
     }
 
@@ -411,6 +498,9 @@ class CommunityViewModel(
                 summary = snapshot.summary.toPresentation(),
                 posts = snapshot.posts.map { post -> post.toPresentation(communityBaseUrl) },
             )
+        }
+        likeMutations.forEach { (postId, mutation) ->
+            if (mutation.requestInFlight) applyDesiredLike(postId, mutation, uiState.value.backendMessage)
         }
     }
 
@@ -462,20 +552,23 @@ class CommunityViewModel(
         }
     }
 
-    private fun applySocialUpdate(update: id.waspadai.app.feature.community.domain.CommunitySocialUpdate) {
+    private fun applySocialMetadata(update: id.waspadai.app.feature.community.domain.CommunitySocialUpdate) {
         _uiState.update { state ->
             state.copy(
-                isVoteSubmitting = false,
                 backendPhase = CommunityBackendPhase.Connected,
-                backendMessage = if (update.liked) "Like tersimpan." else "Like dibatalkan.",
                 posts = state.posts.map { post ->
                     if (post.id == update.caseId) post.copy(
-                        likeCount = update.likeCount,
                         viewCount = update.viewCount,
                         commentCount = update.commentCount,
                         shareCount = update.shareCount,
-                        isSupported = update.liked,
                     ) else post
+                },
+                detailByPostId = state.detailByPostId.mapValues { (id, detail) ->
+                    if (id == update.caseId) detail.copy(
+                        viewCount = update.viewCount,
+                        commentCount = update.commentCount,
+                        shareCount = update.shareCount,
+                    ) else detail
                 },
             )
         }
@@ -495,11 +588,15 @@ class CommunityViewModel(
     }
 
     private fun applyRealtimeEvent(event: id.waspadai.app.feature.community.domain.CommunityRealtimeEvent) {
+        val pendingLike = likeMutations[event.communityId]?.takeIf { it.requestInFlight }
+        if (pendingLike == null && event.likeCount != null) {
+            likeMutations[event.communityId]?.confirmedServerCount = event.likeCount
+        }
         _uiState.update { state ->
             state.copy(
                 posts = state.posts.map { post ->
                     if (post.id != event.communityId) post else post.copy(
-                        likeCount = event.likeCount ?: post.likeCount,
+                        likeCount = if (pendingLike == null) event.likeCount ?: post.likeCount else post.likeCount,
                         viewCount = event.viewCount ?: post.viewCount,
                         commentCount = event.commentCount ?: post.commentCount,
                         shareCount = event.shareCount ?: post.shareCount,
@@ -510,7 +607,7 @@ class CommunityViewModel(
                 },
                 detailByPostId = state.detailByPostId.mapValues { (id, detail) ->
                     if (id != event.communityId) detail else detail.copy(
-                        likeCount = event.likeCount ?: detail.likeCount,
+                        likeCount = if (pendingLike == null) event.likeCount ?: detail.likeCount else detail.likeCount,
                         viewCount = event.viewCount ?: detail.viewCount,
                         commentCount = event.commentCount ?: detail.commentCount,
                         shareCount = event.shareCount ?: detail.shareCount,
@@ -527,6 +624,7 @@ class CommunityViewModel(
 
     override fun onCleared() {
         realtimeJob?.cancel()
+        detailJobs.values.forEach { it.cancel() }
         super.onCleared()
     }
 
@@ -596,10 +694,20 @@ private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = C
         CommunityPostStatus.Unknown -> "Status belum dikenali"
     },
     avatarRes = R.drawable.community_avatar_putu,
-    imageUrl = if (hasImage) {
+    imageUrl = media.firstOrNull()?.url ?: if (hasImage) {
         "${baseUrl.trimEnd('/')}/api/v1/community/$caseId/image"
     } else {
         null
+    },
+    media = media.ifEmpty {
+        if (hasImage) {
+            listOf(
+                id.waspadai.app.feature.community.domain.CommunityMedia(
+                    id = "$caseId-legacy",
+                    url = "${baseUrl.trimEnd('/')}/api/v1/community/$caseId/image",
+                )
+            )
+        } else emptyList()
     },
     hoaksCount = counts.hoaks,
     waspadaCount = counts.waspada,
@@ -610,6 +718,19 @@ private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = C
     commentCount = commentCount,
     shareCount = shareCount,
     isSupported = userLiked,
+)
+
+private fun CommunityPost.toDetailSnapshot(): CommunityDetailSnapshot = CommunityDetailSnapshot(
+    caseId = id,
+    counts = CommunityVoteCounts(hoaksCount, waspadaCount, validCount),
+    userVote = selectedVerdict?.toDomain(),
+    responses = emptyList(),
+    likeCount = likeCount,
+    viewCount = viewCount,
+    commentCount = commentCount,
+    shareCount = shareCount,
+    userLiked = isSupported,
+    media = media,
 )
 
 private fun CommunityUserSummary.toPresentation(): CommunitySummary = CommunitySummary(

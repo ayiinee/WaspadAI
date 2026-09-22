@@ -151,7 +151,7 @@ fun CommunityRoute(
     LaunchedEffect(Unit) {
         viewModel.onAction(CommunityAction.InitScreen)
     }
-    LaunchedEffect(selectedPostId, uiState.accessTokenDraft) {
+    LaunchedEffect(selectedPostId, selectedPost?.id) {
         selectedPostId?.let { postId ->
             viewModel.onAction(CommunityAction.LoadPostDetail(postId))
         }
@@ -505,131 +505,6 @@ private fun ContributionDivider() {
 }
 
 @Composable
-private fun BackendConnectionPanel(
-    uiState: CommunityUiState,
-    onAction: (CommunityAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(6.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, WaspadAILightBlue),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Backend Koneksi",
-                        color = WaspadAIDarkBlue,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = uiState.backendMessage,
-                        color = when (uiState.backendPhase) {
-                            CommunityBackendPhase.Connected -> WaspadAIValid
-                            CommunityBackendPhase.Failure -> WaspadAIHoax
-                            else -> WaspadAIMuted
-                        },
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp,
-                    )
-                }
-                if (uiState.backendPhase == CommunityBackendPhase.Loading || uiState.isVoteSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = WaspadAIBlue,
-                    )
-                }
-            }
-            BackendInputField(
-                label = "Base URL Product API",
-                value = uiState.baseUrlDraft,
-                onValueChange = { onAction(CommunityAction.BaseUrlChanged(it)) },
-            )
-            BackendInputField(
-                label = "Bearer token Supabase",
-                value = uiState.accessTokenDraft,
-                onValueChange = { onAction(CommunityAction.AccessTokenChanged(it)) },
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = { onAction(CommunityAction.RefreshBackend) },
-                    enabled = uiState.backendPhase != CommunityBackendPhase.Loading,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Refresh feed", maxLines = 1)
-                }
-                OutlinedButton(
-                    onClick = { onAction(CommunityAction.BaseUrlChanged("http://10.0.2.2:8001")) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Emulator local", maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BackendInputField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            color = WaspadAIMuted,
-            fontSize = 11.sp,
-            lineHeight = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = TextStyle(color = Color.Black, fontSize = 12.sp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(38.dp)
-                .border(1.dp, WaspadAILightBlue, RoundedCornerShape(4.dp)),
-            decorationBox = { innerTextField ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 10.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    if (value.isBlank()) {
-                        Text(
-                            text = if (label.startsWith("Base")) "http://10.0.2.2:8001" else "Supabase access token",
-                            color = Color.Black.copy(alpha = 0.22f),
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
-    }
-}
-
-@Composable
 private fun CommunitySearchBar(
     query: String,
     selectedFilter: CommunityFeedFilter,
@@ -827,13 +702,16 @@ private fun CommunityPostCard(
                 fontSize = 12.sp,
                 lineHeight = 15.sp,
             )
-            post.imageUrl?.takeIf(String::isNotBlank)?.let { imageUrl ->
+            if (post.media.isNotEmpty()) {
                 Spacer(Modifier.height(7.dp))
-                CommunityEvidenceImage(
-                    imageUrl = imageUrl,
+                CommunityMediaCarousel(
+                    media = post.media,
                     accessToken = accessToken,
                     author = post.author,
                 )
+            } else post.imageUrl?.takeIf(String::isNotBlank)?.let { imageUrl ->
+                Spacer(Modifier.height(7.dp))
+                CommunityEvidenceImage(imageUrl, accessToken, post.author)
             }
             Spacer(Modifier.height(10.dp))
             Box(

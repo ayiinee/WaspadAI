@@ -2,6 +2,9 @@ package id.waspadai.app.feature.community.presentation
 
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
+import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
+import id.waspadai.app.feature.community.domain.CommunityRealtimeEvent
+import id.waspadai.app.feature.community.domain.CommunitySocialUpdate
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityRepository
@@ -13,11 +16,14 @@ import id.waspadai.app.feature.community.domain.CommunityVoteCounts
 import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
 import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -132,6 +138,7 @@ class CommunityViewModelTest {
         val viewModel = viewModel(FakeCommunityRepository(), token = "")
 
         viewModel.onAction(CommunityAction.RefreshBackend)
+        dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(CommunityBackendPhase.Failure, viewModel.uiState.value.backendPhase)
     }
@@ -152,6 +159,100 @@ class CommunityViewModelTest {
         val visible = viewModel.uiState.value.visiblePosts
         assertTrue(visible.all { it.title.contains("Hoaks", ignoreCase = true) || it.body.contains("Hoaks", ignoreCase = true) })
     }
+
+    @Test
+    fun `detail uses feed snapshot immediately while refresh is in flight`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.LoadPostDetail("fake-case-1"))
+
+        val state = viewModel.uiState.value
+        assertTrue(state.detailByPostId.containsKey("fake-case-1"))
+        assertEquals(null, state.detailLoadingPostId)
+        assertEquals(4, state.detailByPostId.getValue("fake-case-1").likeCount)
+    }
+
+    @Test
+    fun `like then unlike updates UI immediately and stale like response cannot win`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.SupportClicked("fake-case-1"))
+        runCurrent()
+        viewModel.onAction(CommunityAction.SupportClicked("fake-case-1"))
+        assertEquals(false, viewModel.uiState.value.posts.first().isSupported)
+        assertEquals(4, viewModel.uiState.value.posts.first().likeCount)
+
+        repository.likeResponse.complete(AppResult.Success(social(liked = true, count = 5)))
+        runCurrent()
+        assertEquals(false, viewModel.uiState.value.posts.first().isSupported)
+        assertEquals(4, viewModel.uiState.value.posts.first().likeCount)
+
+        repository.unlikeResponse.complete(AppResult.Success(social(liked = false, count = 4)))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.posts.first().isSupported)
+        assertEquals(4, viewModel.uiState.value.posts.first().likeCount)
+        assertEquals(1, repository.likeCalls)
+        assertEquals(1, repository.unlikeCalls)
+    }
+
+    @Test
+    fun `like unlike like coalesces to latest intent`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.SupportClicked("fake-case-1"))
+        runCurrent()
+        viewModel.onAction(CommunityAction.SupportClicked("fake-case-1"))
+        viewModel.onAction(CommunityAction.SupportClicked("fake-case-1"))
+        assertEquals(true, viewModel.uiState.value.posts.first().isSupported)
+        assertEquals(5, viewModel.uiState.value.posts.first().likeCount)
+
+        repository.likeResponse.complete(AppResult.Success(social(liked = true, count = 5)))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.posts.first().isSupported)
+        assertEquals(5, viewModel.uiState.value.posts.first().likeCount)
+        assertEquals(0, repository.unlikeCalls)
+    }
+
+    @Test
+    fun `ten rapid taps never produce negative count and final intent wins`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        repeat(10) { index ->
+            viewModel.onAction(CommunityAction.SupportClicked("fake-case-1"))
+            if (index == 0) runCurrent()
+            assertTrue(viewModel.uiState.value.posts.first().likeCount >= 0)
+        }
+        assertEquals(false, viewModel.uiState.value.posts.first().isSupported)
+
+        repository.likeResponse.complete(AppResult.Success(social(liked = true, count = 5)))
+        runCurrent()
+        repository.unlikeResponse.complete(AppResult.Success(social(liked = false, count = 4)))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.posts.first().isSupported)
+        assertEquals(4, viewModel.uiState.value.posts.first().likeCount)
+    }
+
+    private fun social(liked: Boolean, count: Int) = CommunitySocialUpdate(
+        caseId = "fake-case-1",
+        liked = liked,
+        likeCount = count,
+        viewCount = 2,
+        commentCount = 1,
+        shareCount = 0,
+        shareUrl = null,
+    )
 
     // ──────────────────────────────────────────────────────────────────────────
     // Helpers
@@ -177,6 +278,10 @@ class CommunityViewModelTest {
         private val failLoad: Boolean = false,
     ) : CommunityRepository {
         var loadCommunityCallCount = 0
+        var likeCalls = 0
+        var unlikeCalls = 0
+        val likeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
+        val unlikeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
 
         private val fakePosts = listOf(
             CommunityFeedPost(
@@ -187,6 +292,9 @@ class CommunityViewModelTest {
                 publishedAt = "2026-09-18T07:30:00Z",
                 counts = CommunityVoteCounts(hoaks = 3, waspada = 5, valid = 1),
                 userVote = null,
+                likeCount = 4,
+                viewCount = 2,
+                commentCount = 1,
             )
         )
 
@@ -225,6 +333,55 @@ class CommunityViewModelTest {
             accessToken: String,
             caseId: String,
         ): AppResult<CommunityVoteUpdate> = AppResult.Failure("not used")
+
+        override suspend fun loadCommunityDetail(
+            baseUrl: String,
+            accessToken: String,
+            caseId: String,
+        ): AppResult<CommunityDetailSnapshot> = AppResult.Success(
+            CommunityDetailSnapshot(
+                caseId = caseId,
+                counts = CommunityVoteCounts(3, 5, 1),
+                userVote = null,
+                responses = emptyList(),
+                likeCount = 4,
+                viewCount = 2,
+                commentCount = 1,
+            )
+        )
+
+        override suspend fun likeCommunity(
+            baseUrl: String,
+            accessToken: String,
+            caseId: String,
+        ): AppResult<CommunitySocialUpdate> {
+            likeCalls++
+            return likeResponse.await()
+        }
+
+        override suspend fun unlikeCommunity(
+            baseUrl: String,
+            accessToken: String,
+            caseId: String,
+        ): AppResult<CommunitySocialUpdate> {
+            unlikeCalls++
+            return unlikeResponse.await()
+        }
+
+        override suspend fun markCommunitySeen(
+            baseUrl: String,
+            accessToken: String,
+            caseId: String,
+        ): AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
+
+        override suspend fun shareCommunity(
+            baseUrl: String,
+            accessToken: String,
+            caseId: String,
+        ): AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
+
+        override fun observeCommunityEvents(baseUrl: String, accessToken: String) =
+            emptyFlow<CommunityRealtimeEvent>()
 
         override suspend fun requestPreview(
             baseUrl: String,

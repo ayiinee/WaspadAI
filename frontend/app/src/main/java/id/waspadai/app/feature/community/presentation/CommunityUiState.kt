@@ -2,6 +2,7 @@ package id.waspadai.app.feature.community.presentation
 
 import androidx.annotation.DrawableRes
 import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
+import id.waspadai.app.feature.community.domain.CommunityMedia
 
 enum class CommunityVerdict(val label: String) {
     Hoaks("Hoaks"),
@@ -25,6 +26,7 @@ data class CommunityPost(
     @DrawableRes val avatarRes: Int,
     @DrawableRes val evidenceRes: Int? = null,
     val imageUrl: String? = null,
+    val media: List<CommunityMedia> = emptyList(),
     val hoaksCount: Int = 0,
     val waspadaCount: Int = 0,
     val validCount: Int = 0,
