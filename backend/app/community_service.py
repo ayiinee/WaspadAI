@@ -20,9 +20,11 @@ from app.models import (
     CommunityBootstrap,
     CommunityDetail,
     CommunityItem,
+    CommunityMediaItem,
     CommunityPage,
     CommunityPreviewResponse,
     CommunityResponseItem,
+    CommunityResponseResult,
     CommunitySocialResult,
     CommunityPublishRequest,
     CommunityStateResponse,
@@ -48,7 +50,8 @@ async def list_community(
         query = await connection.execute(
             """
             select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
-                   (p.redacted_asset_id is not null) as has_image,
+                   (p.redacted_asset_id is not null or coalesce(jsonb_array_length(media.items), 0) > 0) as has_image,
+                   coalesce(media.items, '[]'::jsonb) as media,
                    coalesce(counts.hoaks, 0)::int as hoaks,
                    coalesce(counts.waspada, 0)::int as waspada,
                    coalesce(counts.valid, 0)::int as valid,
@@ -59,8 +62,19 @@ async def list_community(
                    coalesce(social.share_count, 0)::int as share_count,
                    coalesce(social.user_liked, false) as user_liked
               from public.community_posts p
+              join public.verification_results result on result.case_id = p.case_id
               left join public.community_votes own
                 on own.post_id = p.id and own.user_id = %s
+              left join lateral (
+                  select jsonb_agg(
+                      jsonb_build_object(
+                          'id', m.id, 'media_type', m.media_type,
+                          'position', m.sort_order, 'width', m.width, 'height', m.height
+                      ) order by m.sort_order
+                  ) as items
+                    from public.community_media m
+                   where m.community_id = p.id
+              ) media on true
               left join lateral (
                   select
                       count(*) filter (where v.vote = 'HOAKS') as hoaks,
@@ -202,7 +216,7 @@ async def submit_community_response(
     evidence_bytes: bytes | None,
     evidence_content_type: str | None,
     http_client: httpx.AsyncClient,
-) -> CommunityVoteResult:
+) -> CommunityResponseResult:
     normalized_reasoning = reasoning.strip()
     if len(normalized_reasoning) < 10:
         raise ProductAPIError(422, "VALIDATION_ERROR", "Alasan penilaian minimal 10 karakter.")
@@ -279,9 +293,15 @@ async def submit_community_response(
                 (old_row["evidence_asset_id"],),
             )
         row = await _fetch_vote_result_row(connection, case_id, user_id)
-    if row is None:
+        response_row = await _fetch_response_row(connection, post["post_id"], user_id)
+    if row is None or response_row is None:
         raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
-    return _vote_result(row)
+    return CommunityResponseResult(
+        case_id=case_id,
+        user_vote=request.vote,
+        counts=_counts(row),
+        response=_response_item(response_row),
+    )
 
 
 async def get_community_image(
@@ -303,6 +323,7 @@ async def get_community_image(
             """
             select asset.bucket, asset.object_path, asset.mime_type
               from public.community_posts p
+              join public.verification_results result on result.case_id = p.case_id
               join private.stored_assets asset on asset.id = p.redacted_asset_id
              where p.case_id = %s
                and p.withdrawn_at is null
@@ -350,6 +371,88 @@ async def get_community_image(
             "Storage menolak pembacaan gambar komunitas.",
             retryable=True,
         )
+    return response.content, asset["mime_type"]
+
+
+async def get_community_preview_media(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    case_id: UUID,
+    preview_id: UUID,
+    media_id: UUID,
+    http_client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Gambar preview belum dapat dimuat.", True)
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select asset.bucket, asset.object_path, asset.mime_type
+              from public.community_previews preview
+              join public.community_preview_media media on media.preview_id = preview.id
+              join private.stored_assets asset on asset.id = media.asset_id
+             where preview.id = %s and preview.case_id = %s and preview.user_id = %s
+               and media.id = %s and preview.state = 'READY'
+               and preview.expires_at > now() and asset.deleted_at is null
+            """,
+            (preview_id, case_id, user_id, media_id),
+        )
+        asset = await query.fetchone()
+    if asset is None:
+        raise ProductAPIError(404, "COMMUNITY_IMAGE_NOT_FOUND", "Gambar preview tidak ditemukan.")
+    return await _download_asset(settings, asset, http_client, "gambar preview")
+
+
+async def get_community_media(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    case_id: UUID,
+    media_id: UUID,
+    http_client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Gambar komunitas belum dapat dimuat.", True)
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select asset.bucket, asset.object_path, asset.mime_type
+              from public.community_posts post
+              join public.community_media media on media.community_id = post.id
+              join private.stored_assets asset on asset.id = media.asset_id
+             where post.case_id = %s and media.id = %s
+               and post.withdrawn_at is null
+               and post.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+               and post.publication_consent_id is not null
+               and asset.deleted_at is null
+            """,
+            (case_id, media_id),
+        )
+        asset = await query.fetchone()
+    if asset is None:
+        raise ProductAPIError(404, "COMMUNITY_IMAGE_NOT_FOUND", "Gambar komunitas tidak ditemukan.")
+
+    return await _download_asset(settings, asset, http_client, "gambar komunitas")
+
+
+async def _download_asset(
+    settings: Settings,
+    asset: DictRow,
+    http_client: httpx.AsyncClient,
+    label: str,
+) -> tuple[bytes, str]:
+    service_role_key = settings.supabase_service_role_key.get_secret_value()  # type: ignore[union-attr]
+    storage_url = f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{asset['bucket']}/{asset['object_path']}"  # type: ignore[union-attr]
+    try:
+        response = await http_client.get(
+            storage_url,
+            headers={"Authorization": f"Bearer {service_role_key}", "apikey": service_role_key},
+        )
+    except httpx.RequestError as error:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", f"{label.capitalize()} belum dapat dimuat.", True) from error
+    if response.is_error:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", f"Storage menolak pembacaan {label}.", True)
     return response.content, asset["mime_type"]
 
 
@@ -448,13 +551,8 @@ async def create_community_preview(
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
             """
-            select c.id, c.revision, c.headline, c.sanitized_text,
-                   asset.id as asset_id
+            select c.id, c.revision, c.headline, c.sanitized_text
               from public.verification_cases c
-              left join private.stored_assets asset
-                on asset.case_id = c.id
-               and asset.purpose = 'SCREENSHOT_OPT_IN'
-               and asset.deleted_at is null
              where c.id = %s and c.user_id = %s and c.deleted_at is null
                and c.community_state = 'PRIVATE'
             """,
@@ -463,6 +561,19 @@ async def create_community_preview(
         case = await query.fetchone()
         if case is None:
             raise ProductAPIError(404, "CASE_NOT_FOUND", "History tidak ditemukan.")
+        assets_query = await connection.execute(
+            """
+            select asset.id
+              from private.stored_assets asset
+             where asset.case_id = %s
+               and asset.purpose = 'SCREENSHOT_OPT_IN'
+               and asset.deleted_at is null
+             order by asset.created_at, asset.id
+             limit 4
+            """,
+            (case_id,),
+        )
+        assets = await assets_query.fetchall()
 
         redacted_text = (case["sanitized_text"] or case["headline"] or "").strip()
         if not redacted_text:
@@ -489,18 +600,37 @@ async def create_community_preview(
                 user_id,
                 case["revision"],
                 redacted_text,
-                case["asset_id"],
+                assets[0]["id"] if assets else None,
                 content_hash,
                 expires_at,
                 settings.preview_ttl_seconds,
             ),
         )
         row = await inserted.fetchone()
+        preview_media: list[CommunityMediaItem] = []
+        for position, asset in enumerate(assets):
+            media_insert = await connection.execute(
+                """
+                insert into public.community_preview_media(preview_id, asset_id, position)
+                values (%s, %s, %s)
+                returning id
+                """,
+                (preview_id, asset["id"], position),
+            )
+            media_row = await media_insert.fetchone()
+            preview_media.append(
+                CommunityMediaItem(
+                    id=media_row["id"],
+                    url=f"/api/v1/history/{case_id}/community-preview/{preview_id}/media/{media_row['id']}",
+                    position=position,
+                )
+            )
     return CommunityPreviewResponse(
         preview_id=preview_id,
         expires_at=_iso8601(row["expires_at"]),
         redacted_text=redacted_text,
         redacted_image_url=None,
+        media=preview_media,
         redactions=[],
         confirmation_required=True,
     )
@@ -567,12 +697,13 @@ async def publish_community_case(
                 rag_row = await rag.fetchone()
                 rag_consent_id = rag_row["id"]
 
-            await connection.execute(
+            inserted_post = await connection.execute(
                 """
                 insert into public.community_posts
                     (case_id, owner_id, preview_id, title, redacted_text, redacted_asset_id, status,
                      publication_consent_id, rag_consent_id, content_hash, revision)
                 values (%s, %s, %s, %s, %s, %s, 'PUBLISHED_UNVERIFIED', %s, %s, %s, %s)
+                returning id
                 """,
                 (
                     case_id,
@@ -587,6 +718,30 @@ async def publish_community_case(
                     preview["case_revision"],
                 ),
             )
+            post_row = await inserted_post.fetchone()
+            await connection.execute(
+                """
+                insert into public.community_media
+                    (community_id, asset_id, media_type, sort_order, width, height)
+                select %s, preview_media.asset_id, preview_media.media_type,
+                       preview_media.position, preview_media.width, preview_media.height
+                  from public.community_preview_media preview_media
+                 where preview_media.preview_id = %s
+                 order by preview_media.position
+                 limit 4
+                on conflict do nothing
+                """,
+                (post_row["id"], request.preview_id),
+            )
+            if preview["redacted_asset_id"] is not None:
+                await connection.execute(
+                    """
+                    insert into public.community_media(community_id, asset_id, sort_order)
+                    values (%s, %s, 0)
+                    on conflict do nothing
+                    """,
+                    (post_row["id"], preview["redacted_asset_id"]),
+                )
             updated = await connection.execute(
                 """
                 update public.verification_cases
@@ -631,6 +786,7 @@ async def withdraw_community_case(
             select p.id as post_id, p.status as post_status, p.publication_consent_id,
                    p.rag_consent_id, c.community_state, c.revision
               from public.community_posts p
+              join public.verification_results result on result.case_id = p.case_id
               join public.verification_cases c on c.id = p.case_id
              where p.case_id = %s and p.owner_id = %s and c.user_id = %s
                and c.deleted_at is null
@@ -700,7 +856,8 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
     query = await connection.execute(  # type: ignore[attr-defined]
         """
         select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
-               (p.redacted_asset_id is not null) as has_image,
+               (p.redacted_asset_id is not null or coalesce(jsonb_array_length(media.items), 0) > 0) as has_image,
+               coalesce(media.items, '[]'::jsonb) as media,
                r.result_json, r.execution_mode,
                coalesce(counts.hoaks, 0)::int as hoaks,
                coalesce(counts.waspada, 0)::int as waspada,
@@ -712,10 +869,21 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
                coalesce(social.share_count, 0)::int as share_count,
                coalesce(social.user_liked, false) as user_liked
           from public.community_posts p
+          join public.verification_results result on result.case_id = p.case_id
           join public.verification_cases c on c.id = p.case_id and c.deleted_at is null
           join public.verification_results r on r.case_id = p.case_id
           left join public.community_votes own
             on own.post_id = p.id and own.user_id = %s
+          left join lateral (
+              select jsonb_agg(
+                  jsonb_build_object(
+                      'id', m.id, 'media_type', m.media_type,
+                      'position', m.sort_order, 'width', m.width, 'height', m.height
+                  ) order by m.sort_order
+              ) as items
+                from public.community_media m
+               where m.community_id = p.id
+          ) media on true
           left join lateral (
               select
                   count(*) filter (where v.vote = 'HOAKS') as hoaks,
@@ -773,11 +941,30 @@ async def _fetch_response_rows(connection: object, case_id: UUID) -> list[DictRo
     return await query.fetchall()
 
 
+async def _fetch_response_row(
+    connection: object, post_id: UUID, user_id: UUID
+) -> DictRow | None:
+    query = await connection.execute(  # type: ignore[attr-defined]
+        """
+        select v.user_id as response_id,
+               coalesce(nullif(btrim(profile.display_name), ''), 'Pengguna WaspadAI') as author,
+               v.created_at, v.vote, v.reasoning,
+               (v.evidence_asset_id is not null) as has_image
+          from public.community_votes v
+          left join public.profiles profile on profile.id = v.user_id
+         where v.post_id = %s and v.user_id = %s
+        """,
+        (post_id, user_id),
+    )
+    return await query.fetchone()
+
+
 async def _fetch_vote_target(connection: object, case_id: UUID) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
         select p.id as post_id, p.owner_id
           from public.community_posts p
+          join public.verification_results result on result.case_id = p.case_id
          where p.case_id = %s
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
@@ -805,6 +992,7 @@ async def _fetch_vote_result_row(
                count(*) filter (where v.vote = 'WASPADA')::int as waspada,
                count(*) filter (where v.vote = 'VALID')::int as valid
           from public.community_posts p
+          join public.verification_results result on result.case_id = p.case_id
           left join public.community_votes v on v.post_id = p.id
           left join public.community_votes own
             on own.post_id = p.id and own.user_id = %s
@@ -831,6 +1019,7 @@ def _require_vote_target(row: DictRow | None, user_id: UUID) -> None:
 
 
 def _community_item(row: DictRow) -> CommunityItem:
+    media = _community_media(row["case_id"], row)
     return CommunityItem(
         case_id=row["case_id"],
         title=row["title"],
@@ -838,6 +1027,8 @@ def _community_item(row: DictRow) -> CommunityItem:
         status=row["status"],
         published_at=_iso8601(row["published_at"]),
         has_image=bool(row["has_image"]),
+        image_url=media[0].url if media else None,
+        media=media,
         counts=_counts(row),
         user_vote=row["user_vote"],
         like_count=row["like_count"],
@@ -849,6 +1040,7 @@ def _community_item(row: DictRow) -> CommunityItem:
 
 
 def _community_detail(row: DictRow, response_rows: list[DictRow]) -> CommunityDetail:
+    media = _community_media(row["case_id"], row)
     return CommunityDetail(
         case_id=row["case_id"],
         title=row["title"],
@@ -856,6 +1048,8 @@ def _community_detail(row: DictRow, response_rows: list[DictRow]) -> CommunityDe
         status=row["status"],
         published_at=_iso8601(row["published_at"]),
         has_image=bool(row["has_image"]),
+        image_url=media[0].url if media else None,
+        media=media,
         counts=_counts(row),
         user_vote=row["user_vote"],
         result=AIResult.model_validate(row["result_json"]),
@@ -865,18 +1059,36 @@ def _community_detail(row: DictRow, response_rows: list[DictRow]) -> CommunityDe
         comment_count=row["comment_count"],
         share_count=row["share_count"],
         user_liked=bool(row["user_liked"]),
-        responses=[
-            CommunityResponseItem(
-                response_id=response["response_id"],
-                author=response["author"],
-                created_at=_iso8601(response["created_at"]),
-                vote=response["vote"],
-                reasoning=response["reasoning"] or "Penilaian komunitas tersimpan.",
-                has_image=bool(response["has_image"]),
-            )
-            for response in response_rows
-        ],
+        responses=[_response_item(response) for response in response_rows],
     )
+
+
+def _response_item(row: DictRow) -> CommunityResponseItem:
+    return CommunityResponseItem(
+        response_id=row["response_id"],
+        author=row["author"],
+        created_at=_iso8601(row["created_at"]),
+        vote=row["vote"],
+        reasoning=row["reasoning"] or "Penilaian komunitas tersimpan.",
+        has_image=bool(row["has_image"]),
+    )
+
+
+def _community_media(case_id: UUID, row: DictRow) -> list[CommunityMediaItem]:
+    raw_media = row.get("media") or []
+    items = [
+        CommunityMediaItem(
+            id=item["id"],
+            media_type=item.get("media_type", "IMAGE"),
+            url=f"/api/v1/community/{case_id}/media/{item['id']}",
+            thumbnail_url=None,
+            width=item.get("width"),
+            height=item.get("height"),
+            position=item.get("position", index),
+        )
+        for index, item in enumerate(raw_media[:4])
+    ]
+    return sorted(items, key=lambda item: item.position)
 
 
 async def like_community(
@@ -937,13 +1149,15 @@ async def record_community_share(
             (post["post_id"], user_id),
         )
         row = await _fetch_social_row(connection, user_id, case_id)
-    return _social_result(row, case_id, share_url=f"/community/{case_id}")
+    share_url = f"{settings.public_base_url.rstrip('/')}/community/{case_id}"
+    return _social_result(row, case_id, share_url=share_url)
 
 
 async def _fetch_social_target(connection: object, case_id: UUID) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """select p.id as post_id
              from public.community_posts p
+             join public.verification_results result on result.case_id = p.case_id
             where p.case_id = %s
               and p.withdrawn_at is null
               and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
@@ -972,6 +1186,7 @@ async def _fetch_social_row(
                     (select count(*) from public.community_votes v where v.post_id = p.id)::int as comment_count,
                     (select count(*) from public.community_shares s where s.post_id = p.id)::int as share_count
                from public.community_posts p
+              join public.verification_results result on result.case_id = p.case_id
               where p.case_id = %s
                 and p.withdrawn_at is null
                 and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')

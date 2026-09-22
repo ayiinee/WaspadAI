@@ -34,16 +34,29 @@ async def get_current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing bearer token")
     settings: Settings = request.app.state.settings
+    return await authenticate_access_token(
+        settings,
+        request.app.state.auth_client,
+        credentials.credentials,
+    )
+
+
+async def authenticate_access_token(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    access_token: str,
+) -> AuthenticatedUser:
+    """Validate an access token for HTTP and WebSocket transports."""
+
     if settings.supabase_auth_mode != "get_user" or not settings.supabase_auth_is_configured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="auth unavailable",
         )
-    client: httpx.AsyncClient = request.app.state.auth_client
     auth_url = f"{settings.supabase_url.rstrip('/')}/auth/v1/user"
     headers = {
         "apikey": settings.supabase_publishable_key.get_secret_value(),
-        "authorization": f"Bearer {credentials.credentials}",
+        "authorization": f"Bearer {access_token}",
     }
     for attempt in range(_AUTH_REQUEST_ATTEMPTS):
         try:

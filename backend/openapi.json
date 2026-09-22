@@ -55,6 +55,49 @@
         }
       }
     },
+    "/community/{case_id}": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Community Share Page",
+        "operationId": "community_share_page_community__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/verifications/text": {
       "post": {
         "tags": [
@@ -540,6 +583,318 @@
         }
       }
     },
+    "/api/v1/community/{case_id}/media/{media_id}": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Get Community Media Endpoint",
+        "operationId": "get_community_media_endpoint_api_v1_community__case_id__media__media_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/history/{case_id}/community-preview/{preview_id}/media/{media_id}": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Get Community Preview Media Endpoint",
+        "operationId": "get_community_preview_media_endpoint_api_v1_history__case_id__community_preview__preview_id__media__media_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "preview_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Preview Id"
+            }
+          },
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/{case_id}/like": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Like Community Endpoint",
+        "operationId": "like_community_endpoint_api_v1_community__case_id__like_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunitySocialResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Unlike Community Endpoint",
+        "operationId": "unlike_community_endpoint_api_v1_community__case_id__like_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunitySocialResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/{case_id}/seen": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Record Community View Endpoint",
+        "operationId": "record_community_view_endpoint_api_v1_community__case_id__seen_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunitySocialResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/{case_id}/share": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Record Community Share Endpoint",
+        "operationId": "record_community_share_endpoint_api_v1_community__case_id__share_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunitySocialResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/community/{case_id}/responses/{response_user_id}/image": {
       "get": {
         "tags": [
@@ -892,7 +1247,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommunityVoteResult"
+                  "$ref": "#/components/schemas/CommunityResponseResult"
                 }
               }
             }
@@ -1556,6 +1911,25 @@
             "title": "Has Image",
             "default": false
           },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/CommunityMediaItem"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Media"
+          },
           "counts": {
             "$ref": "#/components/schemas/CommunityVoteCounts"
           },
@@ -1592,6 +1966,35 @@
             },
             "type": "array",
             "title": "Responses"
+          },
+          "like_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Like Count",
+            "default": 0
+          },
+          "view_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "View Count",
+            "default": 0
+          },
+          "comment_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Comment Count",
+            "default": 0
+          },
+          "share_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Share Count",
+            "default": 0
+          },
+          "user_liked": {
+            "type": "boolean",
+            "title": "User Liked",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -1641,6 +2044,25 @@
             "title": "Has Image",
             "default": false
           },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/CommunityMediaItem"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Media"
+          },
           "counts": {
             "$ref": "#/components/schemas/CommunityVoteCounts"
           },
@@ -1659,6 +2081,35 @@
               }
             ],
             "title": "User Vote"
+          },
+          "like_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Like Count",
+            "default": 0
+          },
+          "view_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "View Count",
+            "default": 0
+          },
+          "comment_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Comment Count",
+            "default": 0
+          },
+          "share_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Share Count",
+            "default": 0
+          },
+          "user_liked": {
+            "type": "boolean",
+            "title": "User Liked",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -1672,6 +2123,74 @@
           "counts"
         ],
         "title": "CommunityItem"
+      },
+      "CommunityMediaItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "media_type": {
+            "type": "string",
+            "const": "IMAGE",
+            "title": "Media Type",
+            "default": "IMAGE"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "position": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "position"
+        ],
+        "title": "CommunityMediaItem"
       },
       "CommunityPage": {
         "properties": {
@@ -1727,6 +2246,14 @@
               }
             ],
             "title": "Redacted Image Url"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/CommunityMediaItem"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Media"
           },
           "redactions": {
             "items": {
@@ -1823,6 +2350,94 @@
           "reasoning"
         ],
         "title": "CommunityResponseItem"
+      },
+      "CommunityResponseResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "user_vote": {
+            "type": "string",
+            "enum": [
+              "HOAKS",
+              "WASPADA",
+              "VALID"
+            ],
+            "title": "User Vote"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CommunityVoteCounts"
+          },
+          "response": {
+            "$ref": "#/components/schemas/CommunityResponseItem"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "user_vote",
+          "counts",
+          "response"
+        ],
+        "title": "CommunityResponseResult"
+      },
+      "CommunitySocialResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "liked": {
+            "type": "boolean",
+            "title": "Liked"
+          },
+          "like_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Like Count"
+          },
+          "view_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "View Count"
+          },
+          "comment_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Comment Count"
+          },
+          "share_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Share Count"
+          },
+          "share_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "liked",
+          "like_count",
+          "view_count",
+          "comment_count",
+          "share_count"
+        ],
+        "title": "CommunitySocialResult"
       },
       "CommunityStateResponse": {
         "properties": {

@@ -18,18 +18,23 @@ from fastapi import (
     Query,
     Request,
     UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
     status,
 )
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
-from app.auth import AuthenticatedUser, get_current_user
+from app.auth import AuthenticatedUser, authenticate_access_token, get_current_user
+from app.community_realtime import CommunityConnectionManager
 from app.community_service import (
     cast_community_vote,
     create_community_preview,
     get_community_bootstrap,
     get_community_detail,
     get_community_image,
+    get_community_media,
+    get_community_preview_media,
     get_community_response_image,
     get_community_user_summary,
     like_community,
@@ -61,6 +66,7 @@ from app.models import (
     CommunityPage,
     CommunityPreviewResponse,
     CommunityPublishRequest,
+    CommunityResponseResult,
     CommunitySocialResult,
     CommunityStateResponse,
     CommunityUserSummary,
@@ -126,6 +132,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="WaspadAI Product API", version="0.1.0", lifespan=lifespan)
+    community_connections = CommunityConnectionManager()
 
     @app.middleware("http")
     async def attach_request_id(request: Request, call_next: object) -> object:
@@ -175,6 +182,37 @@ def create_app() -> FastAPI:
                 detail="database unavailable",
             ) from error
         return {"status": "ready"}
+
+    @app.get("/community/{case_id}", tags=["Community"], response_class=HTMLResponse)
+    async def community_share_page(case_id: UUID) -> HTMLResponse:
+        deep_link = f"waspadai://community/{case_id}"
+        return HTMLResponse(
+            "<!doctype html><html lang='id'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Kasus Komunitas WaspadAI</title></head><body>"
+            "<h1>Kasus Komunitas WaspadAI</h1>"
+            f"<p><a href='{deep_link}'>Buka kasus di aplikasi WaspadAI</a></p>"
+            f"<script>location.href='{deep_link}'</script></body></html>",
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+
+    @app.websocket("/api/v1/community/ws")
+    async def community_websocket(websocket: WebSocket, access_token: str = Query(...)) -> None:
+        try:
+            await authenticate_access_token(
+                app.state.settings,
+                app.state.auth_client,
+                access_token,
+            )
+        except HTTPException:
+            await websocket.close(code=4401)
+            return
+        await community_connections.connect(websocket)
+        try:
+            while True:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            await community_connections.disconnect(websocket)
 
     @app.post(
         "/api/v1/verifications/text",
@@ -375,6 +413,46 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "private, max-age=60"},
         )
 
+    @app.get("/api/v1/community/{case_id}/media/{media_id}", tags=["Community"])
+    async def get_community_media_endpoint(
+        case_id: UUID,
+        media_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        content, content_type = await get_community_media(
+            pool, app.state.settings, user.id, case_id, media_id, app.state.http_client
+        )
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "private, max-age=86400, immutable"},
+        )
+
+    @app.get(
+        "/api/v1/history/{case_id}/community-preview/{preview_id}/media/{media_id}",
+        tags=["Community"],
+    )
+    async def get_community_preview_media_endpoint(
+        case_id: UUID,
+        preview_id: UUID,
+        media_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        content, content_type = await get_community_preview_media(
+            pool, app.state.settings, user.id, case_id, preview_id, media_id, app.state.http_client
+        )
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "private, max-age=60"},
+        )
+
     @app.post("/api/v1/community/{case_id}/like", tags=["Community"], response_model=CommunitySocialResult)
     async def like_community_endpoint(
         case_id: UUID,
@@ -383,7 +461,9 @@ def create_app() -> FastAPI:
         pool = app.state.db_pool
         if pool is None:
             raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
-        return await like_community(pool, app.state.settings, user.id, case_id)
+        result = await like_community(pool, app.state.settings, user.id, case_id)
+        await community_connections.broadcast(_social_event("community.like.updated", result))
+        return result
 
     @app.delete("/api/v1/community/{case_id}/like", tags=["Community"], response_model=CommunitySocialResult)
     async def unlike_community_endpoint(
@@ -393,7 +473,9 @@ def create_app() -> FastAPI:
         pool = app.state.db_pool
         if pool is None:
             raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
-        return await unlike_community(pool, app.state.settings, user.id, case_id)
+        result = await unlike_community(pool, app.state.settings, user.id, case_id)
+        await community_connections.broadcast(_social_event("community.like.updated", result))
+        return result
 
     @app.post("/api/v1/community/{case_id}/seen", tags=["Community"], response_model=CommunitySocialResult)
     async def record_community_view_endpoint(
@@ -403,7 +485,9 @@ def create_app() -> FastAPI:
         pool = app.state.db_pool
         if pool is None:
             raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
-        return await record_community_view(pool, app.state.settings, user.id, case_id)
+        result = await record_community_view(pool, app.state.settings, user.id, case_id)
+        await community_connections.broadcast(_social_event("community.view.updated", result))
+        return result
 
     @app.post("/api/v1/community/{case_id}/share", tags=["Community"], response_model=CommunitySocialResult)
     async def record_community_share_endpoint(
@@ -413,7 +497,9 @@ def create_app() -> FastAPI:
         pool = app.state.db_pool
         if pool is None:
             raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
-        return await record_community_share(pool, app.state.settings, user.id, case_id)
+        result = await record_community_share(pool, app.state.settings, user.id, case_id)
+        await community_connections.broadcast(_social_event("community.share.updated", result))
+        return result
 
     @app.get("/api/v1/community/{case_id}/responses/{response_user_id}/image", tags=["Community"])
     async def get_community_response_image_endpoint(
@@ -471,7 +557,11 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await publish_community_case(pool, app.state.settings, user.id, case_id, payload)
+        result = await publish_community_case(pool, app.state.settings, user.id, case_id, payload)
+        await community_connections.broadcast(
+            {"type": "community.created", "community_id": str(case_id), "payload": {}}
+        )
+        return result
 
     @app.delete(
         "/api/v1/history/{case_id}/community",
@@ -525,7 +615,7 @@ def create_app() -> FastAPI:
     @app.post(
         "/api/v1/community/{case_id}/response",
         tags=["Community"],
-        response_model=CommunityVoteResult,
+        response_model=CommunityResponseResult,
     )
     async def submit_community_response_endpoint(
         case_id: UUID,
@@ -533,7 +623,7 @@ def create_app() -> FastAPI:
         reasoning: str = Form(..., min_length=10, max_length=5000),
         evidence: UploadFile | None = File(default=None),
         user: AuthenticatedUser = Depends(get_current_user),
-    ) -> CommunityVoteResult:
+    ) -> CommunityResponseResult:
         evidence_bytes: bytes | None = None
         evidence_content_type: str | None = None
         if evidence is not None:
@@ -557,7 +647,7 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await submit_community_response(
+        result = await submit_community_response(
             pool,
             app.state.settings,
             user.id,
@@ -568,6 +658,21 @@ def create_app() -> FastAPI:
             evidence_content_type,
             app.state.http_client,
         )
+        event = {
+            "type": "community.response.created",
+            "community_id": str(case_id),
+            "payload": {
+                "hoaks_count": result.counts.HOAKS,
+                "waspada_count": result.counts.WASPADA,
+                "valid_count": result.counts.VALID,
+                "response": result.response.model_dump(mode="json"),
+            },
+        }
+        await community_connections.broadcast(event)
+        await community_connections.broadcast(
+            {**event, "type": "community.poll.updated", "payload": {k: v for k, v in event["payload"].items() if k != "response"}}
+        )
+        return result
 
     @app.get(
         "/api/v1/learning/modules",
@@ -697,6 +802,19 @@ app = create_app()
 
 def _request_id(request: Request) -> str:
     return getattr(request.state, "request_id", str(uuid4()))
+
+
+def _social_event(event_type: str, result: CommunitySocialResult) -> dict[str, object]:
+    return {
+        "type": event_type,
+        "community_id": str(result.case_id),
+        "payload": {
+            "like_count": result.like_count,
+            "view_count": result.view_count,
+            "comment_count": result.comment_count,
+            "share_count": result.share_count,
+        },
+    }
 
 
 def _retry_after_header(retry_after_seconds: int | None) -> dict[str, str] | None:

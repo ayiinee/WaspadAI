@@ -186,6 +186,18 @@ class CommunityVoteCounts(BaseModel):
     VALID: int = Field(default=0, ge=0)
 
 
+class CommunityMediaItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    media_type: Literal["IMAGE"] = "IMAGE"
+    url: str
+    thumbnail_url: str | None = None
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+    position: int = Field(ge=0, le=3)
+
+
 class CommunityItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -195,6 +207,8 @@ class CommunityItem(BaseModel):
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
     published_at: str
     has_image: bool = False
+    image_url: str | None = None
+    media: list[CommunityMediaItem] = Field(default_factory=list, max_length=4)
     counts: CommunityVoteCounts
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None = None
     like_count: int = Field(default=0, ge=0)
@@ -235,6 +249,8 @@ class CommunityDetail(BaseModel):
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
     published_at: str
     has_image: bool = False
+    image_url: str | None = None
+    media: list[CommunityMediaItem] = Field(default_factory=list, max_length=4)
     counts: CommunityVoteCounts
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
     result: AIResult
@@ -266,6 +282,15 @@ class CommunityVoteResult(BaseModel):
     counts: CommunityVoteCounts
 
 
+class CommunityResponseResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    user_vote: Literal["HOAKS", "WASPADA", "VALID"]
+    counts: CommunityVoteCounts
+    response: CommunityResponseItem
+
+
 class CommunitySocialResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -285,6 +310,7 @@ class CommunityPreviewResponse(BaseModel):
     expires_at: str
     redacted_text: str
     redacted_image_url: str | None
+    media: list[CommunityMediaItem] = Field(default_factory=list, max_length=4)
     redactions: list[str]
     confirmation_required: Literal[True] = True
 

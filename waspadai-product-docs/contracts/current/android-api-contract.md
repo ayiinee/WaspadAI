@@ -460,6 +460,31 @@ POST   /api/v1/community/{case_id}/vote
 DELETE /api/v1/community/{case_id}/vote
 ```
 
+Feed dan detail memakai `media` sebagai struktur gambar kanonik (maksimal empat,
+berurutan berdasarkan `position`). `has_image` dan `image_url` tetap tersedia
+sementara untuk kompatibilitas client single-image lama.
+
+```json
+{
+  "has_image": true,
+  "image_url": "/api/v1/community/<case_id>/media/<media_id>",
+  "media": [
+    {
+      "id": "<media_id>",
+      "media_type": "IMAGE",
+      "url": "/api/v1/community/<case_id>/media/<media_id>",
+      "thumbnail_url": null,
+      "width": 1080,
+      "height": 1350,
+      "position": 0
+    }
+  ]
+}
+```
+
+URL media memerlukan bearer token yang sama dengan feed. Client harus memakai
+`id + url` sebagai cache identity dan tidak menambahkan cache-busting query.
+
 Vote request:
 
 ```json

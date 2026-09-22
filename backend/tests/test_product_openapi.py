@@ -23,6 +23,7 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert "/api/v1/community" in specification["paths"]
     assert "/api/v1/community/me/summary" in specification["paths"]
     assert "/api/v1/community/{case_id}" in specification["paths"]
+    assert "/api/v1/community/{case_id}/media/{media_id}" in specification["paths"]
     assert "/api/v1/history/{case_id}/community-preview" in specification["paths"]
     assert "/api/v1/history/{case_id}/community" in specification["paths"]
     assert "/api/v1/learning/modules" in specification["paths"]
