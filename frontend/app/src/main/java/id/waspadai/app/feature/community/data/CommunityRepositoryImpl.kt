@@ -6,6 +6,9 @@ import id.waspadai.app.feature.community.data.dto.CommunityDetailDto
 import id.waspadai.app.feature.community.data.dto.CommunityItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityPageDto
 import id.waspadai.app.feature.community.data.dto.CommunityPreviewDto
+import id.waspadai.app.feature.community.data.dto.CommunityRealtimeEventDto
+import id.waspadai.app.feature.community.data.dto.CommunityResponseItemDto
+import id.waspadai.app.feature.community.data.dto.CommunityResponseResultDto
 import id.waspadai.app.feature.community.data.dto.CommunityPublishRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityStateDto
 import id.waspadai.app.feature.community.data.dto.CommunityUserSummaryDto
@@ -26,9 +29,12 @@ import id.waspadai.app.feature.community.domain.CommunityVote
 import id.waspadai.app.feature.community.domain.CommunityVoteCounts
 import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
 import id.waspadai.app.feature.community.domain.CommunitySocialUpdate
+import id.waspadai.app.feature.community.domain.CommunityRealtimeEvent
+import id.waspadai.app.feature.community.domain.CommunityResponseUpdate
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.client.request.accept
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -44,11 +50,20 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Headers
 import io.ktor.http.isSuccess
+import io.ktor.http.takeFrom
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readText
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -213,7 +228,7 @@ class CommunityRepositoryImpl(
         evidenceBytes: ByteArray?,
         evidenceFileName: String?,
         evidenceContentType: String?,
-    ): AppResult<CommunityVoteUpdate> = runCommunityRequest {
+    ): AppResult<CommunityResponseUpdate> = runCommunityRequest {
         val response = client.post("${baseUrl.normalized()}/api/v1/community/$caseId/response") {
             headers { append(HttpHeaders.Authorization, "Bearer ${accessToken.trim()}") }
             accept(ContentType.Application.Json)
@@ -242,7 +257,7 @@ class CommunityRepositoryImpl(
         if (!response.status.isSuccess()) {
             throw CommunityApiException(response.status, response.safeError())
         }
-        response.body<CommunityVoteResultDto>().toDomain()
+        response.body<CommunityResponseResultDto>().toDomain()
     }.also { result ->
         if (result is AppResult.Success) invalidateCommunityCache()
     }
@@ -274,6 +289,35 @@ class CommunityRepositoryImpl(
 
     override suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
         socialRequest("${baseUrl.normalized()}/api/v1/community/$caseId/share", accessToken, false)
+
+    override fun observeCommunityEvents(baseUrl: String, accessToken: String): Flow<CommunityRealtimeEvent> = flow {
+        val socketUrl = baseUrl.normalized()
+            .replaceFirst("https://", "wss://")
+            .replaceFirst("http://", "ws://") + "/api/v1/community/ws"
+        while (currentCoroutineContext().isActive) {
+            try {
+                val session = client.webSocketSession {
+                    url {
+                        takeFrom(socketUrl)
+                        parameters.append("access_token", accessToken.trim())
+                    }
+                }
+                try {
+                    for (frame in session.incoming) {
+                        if (frame is Frame.Text) {
+                            emit(Json.decodeFromString<CommunityRealtimeEventDto>(frame.readText()).toDomain())
+                        }
+                    }
+                } finally {
+                    session.close()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                delay(2_000)
+            }
+        }
+    }
 
     private suspend fun socialRequest(url: String, accessToken: String, delete: Boolean): AppResult<CommunitySocialUpdate> = runCommunityRequest {
         val response = if (delete) client.delete(url) { authorize(accessToken) } else client.post(url) { authorize(accessToken) }
@@ -416,6 +460,39 @@ private fun CommunityPreviewDto.toDomain(): CommunityPreview = CommunityPreview(
     redactedText = redactedText,
     redactedImageUrl = redactedImageUrl,
     redactions = redactions,
+)
+
+private fun CommunityResponseResultDto.toDomain(): CommunityResponseUpdate = CommunityResponseUpdate(
+    caseId = caseId,
+    userVote = userVote.toVoteOrNull() ?: CommunityVote.Valid,
+    counts = counts.toDomain(),
+    response = response.toDomain(),
+)
+
+private fun CommunityRealtimeEventDto.toDomain(): CommunityRealtimeEvent = CommunityRealtimeEvent(
+    type = type,
+    communityId = communityId,
+    likeCount = payload.likeCount,
+    viewCount = payload.viewCount,
+    commentCount = payload.commentCount,
+    shareCount = payload.shareCount,
+    counts = if (payload.hoaksCount != null || payload.waspadaCount != null || payload.validCount != null) {
+        CommunityVoteCounts(
+            hoaks = payload.hoaksCount ?: 0,
+            waspada = payload.waspadaCount ?: 0,
+            valid = payload.validCount ?: 0,
+        )
+    } else null,
+    response = payload.response?.toDomain(),
+)
+
+private fun CommunityResponseItemDto.toDomain(): CommunityResponseItem = CommunityResponseItem(
+    responseId = responseId,
+    author = author,
+    createdAt = createdAt,
+    vote = vote.toVoteOrNull() ?: CommunityVote.Valid,
+    reasoning = reasoning,
+    hasImage = hasImage,
 )
 
 private fun CommunityDetailDto.toDomain(): CommunityDetailSnapshot = CommunityDetailSnapshot(

@@ -14,10 +14,12 @@ import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
 import id.waspadai.app.feature.community.domain.CommunityVoteCounts
 import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
+import id.waspadai.app.feature.community.domain.CommunityResponseUpdate
 import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -39,6 +41,8 @@ class CommunityViewModel(
         )
     )
     val uiState: StateFlow<CommunityUiState> = _uiState.asStateFlow()
+    private var realtimeJob: Job? = null
+    private var realtimeKey: String? = null
 
     fun onAction(action: CommunityAction) {
         when (action) {
@@ -159,6 +163,7 @@ class CommunityViewModel(
                 )
             }
             doLoadCommunity(baseUrl, token, forceRefresh)
+            startRealtime(baseUrl, token)
         }
     }
 
@@ -310,7 +315,7 @@ class CommunityViewModel(
                 )
             ) {
                 is AppResult.Success -> {
-                    applyVoteUpdate(result.value)
+                    applyResponseUpdate(result.value)
                     _uiState.update {
                         it.copy(
                             responseSubmittingPostId = null,
@@ -337,7 +342,20 @@ class CommunityViewModel(
         val post = current.posts.firstOrNull { it.id == postId } ?: return
         val baseUrl = current.baseUrlDraft.trim()
         val accessToken = current.accessTokenDraft.trim()
-        _uiState.update { it.copy(isVoteSubmitting = true, backendMessage = "Memperbarui like...") }
+        if (current.isVoteSubmitting) return
+        val previousLiked = post.isSupported
+        val previousCount = post.likeCount
+        val optimisticLiked = !previousLiked
+        val optimisticCount = (previousCount + if (optimisticLiked) 1 else -1).coerceAtLeast(0)
+        _uiState.update {
+            it.copy(
+                isVoteSubmitting = true,
+                backendMessage = "Memperbarui like...",
+                posts = it.posts.map { item ->
+                    if (item.id == postId) item.copy(isSupported = optimisticLiked, likeCount = optimisticCount) else item
+                },
+            )
+        }
         viewModelScope.launch {
             val result = if (post.isSupported) {
                 communityRepository.unlikeCommunity(baseUrl, accessToken, postId)
@@ -347,7 +365,14 @@ class CommunityViewModel(
             when (result) {
                 is AppResult.Success -> applySocialUpdate(result.value)
                 is AppResult.Failure -> _uiState.update {
-                    it.copy(isVoteSubmitting = false, backendPhase = CommunityBackendPhase.Failure, backendMessage = result.message)
+                    it.copy(
+                        isVoteSubmitting = false,
+                        backendPhase = CommunityBackendPhase.Failure,
+                        backendMessage = result.message,
+                        posts = it.posts.map { item ->
+                            if (item.id == postId) item.copy(isSupported = previousLiked, likeCount = previousCount) else item
+                        },
+                    )
                 }
             }
         }
@@ -411,6 +436,32 @@ class CommunityViewModel(
         }
     }
 
+    private fun applyResponseUpdate(update: CommunityResponseUpdate) {
+        _uiState.update { state ->
+            val detail = state.detailByPostId[update.caseId]
+            val selected = update.userVote.toPresentation()
+            state.copy(
+                backendPhase = CommunityBackendPhase.Connected,
+                backendMessage = "Tanggapan tersimpan. Polling diperbarui.",
+                posts = state.posts.map { item ->
+                    if (item.id == update.caseId) item.withBackendVote(update.counts, selected) else item
+                },
+                detailByPostId = if (detail == null) {
+                    state.detailByPostId
+                } else {
+                    state.detailByPostId + (update.caseId to detail.copy(
+                        counts = update.counts,
+                        userVote = update.userVote,
+                        commentCount = (detail.commentCount + 1).coerceAtLeast(1),
+                        responses = (detail.responses
+                            .filterNot { it.responseId == update.response.responseId } + update.response)
+                            .sortedByDescending { it.createdAt },
+                    ))
+                },
+            )
+        }
+    }
+
     private fun applySocialUpdate(update: id.waspadai.app.feature.community.domain.CommunitySocialUpdate) {
         _uiState.update { state ->
             state.copy(
@@ -428,6 +479,55 @@ class CommunityViewModel(
                 },
             )
         }
+    }
+
+    private fun startRealtime(baseUrl: String, accessToken: String) {
+        val key = "${baseUrl.trimEnd('/')}:$accessToken"
+        if (realtimeKey == key) return
+        realtimeJob?.cancel()
+        realtimeKey = key
+        val communityRepository = repository ?: return
+        realtimeJob = viewModelScope.launch {
+            communityRepository.observeCommunityEvents(baseUrl, accessToken).collect { event ->
+                applyRealtimeEvent(event)
+            }
+        }
+    }
+
+    private fun applyRealtimeEvent(event: id.waspadai.app.feature.community.domain.CommunityRealtimeEvent) {
+        _uiState.update { state ->
+            state.copy(
+                posts = state.posts.map { post ->
+                    if (post.id != event.communityId) post else post.copy(
+                        likeCount = event.likeCount ?: post.likeCount,
+                        viewCount = event.viewCount ?: post.viewCount,
+                        commentCount = event.commentCount ?: post.commentCount,
+                        shareCount = event.shareCount ?: post.shareCount,
+                        hoaksCount = event.counts?.hoaks ?: post.hoaksCount,
+                        waspadaCount = event.counts?.waspada ?: post.waspadaCount,
+                        validCount = event.counts?.valid ?: post.validCount,
+                    )
+                },
+                detailByPostId = state.detailByPostId.mapValues { (id, detail) ->
+                    if (id != event.communityId) detail else detail.copy(
+                        likeCount = event.likeCount ?: detail.likeCount,
+                        viewCount = event.viewCount ?: detail.viewCount,
+                        commentCount = event.commentCount ?: detail.commentCount,
+                        shareCount = event.shareCount ?: detail.shareCount,
+                        counts = event.counts ?: detail.counts,
+                        responses = event.response?.let { response ->
+                            (detail.responses.filterNot { it.responseId == response.responseId } + response)
+                                .sortedByDescending { it.createdAt }
+                        } ?: detail.responses,
+                    )
+                },
+            )
+        }
+    }
+
+    override fun onCleared() {
+        realtimeJob?.cancel()
+        super.onCleared()
     }
 
     private fun updatePost(

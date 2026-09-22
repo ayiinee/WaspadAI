@@ -52,6 +52,33 @@ data class CommunityVoteResultDto(
 )
 
 @Serializable
+data class CommunityResponseResultDto(
+    @SerialName("case_id") val caseId: String = "",
+    @SerialName("user_vote") val userVote: String = "VALID",
+    val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),
+    val response: CommunityResponseItemDto = CommunityResponseItemDto(),
+)
+
+@Serializable
+data class CommunityRealtimeEventDto(
+    val type: String = "",
+    @SerialName("community_id") val communityId: String = "",
+    val payload: CommunityRealtimePayloadDto = CommunityRealtimePayloadDto(),
+)
+
+@Serializable
+data class CommunityRealtimePayloadDto(
+    @SerialName("like_count") val likeCount: Int? = null,
+    @SerialName("view_count") val viewCount: Int? = null,
+    @SerialName("comment_count") val commentCount: Int? = null,
+    @SerialName("share_count") val shareCount: Int? = null,
+    @SerialName("hoaks_count") val hoaksCount: Int? = null,
+    @SerialName("waspada_count") val waspadaCount: Int? = null,
+    @SerialName("valid_count") val validCount: Int? = null,
+    val response: CommunityResponseItemDto? = null,
+)
+
+@Serializable
 data class CommunityDetailDto(
     @SerialName("case_id") val caseId: String = "",
     val counts: CommunityVoteCountsDto = CommunityVoteCountsDto(),

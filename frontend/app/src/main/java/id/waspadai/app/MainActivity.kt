@@ -42,16 +42,19 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         val app = application as WaspadAIApplication
+        val sharedCaseId = intent?.data
+            ?.takeIf { it.scheme == "waspadai" && it.host == "community" }
+            ?.lastPathSegment
         setContent {
             WaspadAITheme {
-                WaspadAiApp(app)
+                WaspadAiApp(app, sharedCaseId)
             }
         }
     }
 }
 
 @Composable
-private fun WaspadAiApp(app: WaspadAIApplication) {
+private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -111,7 +114,7 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                     }
                 },
                 onAuthenticated = {
-                    navController.navigate(VerificationRouteName) {
+                    navController.navigate(if (sharedCaseId != null) CommunityRouteName else VerificationRouteName) {
                         popUpTo(WelcomeRouteName) { inclusive = true }
                     }
                 },
@@ -144,6 +147,7 @@ private fun WaspadAiApp(app: WaspadAIApplication) {
                 defaultAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
                 onBack = { navController.popBackStack() },
                 viewModel = communityViewModel,
+                initialPostId = sharedCaseId,
                 onDestinationSelected = navigateToTopLevel,
             )
         }

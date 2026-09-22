@@ -131,6 +131,7 @@ fun CommunityRoute(
     defaultAccessToken: String,
     onBack: () -> Unit,
     onDestinationSelected: (String) -> Unit = {},
+    initialPostId: String? = null,
     viewModel: CommunityViewModel = viewModel(
         factory = CommunityViewModel.Factory(
             repository = repository,
@@ -143,7 +144,7 @@ fun CommunityRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var selectedPostId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedPostId by rememberSaveable { mutableStateOf(initialPostId) }
     val selectedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
 
     // Trigger auto-refresh saat layar pertama kali ditampilkan
@@ -159,9 +160,14 @@ fun CommunityRoute(
         val sharePath = uiState.shareLink ?: return@LaunchedEffect
         val sharedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
             ?: uiState.posts.firstOrNull()
+        val shareUrl = if (sharePath.startsWith("http://") || sharePath.startsWith("https://")) {
+            sharePath
+        } else {
+            "${defaultBaseUrl.trimEnd('/')}$sharePath"
+        }
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "${sharedPost?.body.orEmpty()}\n\n${defaultBaseUrl.trimEnd('/')}$sharePath")
+            putExtra(Intent.EXTRA_TEXT, "${sharedPost?.body.orEmpty()}\n\n$shareUrl")
         }
         context.startActivity(Intent.createChooser(shareIntent, "Bagikan kasus"))
         viewModel.onAction(CommunityAction.ShareLinkConsumed)

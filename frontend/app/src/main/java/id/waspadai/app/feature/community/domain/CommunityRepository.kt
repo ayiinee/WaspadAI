@@ -1,6 +1,7 @@
 package id.waspadai.app.feature.community.domain
 
 import id.waspadai.app.core.common.AppResult
+import kotlinx.coroutines.flow.Flow
 
 interface CommunityRepository {
     /**
@@ -30,7 +31,7 @@ interface CommunityRepository {
         evidenceBytes: ByteArray? = null,
         evidenceFileName: String? = null,
         evidenceContentType: String? = null,
-    ): AppResult<CommunityVoteUpdate> = AppResult.Failure("Submit tanggapan belum tersedia.")
+    ): AppResult<CommunityResponseUpdate> = AppResult.Failure("Submit tanggapan belum tersedia.")
 
     suspend fun castVote(
         baseUrl: String,
@@ -52,6 +53,8 @@ interface CommunityRepository {
     suspend fun markCommunitySeen(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate>
 
     suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate>
+
+    fun observeCommunityEvents(baseUrl: String, accessToken: String): Flow<CommunityRealtimeEvent>
 
     suspend fun requestPreview(
         baseUrl: String,
@@ -127,6 +130,24 @@ data class CommunityVoteUpdate(
     val caseId: String,
     val userVote: CommunityVote?,
     val counts: CommunityVoteCounts,
+)
+
+data class CommunityResponseUpdate(
+    val caseId: String,
+    val userVote: CommunityVote,
+    val counts: CommunityVoteCounts,
+    val response: CommunityResponseItem,
+)
+
+data class CommunityRealtimeEvent(
+    val type: String,
+    val communityId: String,
+    val likeCount: Int? = null,
+    val viewCount: Int? = null,
+    val commentCount: Int? = null,
+    val shareCount: Int? = null,
+    val counts: CommunityVoteCounts? = null,
+    val response: CommunityResponseItem? = null,
 )
 
 data class CommunitySocialUpdate(
