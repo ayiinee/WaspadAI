@@ -580,7 +580,7 @@ async def create_community_preview(
              order by asset.created_at, asset.id
              limit 4
             """,
-            (case_id, case_id),
+            (case_id,),
         )
         assets = await assets_query.fetchall()
 
