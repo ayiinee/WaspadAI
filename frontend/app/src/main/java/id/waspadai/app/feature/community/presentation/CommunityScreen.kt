@@ -47,6 +47,9 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Search
@@ -54,6 +57,7 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +74,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -233,6 +238,8 @@ fun CommunityScreen(
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var editingPost by remember { mutableStateOf<CommunityPost?>(null) }
+    var deletingPost by remember { mutableStateOf<CommunityPost?>(null) }
     var isSearchVisible by rememberSaveable {
         mutableStateOf(uiState.searchQuery.isNotBlank())
     }
@@ -339,15 +346,58 @@ fun CommunityScreen(
                                 },
                                 onShareClick = { onSharePost(post) },
                                 onOpenDetails = { onOpenPost(post) },
-                                modifier = Modifier
-                                    .padding(horizontal = 23.dp)
-                                    .animateItem(),
+                                onEdit = { editingPost = post },
+                                onDelete = { deletingPost = post },
+                                modifier = Modifier.animateItem(),
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    editingPost?.let { post ->
+        EditCommunityPostDialog(
+            post = post,
+            isSaving = uiState.managingPostId == post.id,
+            onDismiss = { if (uiState.managingPostId == null) editingPost = null },
+            onSave = { caption ->
+                onAction(CommunityAction.EditPost(post.id, caption))
+                editingPost = null
+            },
+        )
+    }
+    deletingPost?.let { post ->
+        AlertDialog(
+            onDismissRequest = { if (uiState.managingPostId == null) deletingPost = null },
+            title = { Text("Hapus postingan?") },
+            text = { Text("Postingan akan dihapus dari Koneksi. Konfirmasi untuk melanjutkan.") },
+            confirmButton = {
+                TextButton(
+                    enabled = uiState.managingPostId == null,
+                    onClick = {
+                        onAction(CommunityAction.DeletePost(post.id))
+                        deletingPost = null
+                    },
+                ) { Text("Delete", color = WaspadAIHoax) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingPost = null }) { Text("Batal") }
+            },
+        )
+    }
+    uiState.postManagementError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { onAction(CommunityAction.PostManagementErrorDismissed) },
+            title = { Text("Postingan belum dapat diubah") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { onAction(CommunityAction.PostManagementErrorDismissed) }) {
+                    Text("Tutup")
+                }
+            },
+        )
     }
 }
 
@@ -667,9 +717,17 @@ private fun CommunityPostCard(
     onVerdictClick: (CommunityVerdict) -> Unit,
     onShareClick: () -> Unit,
     onOpenDetails: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val horizontalPadding = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 28.dp
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val horizontalPadding = when {
+        screenWidth < 360 -> 14.dp
+        screenWidth < 600 -> 20.dp
+        else -> 32.dp
+    }
+    var ownerMenuExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
     Column(
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -706,6 +764,43 @@ private fun CommunityPostCard(
                         lineHeight = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
+                }
+                if (post.isOwner) {
+                    Box {
+                        IconButton(
+                            onClick = { ownerMenuExpanded = true },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "Kelola postingan",
+                                tint = WaspadAIDarkBlue,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = ownerMenuExpanded,
+                            onDismissRequest = { ownerMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit Postingan") },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                                onClick = {
+                                    ownerMenuExpanded = false
+                                    onEdit()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete Postingan", color = WaspadAIHoax) },
+                                leadingIcon = {
+                                    Icon(Icons.Rounded.Delete, contentDescription = null, tint = WaspadAIHoax)
+                                },
+                                onClick = {
+                                    ownerMenuExpanded = false
+                                    onDelete()
+                                },
+                            )
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(9.dp))
@@ -803,6 +898,40 @@ private fun CommunityPostCard(
         }
         HorizontalDivider(color = Color.Black.copy(alpha = .16f), thickness = 1.dp)
     }
+}
+
+@Composable
+private fun EditCommunityPostDialog(
+    post: CommunityPost,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var caption by rememberSaveable(post.id) { mutableStateOf(post.body) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Postingan") },
+        text = {
+            OutlinedTextField(
+                value = caption,
+                onValueChange = { if (it.length <= 5000) caption = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Isi postingan") },
+                minLines = 4,
+                maxLines = 10,
+                supportingText = { Text("${caption.length}/5000") },
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isSaving && caption.isNotBlank() && caption.trim() != post.body,
+                onClick = { onSave(caption.trim()) },
+            ) { Text(if (isSaving) "Menyimpan..." else "Simpan") }
+        },
+        dismissButton = {
+            TextButton(enabled = !isSaving, onClick = onDismiss) { Text("Batal") }
+        },
+    )
 }
 
 @Composable

@@ -32,6 +32,7 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     }
     assert "/api/v1/community/me/summary" in specification["paths"]
     assert "/api/v1/community/{case_id}" in specification["paths"]
+    assert "patch" in specification["paths"]["/api/v1/community/{case_id}"]
     assert "/api/v1/community/{case_id}/media/{media_id}" in specification["paths"]
     assert "/api/v1/history/{case_id}/community-preview" in specification["paths"]
     assert "/api/v1/history/{case_id}/community" in specification["paths"]
@@ -69,6 +70,9 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert {"id", "case_id", "creator", "media"} <= set(community_item["properties"])
     social_result = specification["components"]["schemas"]["CommunitySocialResult"]
     assert {"community_id", "case_id"} <= set(social_result["properties"])
+    update_request = specification["components"]["schemas"]["CommunityUpdateRequest"]
+    assert update_request["required"] == ["caption"]
+    assert update_request["properties"]["caption"]["maxLength"] == 5000
 
 
 def test_community_feed_requires_supabase_bearer() -> None:

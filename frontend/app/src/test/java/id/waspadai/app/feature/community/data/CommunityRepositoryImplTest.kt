@@ -132,7 +132,7 @@ class CommunityRepositoryImplTest {
                 {
                   "id": "community-1",
                   "case_id": "case-1",
-                  "creator": {"display_name":"Anda","is_current_user":true},
+                  "creator": {"display_name":"Olivia","is_current_user":true},
                   "title":"Kasus","redacted_text":"Aman",
                   "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-22T00:00:00Z",
                   "counts":{},"media":[]
@@ -156,6 +156,53 @@ class CommunityRepositoryImplTest {
         assertEquals("case-1", result.value.historyCaseId)
         assertTrue(result.value.isOwner)
         assertEquals("community-1", repository.feedState.value?.posts?.first()?.caseId)
+    }
+
+    @Test
+    fun `edit sends trimmed caption to canonical community endpoint`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals("https://api.example.test/api/v1/community/community-1", request.url.toString())
+            assertEquals("PATCH", request.method.value)
+            val requestBody = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+            assertEquals("Caption baru", requestBody["caption"]?.jsonPrimitive?.content)
+            respond(
+                """
+                {
+                  "id":"community-1","case_id":"case-1",
+                  "creator":{"display_name":"Olivia","is_current_user":true},
+                  "title":"Kasus","redacted_text":"Caption baru",
+                  "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-23T00:00:00Z",
+                  "counts":{},"media":[]
+                }
+                """.trimIndent(),
+                headers = jsonHeaders(),
+            )
+        })
+
+        val result = repository.updatePost(
+            "https://api.example.test/", "token", "community-1", "  Caption baru  "
+        )
+
+        assertTrue(result is AppResult.Success)
+        assertEquals("Olivia", (result as AppResult.Success).value.creatorName)
+    }
+
+    @Test
+    fun `delete uses history case endpoint`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals(
+                "https://api.example.test/api/v1/history/history-1/community",
+                request.url.toString(),
+            )
+            assertEquals("DELETE", request.method.value)
+            respond("{}", headers = jsonHeaders())
+        })
+
+        val result = repository.deletePost(
+            "https://api.example.test", "token", "history-1", "community-1"
+        )
+
+        assertTrue(result is AppResult.Success)
     }
 
     private fun repositoryWith(engine: MockEngine): CommunityRepositoryImpl {

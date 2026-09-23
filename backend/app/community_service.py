@@ -29,6 +29,7 @@ from app.models import (
     CommunityResponseResult,
     CommunitySocialResult,
     CommunityStateResponse,
+    CommunityUpdateRequest,
     CommunityUserSummary,
     CommunityVoteCounts,
     CommunityVoteRequest,
@@ -76,6 +77,7 @@ async def list_community(
             """
             select p.id as community_id, p.case_id, p.title, p.redacted_text, p.status, p.published_at,
                    (p.owner_id = %s) as is_owner,
+                   private.community_display_name(p.owner_id) as creator_display_name,
                    (p.redacted_asset_id is not null or coalesce(jsonb_array_length(media.items), 0) > 0) as has_image,
                    coalesce(media.items, '[]'::jsonb) as media,
                    coalesce(counts.hoaks, 0)::int as hoaks,
@@ -819,13 +821,72 @@ async def publish_community_case(
     return _community_item(created_row)
 
 
+async def update_community_case(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    community_id: UUID,
+    request: CommunityUpdateRequest,
+) -> CommunityItem:
+    """Update an owner's editable community caption without changing its media."""
+
+    caption = request.caption.strip()
+    if not caption:
+        raise ProductAPIError(422, "COMMUNITY_CAPTION_REQUIRED", "Caption wajib diisi.")
+    content_hash = sha256(caption.encode("utf-8")).hexdigest()
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """
+            select p.id, p.status, p.publication_consent_id, p.rag_consent_id
+              from public.community_posts p
+             where p.id = %s and p.owner_id = %s and p.withdrawn_at is null
+             for update
+            """,
+            (community_id, user_id),
+        )
+        post = await query.fetchone()
+        if post is None:
+            raise ProductAPIError(
+                404, "COMMUNITY_NOT_FOUND", "Postingan komunitas tidak ditemukan."
+            )
+        if post["status"] not in COMMUNITY_PUBLIC_STATUSES:
+            raise ProductAPIError(
+                404, "COMMUNITY_NOT_FOUND", "Postingan komunitas tidak ditemukan."
+            )
+
+        await connection.execute(
+            """
+            update public.community_posts
+               set redacted_text = %s, content_hash = %s, revision = revision + 1
+             where id = %s
+            """,
+            (caption, content_hash, community_id),
+        )
+        await connection.execute(
+            """
+            update private.consent_records
+               set content_hash = %s
+             where user_id = %s and id in (%s, %s) and revoked_at is null
+            """,
+            (content_hash, user_id, post["publication_consent_id"], post["rag_consent_id"]),
+        )
+        updated = await _fetch_detail_row(connection, user_id, community_id)
+        if updated is None:
+            raise ProductAPIError(
+                500,
+                "COMMUNITY_UPDATE_INCONSISTENT",
+                "Postingan belum dapat dibaca kembali.",
+            )
+    return _community_item(updated)
+
+
 async def withdraw_community_case(
     pool: AsyncConnectionPool,
     settings: Settings,
     user_id: UUID,
     case_id: UUID,
 ) -> CommunityStateResponse:
-    """Withdraw an unverified community post and revoke its publication consents."""
+    """Soft-withdraw an owner's public post and revoke its publication consents."""
 
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
@@ -844,22 +905,13 @@ async def withdraw_community_case(
         post = await query.fetchone()
         if post is None:
             raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
-        if (
-            post["post_status"] == "VERIFIED_EVIDENCE"
-            or post["community_state"] == "VERIFIED_EVIDENCE"
-        ):
-            raise ProductAPIError(
-                409,
-                "COMMUNITY_WITHDRAWAL_FORBIDDEN",
-                "Kasus community yang sudah menjadi evidence terverifikasi tidak dapat ditarik.",
-            )
         if post["post_status"] == "WITHDRAWN":
             return CommunityStateResponse(
                 case_id=case_id,
                 community_state="WITHDRAWN",
                 revision=post["revision"],
             )
-        if post["post_status"] != "PUBLISHED_UNVERIFIED":
+        if post["post_status"] not in COMMUNITY_PUBLIC_STATUSES:
             raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
 
         await connection.execute(
@@ -904,6 +956,7 @@ async def _fetch_detail_row(connection: object, user_id: UUID, community_id: UUI
         """
         select p.id as community_id, p.case_id, p.title, p.redacted_text, p.status, p.published_at,
                (p.owner_id = %s) as is_owner,
+               private.community_display_name(p.owner_id) as creator_display_name,
                (p.redacted_asset_id is not null or coalesce(jsonb_array_length(media.items), 0) > 0) as has_image,
                coalesce(media.items, '[]'::jsonb) as media,
                r.result_json, r.execution_mode,
@@ -1072,7 +1125,7 @@ def _community_item(row: DictRow) -> CommunityItem:
         id=row["community_id"],
         case_id=row["case_id"],
         creator=CommunityCreator(
-            display_name="Anda" if row["is_owner"] else "Pengguna WaspadAI",
+            display_name=row["creator_display_name"],
             is_current_user=bool(row["is_owner"]),
         ),
         title=row["title"],
@@ -1098,7 +1151,7 @@ def _community_detail(row: DictRow, response_rows: list[DictRow]) -> CommunityDe
         id=row["community_id"],
         case_id=row["case_id"],
         creator=CommunityCreator(
-            display_name="Anda" if row["is_owner"] else "Pengguna WaspadAI",
+            display_name=row["creator_display_name"],
             is_current_user=bool(row["is_owner"]),
         ),
         title=row["title"],

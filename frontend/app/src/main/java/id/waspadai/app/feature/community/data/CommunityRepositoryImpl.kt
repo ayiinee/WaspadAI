@@ -12,6 +12,7 @@ import id.waspadai.app.feature.community.data.dto.CommunityResponseItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityResponseResultDto
 import id.waspadai.app.feature.community.data.dto.CommunityPublishRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityUserSummaryDto
+import id.waspadai.app.feature.community.data.dto.CommunityUpdateRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteCountsDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteRequestDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteResultDto
@@ -41,6 +42,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.patch
 import io.ktor.client.request.setBody
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
@@ -303,6 +305,54 @@ class CommunityRepositoryImpl(
     override suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
         socialRequest("${baseUrl.normalized()}/api/v1/community/$caseId/share", accessToken, false)
 
+    override suspend fun updatePost(
+        baseUrl: String,
+        accessToken: String,
+        communityId: String,
+        caption: String,
+    ): AppResult<CommunityFeedPost> = runCommunityRequest {
+        val normalizedBaseUrl = baseUrl.normalized()
+        val response = client.patch("$normalizedBaseUrl/api/v1/community/$communityId") {
+            authorize(accessToken)
+            headers { append(HttpHeaders.ContentType, ContentType.Application.Json.toString()) }
+            setBody(CommunityUpdateRequestDto(caption.trim()))
+        }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+        response.body<CommunityItemDto>().toDomain(normalizedBaseUrl)
+    }.also { result ->
+        if (result is AppResult.Success) {
+            mutateFeed(baseUrl, accessToken) { snapshot ->
+                snapshot.copy(
+                    posts = snapshot.posts.map { post ->
+                        if (post.caseId == communityId) result.value else post
+                    },
+                )
+            }
+        }
+    }
+
+    override suspend fun deletePost(
+        baseUrl: String,
+        accessToken: String,
+        historyCaseId: String,
+        communityId: String,
+    ): AppResult<Unit> = runCommunityRequest {
+        val response = client.delete(
+            "${baseUrl.normalized()}/api/v1/history/$historyCaseId/community"
+        ) { authorize(accessToken) }
+        if (!response.status.isSuccess()) {
+            throw CommunityApiException(response.status, response.safeError())
+        }
+    }.also { result ->
+        if (result is AppResult.Success) {
+            mutateFeed(baseUrl, accessToken) { snapshot ->
+                snapshot.copy(posts = snapshot.posts.filterNot { it.caseId == communityId })
+            }
+        }
+    }
+
     override fun observeCommunityEvents(baseUrl: String, accessToken: String): Flow<CommunityRealtimeEvent> = flow {
         val socketUrl = baseUrl.normalized()
             .replaceFirst("https://", "wss://")
@@ -436,6 +486,23 @@ class CommunityRepositoryImpl(
         return runCatching {
             json.decodeFromString<CommunityErrorEnvelope>(rawBody).error
         }.getOrNull()
+    }
+
+    private suspend fun mutateFeed(
+        baseUrl: String,
+        accessToken: String,
+        transform: (CommunitySnapshot) -> CommunitySnapshot,
+    ) {
+        val current = _feedState.value ?: return
+        val updated = transform(current)
+        _feedState.value = updated
+        cacheMutex.withLock {
+            cachedCommunity = CachedCommunity(
+                key = CommunityCacheKey(baseUrl.normalized(), accessToken.trim()),
+                snapshot = updated,
+                storedAtMillis = System.currentTimeMillis(),
+            )
+        }
     }
 }
 

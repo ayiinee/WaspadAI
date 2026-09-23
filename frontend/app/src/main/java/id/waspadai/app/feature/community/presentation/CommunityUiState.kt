@@ -79,6 +79,8 @@ data class CommunityUiState(
     val posts: List<CommunityPost> = emptyList(),
     val shareLink: String? = null,
     val requestedPostId: String? = null,
+    val managingPostId: String? = null,
+    val postManagementError: String? = null,
 ) {
     val visiblePosts: List<CommunityPost>
         get() = posts.filter { post ->
@@ -111,6 +113,9 @@ sealed interface CommunityAction {
     data class FilterSelected(val filter: CommunityFeedFilter) : CommunityAction
     data class SupportClicked(val postId: String) : CommunityAction
     data class ShareClicked(val postId: String) : CommunityAction
+    data class EditPost(val postId: String, val caption: String) : CommunityAction
+    data class DeletePost(val postId: String) : CommunityAction
+    data object PostManagementErrorDismissed : CommunityAction
     data object ShareLinkConsumed : CommunityAction
     data class VerdictSelected(
         val postId: String,

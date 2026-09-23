@@ -63,6 +63,20 @@ interface CommunityRepository {
     suspend fun shareCommunity(baseUrl: String, accessToken: String, caseId: String): AppResult<CommunitySocialUpdate> =
         AppResult.Failure("Share komunitas belum tersedia.")
 
+    suspend fun updatePost(
+        baseUrl: String,
+        accessToken: String,
+        communityId: String,
+        caption: String,
+    ): AppResult<CommunityFeedPost> = AppResult.Failure("Edit postingan belum tersedia.")
+
+    suspend fun deletePost(
+        baseUrl: String,
+        accessToken: String,
+        historyCaseId: String,
+        communityId: String,
+    ): AppResult<Unit> = AppResult.Failure("Hapus postingan belum tersedia.")
+
     fun observeCommunityEvents(baseUrl: String, accessToken: String): Flow<CommunityRealtimeEvent> = emptyFlow()
 
     suspend fun requestPreview(

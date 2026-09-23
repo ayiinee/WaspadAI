@@ -245,6 +245,34 @@ class CommunityViewModelTest {
     }
 
     @Test
+    fun `owner edit replaces caption without refetch`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.EditPost("fake-case-1", "Caption baru"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Caption baru", viewModel.uiState.value.posts.single().body)
+        assertEquals(1, repository.updateCalls)
+    }
+
+    @Test
+    fun `owner delete removes post without refetch`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.DeletePost("fake-case-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.posts.isEmpty())
+        assertEquals(1, repository.deleteCalls)
+    }
+
+    @Test
     fun `realtime created prepends post without refetch`() = runTest {
         val repository = FakeCommunityRepository()
         val viewModel = viewModel(repository, token = "token")
@@ -310,6 +338,8 @@ class CommunityViewModelTest {
         var loadCommunityCallCount = 0
         var likeCalls = 0
         var unlikeCalls = 0
+        var updateCalls = 0
+        var deleteCalls = 0
         val likeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
         val unlikeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
         val events = MutableSharedFlow<CommunityRealtimeEvent>(extraBufferCapacity = 1)
@@ -317,6 +347,9 @@ class CommunityViewModelTest {
         private val fakePosts = listOf(
             CommunityFeedPost(
                 caseId = "fake-case-1",
+                historyCaseId = "history-case-1",
+                creatorName = "Olivia",
+                isOwner = true,
                 title = "Hoaks Beredar Tentang Presiden",
                 redactedText = "Beredar informasi palsu yang mengatasnamakan presiden...",
                 status = CommunityPostStatus.PublishedUnverified,
@@ -410,6 +443,26 @@ class CommunityViewModelTest {
             accessToken: String,
             caseId: String,
         ): AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
+
+        override suspend fun updatePost(
+            baseUrl: String,
+            accessToken: String,
+            communityId: String,
+            caption: String,
+        ): AppResult<CommunityFeedPost> {
+            updateCalls++
+            return AppResult.Success(fakePosts.single().copy(redactedText = caption.trim()))
+        }
+
+        override suspend fun deletePost(
+            baseUrl: String,
+            accessToken: String,
+            historyCaseId: String,
+            communityId: String,
+        ): AppResult<Unit> {
+            deleteCalls++
+            return AppResult.Success(Unit)
+        }
 
         override fun observeCommunityEvents(baseUrl: String, accessToken: String) = events
 

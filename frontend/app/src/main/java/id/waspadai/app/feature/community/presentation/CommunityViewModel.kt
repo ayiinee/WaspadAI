@@ -103,6 +103,14 @@ class CommunityViewModel(
 
             is CommunityAction.ShareClicked -> sharePost(action.postId)
 
+            is CommunityAction.EditPost -> editPost(action.postId, action.caption)
+
+            is CommunityAction.DeletePost -> deletePost(action.postId)
+
+            CommunityAction.PostManagementErrorDismissed -> _uiState.update {
+                it.copy(postManagementError = null)
+            }
+
             CommunityAction.ShareLinkConsumed -> _uiState.update { it.copy(shareLink = null) }
 
             is CommunityAction.VerdictSelected -> updatePost(action.postId) { post ->
@@ -504,6 +512,76 @@ class CommunityViewModel(
         }
     }
 
+    private fun editPost(postId: String, caption: String) {
+        val communityRepository = repository ?: return
+        val current = uiState.value
+        if (current.managingPostId != null) return
+        val post = current.posts.firstOrNull { it.id == postId && it.isOwner } ?: return
+        if (caption.isBlank() || caption.trim() == post.body) return
+        _uiState.update { it.copy(managingPostId = postId, postManagementError = null) }
+        viewModelScope.launch {
+            when (
+                val result = communityRepository.updatePost(
+                    current.baseUrlDraft.trim(),
+                    current.accessTokenDraft.trim(),
+                    postId,
+                    caption,
+                )
+            ) {
+                is AppResult.Success -> _uiState.update { state ->
+                    state.copy(
+                        managingPostId = null,
+                        backendMessage = "Postingan berhasil diperbarui.",
+                        posts = state.posts.map { existing ->
+                            if (existing.id == postId) result.value.toPresentation(communityBaseUrl) else existing
+                        },
+                    )
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(managingPostId = null, postManagementError = result.message)
+                }
+            }
+        }
+    }
+
+    private fun deletePost(postId: String) {
+        val communityRepository = repository ?: return
+        val current = uiState.value
+        if (current.managingPostId != null) return
+        val post = current.posts.firstOrNull { it.id == postId && it.isOwner } ?: return
+        if (post.historyCaseId.isBlank()) {
+            _uiState.update { it.copy(postManagementError = "ID riwayat postingan tidak tersedia.") }
+            return
+        }
+        _uiState.update { it.copy(managingPostId = postId, postManagementError = null) }
+        viewModelScope.launch {
+            when (
+                val result = communityRepository.deletePost(
+                    current.baseUrlDraft.trim(),
+                    current.accessTokenDraft.trim(),
+                    post.historyCaseId,
+                    postId,
+                )
+            ) {
+                is AppResult.Success -> {
+                    likeMutations.remove(postId)
+                    detailJobs.remove(postId)?.cancel()
+                    _uiState.update { state ->
+                        state.copy(
+                            managingPostId = null,
+                            backendMessage = "Postingan berhasil dihapus.",
+                            posts = state.posts.filterNot { it.id == postId },
+                            detailByPostId = state.detailByPostId - postId,
+                        )
+                    }
+                }
+                is AppResult.Failure -> _uiState.update {
+                    it.copy(managingPostId = null, postManagementError = result.message)
+                }
+            }
+        }
+    }
+
     private fun applySnapshot(snapshot: CommunitySnapshot) {
         _uiState.update {
             it.copy(
@@ -606,6 +684,22 @@ class CommunityViewModel(
     }
 
     private fun applyRealtimeEvent(event: id.waspadai.app.feature.community.domain.CommunityRealtimeEvent) {
+        if (event.type == "community.deleted") {
+            likeMutations.remove(event.communityId)
+            detailJobs.remove(event.communityId)?.cancel()
+            _uiState.update { state ->
+                val removedIds = state.posts
+                    .filter { it.id == event.communityId || it.historyCaseId == event.communityId }
+                    .mapTo(mutableSetOf()) { it.id }
+                state.copy(
+                    posts = state.posts.filterNot {
+                        it.id == event.communityId || it.historyCaseId == event.communityId
+                    },
+                    detailByPostId = state.detailByPostId - removedIds,
+                )
+            }
+            return
+        }
         val pendingLike = likeMutations[event.communityId]?.takeIf { it.requestInFlight }
         if (pendingLike == null && event.likeCount != null) {
             likeMutations[event.communityId]?.confirmedServerCount = event.likeCount
