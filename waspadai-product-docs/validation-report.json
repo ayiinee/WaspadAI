@@ -3,7 +3,7 @@
   "baseline": "2026.09.16",
   "source_of_truth": {
     "path": "contracts/current/android-api-contract.md",
-    "sha256": "37238393a33d54c244f3406b36749561ea35a66f063819b355b2512a8a78c6b3",
+    "sha256": "180ce850d450748bb16ee896786f3866107f658fc6ac9de7913b65c995e00552",
     "workspace_source_byte_identical": true
   },
   "architecture": {

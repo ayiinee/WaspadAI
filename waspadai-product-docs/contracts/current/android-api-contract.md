@@ -449,7 +449,7 @@ Response sukses mengembalikan entity community final, bukan `history_id`,
 {
   "id": "<community_id>",
   "case_id": "<legacy_history_case_id>",
-  "creator": {"display_name": "Anda", "is_current_user": true},
+  "creator": {"display_name": "Olivia", "is_current_user": true},
   "media": [],
   "published_at": "2026-09-23T01:00:00Z",
   "like_count": 0,
@@ -467,10 +467,27 @@ dipertahankan untuk kompatibilitas history lama.
 DELETE /api/v1/history/{case_id}/community
 ```
 
-Pemilik dapat menarik kasus selama belum berstatus `VERIFIED_EVIDENCE`.
+Pemilik dapat menarik postingannya pada kedua status publik. Penarikan bersifat
+soft-withdraw agar record audit tetap tersedia.
 Response `200` mengembalikan `CommunityStateResponse` dengan `community_state`
 `WITHDRAWN`. Pengulangan request withdrawal mengembalikan state dan revision yang
 sama. Withdrawal mencabut consent `COMMUNITY_PUBLICATION` dan `RAG_REUSE` terkait.
+
+### 8.4 Mengedit Caption
+
+```http
+PATCH /api/v1/community/{community_id}
+Content-Type: application/json
+```
+
+```json
+{"caption": "Caption yang sudah diperbarui."}
+```
+
+Hanya pemilik yang dapat mengedit caption. Caption wajib berisi 1–5000 karakter.
+Response sukses adalah `CommunityItem` terbaru dan backend menyiarkan event
+WebSocket `community.updated`. Perubahan hanya menyentuh caption publik; hasil
+verifikasi dan record audit tidak diubah.
 
 ## 9. Community Feed Dan Voting
 
@@ -479,6 +496,7 @@ Endpoint Product Backend:
 ```http
 GET    /api/v1/community?limit=20&cursor=<opaque_cursor>
 GET    /api/v1/community/{community_id}
+PATCH  /api/v1/community/{community_id}
 POST   /api/v1/community/{community_id}/vote
 DELETE /api/v1/community/{community_id}/vote
 POST   /api/v1/community/{community_id}/like
@@ -486,6 +504,14 @@ DELETE /api/v1/community/{community_id}/like
 POST   /api/v1/community/{community_id}/response
 WS     /api/v1/community/ws?access_token=<access_token>
 ```
+
+`creator.display_name` selalu berisi display name profil, termasuk untuk post
+milik pengguna sendiri. Kepemilikan ditentukan oleh `creator.is_current_user`,
+bukan dengan mengganti nama menjadi `Anda`.
+
+Like terhadap postingan sendiri diperbolehkan. Database tetap menjamin tepat
+satu like aktif melalui primary/unique key `(post_id, user_id)`. Larangan owner
+hanya berlaku untuk vote/response (`CANNOT_RESPOND_OWN_POST`).
 
 Feed dan detail memakai `media` sebagai struktur gambar kanonik (maksimal empat,
 berurutan berdasarkan `position`). `has_image` dan `image_url` tetap tersedia

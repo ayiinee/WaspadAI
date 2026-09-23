@@ -111,25 +111,30 @@ def test_withdrawal_is_idempotent_for_already_withdrawn_post(
     assert connection.executed[0][1][0] == case_id
 
 
+def test_verified_post_can_be_withdrawn(monkeypatch: pytest.MonkeyPatch) -> None:
+    _, connection = withdraw(
+        monkeypatch,
+        {
+            "post_id": uuid4(),
+            "post_status": "VERIFIED_EVIDENCE",
+            "publication_consent_id": uuid4(),
+            "rag_consent_id": None,
+            "community_state": "VERIFIED_EVIDENCE",
+            "revision": 7,
+        },
+    )
+
+    queries = "\n".join(query for query, _ in connection.executed)
+    assert "set status = 'WITHDRAWN'" in queries
+
+
 @pytest.mark.parametrize(
     ("post", "status_code", "code"),
     [
         (None, 404, "COMMUNITY_NOT_FOUND"),
-        (
-            {
-                "post_id": uuid4(),
-                "post_status": "VERIFIED_EVIDENCE",
-                "publication_consent_id": uuid4(),
-                "rag_consent_id": None,
-                "community_state": "VERIFIED_EVIDENCE",
-                "revision": 7,
-            },
-            409,
-            "COMMUNITY_WITHDRAWAL_FORBIDDEN",
-        ),
     ],
 )
-def test_withdrawal_rejects_missing_or_verified_post(
+def test_withdrawal_rejects_missing_post(
     monkeypatch: pytest.MonkeyPatch,
     post: dict[str, object] | None,
     status_code: int,

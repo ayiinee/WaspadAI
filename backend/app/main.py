@@ -40,11 +40,12 @@ from app.community_service import (
     like_community,
     list_community,
     publish_community_case,
-    remove_community_vote,
-    submit_community_response,
     record_community_share,
     record_community_view,
+    remove_community_vote,
+    submit_community_response,
     unlike_community,
+    update_community_case,
     withdraw_community_case,
 )
 from app.config import get_settings
@@ -52,13 +53,13 @@ from app.database import create_pool
 from app.errors import ProductAPIError, error_body
 from app.learning_service import (
     complete_lesson,
+    get_learning_media_asset,
     get_learning_module_detail,
     get_learning_progress,
-    get_learning_media_asset,
     get_module_cases,
-    open_learning_module,
     get_module_quiz,
     list_learning_modules,
+    open_learning_module,
     submit_quiz_attempt,
 )
 from app.models import (
@@ -71,6 +72,7 @@ from app.models import (
     CommunityResponseResult,
     CommunitySocialResult,
     CommunityStateResponse,
+    CommunityUpdateRequest,
     CommunityUserSummary,
     CommunityVoteRequest,
     CommunityVoteResult,
@@ -423,7 +425,9 @@ def create_app() -> FastAPI:
     ) -> Response:
         pool = app.state.db_pool
         if pool is None:
-            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
         content, content_type = await get_community_media(
             pool, app.state.settings, user.id, case_id, media_id, app.state.http_client
         )
@@ -477,6 +481,40 @@ def create_app() -> FastAPI:
             raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
         result = await unlike_community(pool, app.state.settings, user.id, case_id)
         await community_connections.broadcast(_social_event("community.like.updated", result))
+        return result
+
+    @app.patch(
+        "/api/v1/community/{case_id}",
+        tags=["Community"],
+        response_model=CommunityItem,
+    )
+    async def update_community_case_endpoint(
+        case_id: UUID,
+        payload: CommunityUpdateRequest,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> CommunityItem:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        result = await update_community_case(
+            pool, app.state.settings, user.id, case_id, payload
+        )
+        await community_connections.broadcast(
+            {
+                "type": "community.updated",
+                "community_id": str(result.id),
+                "payload": {
+                    "post": result.model_copy(
+                        update={
+                            "creator": result.creator.model_copy(
+                                update={"is_current_user": False}
+                            )
+                        }
+                    ).model_dump(mode="json")
+                },
+            },
+            exclude_user_id=user.id,
+        )
         return result
 
     @app.post("/api/v1/community/{case_id}/seen", tags=["Community"], response_model=CommunitySocialResult)
@@ -563,7 +601,7 @@ def create_app() -> FastAPI:
         realtime_post = result.model_copy(
             update={
                 "creator": result.creator.model_copy(
-                    update={"display_name": "Pengguna WaspadAI", "is_current_user": False}
+                    update={"is_current_user": False}
                 )
             }
         )
@@ -591,7 +629,16 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await withdraw_community_case(pool, app.state.settings, user.id, case_id)
+        result = await withdraw_community_case(pool, app.state.settings, user.id, case_id)
+        await community_connections.broadcast(
+            {
+                "type": "community.deleted",
+                "community_id": str(case_id),
+                "payload": {},
+            },
+            exclude_user_id=user.id,
+        )
+        return result
 
     @app.post(
         "/api/v1/community/{case_id}/vote",

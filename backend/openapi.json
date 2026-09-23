@@ -535,6 +535,62 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "Update Community Case Endpoint",
+        "operationId": "update_community_case_endpoint_api_v1_community__case_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/community/{case_id}/image": {
@@ -2573,6 +2629,22 @@
           "revision"
         ],
         "title": "CommunityStateResponse"
+      },
+      "CommunityUpdateRequest": {
+        "properties": {
+          "caption": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Caption"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "caption"
+        ],
+        "title": "CommunityUpdateRequest"
       },
       "CommunityUserSummary": {
         "properties": {

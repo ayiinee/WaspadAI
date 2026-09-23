@@ -166,3 +166,8 @@ data class CommunityPublishRequestDto(
     @SerialName("rag_reuse_consent") val ragReuseConsent: Boolean = false,
     val caption: String,
 )
+
+@Serializable
+data class CommunityUpdateRequestDto(
+    val caption: String,
+)

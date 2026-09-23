@@ -338,6 +338,12 @@ class CommunityPublishRequest(BaseModel):
     caption: str = Field(min_length=1, max_length=5000)
 
 
+class CommunityUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    caption: str = Field(min_length=1, max_length=5000)
+
+
 class CommunityStateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
