@@ -39,6 +39,7 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.forms.MultiPartFormDataContent
@@ -108,12 +109,12 @@ class CommunityRepositoryImpl(
             if (!forceRefresh && inFlightKey == key) {
                 inFlightCommunity
             } else {
-                async { fetchCommunity(key.baseUrl, key.accessToken) }.also { deferred ->
+                async { fetchCommunity(key.baseUrl, key.accessToken, forceRefresh) }.also { deferred ->
                     inFlightKey = key
                     inFlightCommunity = deferred
                 }
             }
-        } ?: async { fetchCommunity(key.baseUrl, key.accessToken) }
+        } ?: async { fetchCommunity(key.baseUrl, key.accessToken, forceRefresh) }
 
         val result = request.await()
         cacheMutex.withLock {
@@ -136,16 +137,20 @@ class CommunityRepositoryImpl(
     private suspend fun fetchCommunity(
         baseUrl: String,
         accessToken: String,
+        recordRefresh: Boolean,
     ): AppResult<CommunitySnapshot> = runCommunityRequest {
-        fetchCommunityBootstrap(baseUrl, accessToken) ?: fetchCommunityLegacy(baseUrl, accessToken)
+        fetchCommunityBootstrap(baseUrl, accessToken, recordRefresh)
+            ?: fetchCommunityLegacy(baseUrl, accessToken, recordRefresh)
     }
 
     private suspend fun fetchCommunityBootstrap(
         baseUrl: String,
         accessToken: String,
+        recordRefresh: Boolean,
     ): CommunitySnapshot? {
         val response = client.get("$baseUrl/api/v1/community/bootstrap") {
             authorize(accessToken)
+            if (recordRefresh) parameter("refresh", true)
         }
         if (response.status.isSuccess()) {
             val bootstrapDto = response.body<CommunityBootstrapDto>()
@@ -160,6 +165,7 @@ class CommunityRepositoryImpl(
     private suspend fun fetchCommunityLegacy(
         baseUrl: String,
         accessToken: String,
+        recordRefresh: Boolean,
     ): CommunitySnapshot {
         val normalizedBaseUrl = baseUrl.normalized()
         val (summary, feed) = coroutineScope {
@@ -171,6 +177,7 @@ class CommunityRepositoryImpl(
             val feedRequest = async {
                 client.get("$normalizedBaseUrl/api/v1/community") {
                     authorize(accessToken)
+                    if (recordRefresh) parameter("refresh", true)
                 }
             }
             summaryRequest.await() to feedRequest.await()

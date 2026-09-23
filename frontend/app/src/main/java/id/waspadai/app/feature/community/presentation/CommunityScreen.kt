@@ -70,6 +70,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -234,6 +238,7 @@ fun CommunityScreen(
     }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val pullToRefreshState = rememberPullToRefreshState()
     val closeSearch: () -> Unit = {
         focusManager.clearFocus()
         keyboardController?.hide()
@@ -295,35 +300,50 @@ fun CommunityScreen(
                     )
                 }
             }
-            LazyColumn(
+            PullToRefreshBox(
+                isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
+                onRefresh = { onAction(CommunityAction.RefreshBackend) },
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
+                state = pullToRefreshState,
+                indicator = {
+                    PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        color = Color.Black,
+                    )
+                },
             ) {
-                if (uiState.visiblePosts.isEmpty()) {
-                    item {
-                        EmptyCommunityResult()
-                    }
-                } else {
-                    items(
-                        items = uiState.visiblePosts,
-                        key = CommunityPost::id,
-                    ) { post ->
-                        CommunityPostCard(
-                            post = post,
-                            accessToken = uiState.accessTokenDraft,
-                            onSupportClick = {
-                                onAction(CommunityAction.SupportClicked(post.id))
-                            },
-                            onVerdictClick = { verdict ->
-                                onAction(CommunityAction.VerdictSelected(post.id, verdict))
-                            },
-                            onShareClick = { onSharePost(post) },
-                            onOpenDetails = { onOpenPost(post) },
-                            modifier = Modifier
-                                .padding(horizontal = 23.dp)
-                                .animateItem(),
-                        )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                ) {
+                    if (uiState.visiblePosts.isEmpty()) {
+                        item {
+                            EmptyCommunityResult()
+                        }
+                    } else {
+                        items(
+                            items = uiState.visiblePosts,
+                            key = CommunityPost::id,
+                        ) { post ->
+                            CommunityPostCard(
+                                post = post,
+                                accessToken = uiState.accessTokenDraft,
+                                onSupportClick = {
+                                    onAction(CommunityAction.SupportClicked(post.id))
+                                },
+                                onVerdictClick = { verdict ->
+                                    onAction(CommunityAction.VerdictSelected(post.id, verdict))
+                                },
+                                onShareClick = { onSharePost(post) },
+                                onOpenDetails = { onOpenPost(post) },
+                                modifier = Modifier
+                                    .padding(horizontal = 23.dp)
+                                    .animateItem(),
+                            )
+                        }
                     }
                 }
             }
@@ -343,7 +363,7 @@ internal fun CommunityPageHeader(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(WaspadAIBlue),
+            .background(Color.Black),
     ) {
         Image(
             painter = painterResource(id = R.drawable.community_header_background),
@@ -351,6 +371,7 @@ internal fun CommunityPageHeader(
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop,
             alpha = .6f,
+            colorFilter = ColorFilter.tint(Color.Black),
         )
         Box(
             modifier = Modifier
@@ -476,7 +497,7 @@ private fun ContributionMetric(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = WaspadAIBlue,
+                tint = Color.Black,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -551,7 +572,7 @@ private fun CommunitySearchBar(
                 .weight(1f)
                 .height(48.dp)
                 .focusRequester(focusRequester)
-                .border(1.5.dp, WaspadAILightBlue, RoundedCornerShape(28.dp)),
+                .border(1.5.dp, Color.Black.copy(alpha = .18f), RoundedCornerShape(28.dp)),
             decorationBox = { innerTextField ->
                 Row(
                     modifier = Modifier
@@ -574,7 +595,7 @@ private fun CommunitySearchBar(
                     Icon(
                         imageVector = Icons.Rounded.Search,
                         contentDescription = "Cari",
-                        tint = WaspadAIBlue,
+                        tint = Color.Black,
                         modifier = Modifier.size(24.dp),
                     )
                 }
@@ -585,7 +606,7 @@ private fun CommunitySearchBar(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(WaspadAIBlue)
+                    .background(Color.Black)
                     .clickable {
                         focusManager.clearFocus()
                         keyboardController?.hide()
@@ -608,7 +629,7 @@ private fun CommunitySearchBar(
                 onDismissRequest = { onAction(CommunityAction.FilterDismissed) },
                 modifier = Modifier
                     .widthIn(min = 180.dp)
-                    .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
+                    .border(1.dp, Color.Black.copy(alpha = .18f), RoundedCornerShape(16.dp)),
                 shape = RoundedCornerShape(16.dp),
                 containerColor = Color.White,
                 shadowElevation = 10.dp,
@@ -619,7 +640,7 @@ private fun CommunitySearchBar(
                         text = {
                             Text(
                                 text = filter.label,
-                                color = if (isSelected) WaspadAIDarkBlue else WaspadAIMuted,
+                                color = if (isSelected) Color.Black else Color.Black.copy(alpha = .4f),
                                 fontWeight = if (isSelected) {
                                     FontWeight.Bold
                                 } else {
@@ -629,7 +650,7 @@ private fun CommunitySearchBar(
                         },
                         onClick = { onAction(CommunityAction.FilterSelected(filter)) },
                         modifier = Modifier.background(
-                            if (isSelected) WaspadAIBlue.copy(alpha = .09f) else Color.White,
+                            if (isSelected) Color.Black.copy(alpha = .09f) else Color.White,
                         ),
                     )
                 }
@@ -666,21 +687,21 @@ private fun CommunityPostCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = post.author,
-                        color = WaspadAIDarkBlue,
+                        color = Color.Black,
                         fontSize = 16.sp,
                         lineHeight = 19.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         text = post.timestamp,
-                        color = WaspadAIMuted,
+                        color = Color.Black.copy(alpha = .4f),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         text = post.statusLabel,
-                        color = post.statusTextColor(),
+                        color = Color.Black,
                         fontSize = 10.sp,
                         lineHeight = 13.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -694,7 +715,7 @@ private fun CommunityPostCard(
             ) {
                 Text(
                     text = post.title,
-                    color = WaspadAIDarkBlue,
+                    color = Color.Black,
                     fontSize = 14.sp,
                     lineHeight = 17.sp,
                     fontWeight = FontWeight.Bold,
@@ -734,7 +755,7 @@ private fun CommunityPostCard(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = "Agregat: Hoaks ${post.hoaksCount} - Waspada ${post.waspadaCount} - Valid ${post.validCount}",
-                color = WaspadAIMuted,
+                color = Color.Black.copy(alpha = .4f),
                 fontSize = 10.sp,
                 lineHeight = 12.sp,
             )
@@ -752,28 +773,21 @@ private fun CommunityPostCard(
                     },
                     label = post.likeCount.toString(),
                     contentDescription = "Total penilaian komunitas",
-                    tint = if (post.isSupported) WaspadAIHoax else WaspadAIDarkBlue,
-                    containerColor = if (post.isSupported) {
-                        WaspadAIHoax.copy(alpha = 0.14f)
-                    } else {
-                        WaspadAILightBlue.copy(alpha = 0.5f)
-                    },
+                    tint = Color.Black,
                     onClick = onSupportClick,
                 )
                 InlineAction(
                     icon = Icons.Rounded.Visibility,
                     label = post.viewCount.toString(),
                     contentDescription = "Dilihat ${post.viewCount} kali",
-                    tint = WaspadAIBlue,
-                    containerColor = Color(0xFFE7F3FC),
+                    tint = Color.Black,
                     onClick = {},
                 )
                 InlineAction(
                     icon = Icons.Rounded.ChatBubble,
                     label = post.commentCount.toString(),
                     contentDescription = "Komentar",
-                    tint = WaspadAIBlue,
-                    containerColor = Color(0xFFE7F3FC),
+                    tint = Color.Black,
                     onClick = {},
                 )
                 Spacer(Modifier.weight(1f))
@@ -781,13 +795,13 @@ private fun CommunityPostCard(
                     Icon(
                         imageVector = Icons.Rounded.Share,
                         contentDescription = "Bagikan kasus",
-                        tint = WaspadAIDarkBlue,
+                        tint = Color.Black,
                         modifier = Modifier.size(20.dp),
                     )
                 }
             }
         }
-        HorizontalDivider(color = WaspadAILightBlue, thickness = 1.dp)
+        HorizontalDivider(color = Color.Black.copy(alpha = .16f), thickness = 1.dp)
     }
 }
 
@@ -1188,18 +1202,15 @@ private fun InlineAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tint: Color = Color.Black,
-    containerColor: Color = Color.Transparent,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(containerColor)
             .clickable(
                 interactionSource = interactionSource,
                 onClick = onClick,
             )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -1235,18 +1246,18 @@ private fun EmptyCommunityResult(modifier: Modifier = Modifier) {
         Icon(
             imageVector = Icons.Rounded.Search,
             contentDescription = null,
-            tint = WaspadAIMuted,
+            tint = Color.Black.copy(alpha = .4f),
             modifier = Modifier.size(42.dp),
         )
         Spacer(Modifier.height(10.dp))
         Text(
             text = "Kasus tidak ditemukan",
-            color = WaspadAIDarkBlue,
+            color = Color.Black,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "Coba kata kunci atau filter lain.",
-            color = WaspadAIMuted,
+            color = Color.Black.copy(alpha = .4f),
             fontSize = 13.sp,
         )
     }

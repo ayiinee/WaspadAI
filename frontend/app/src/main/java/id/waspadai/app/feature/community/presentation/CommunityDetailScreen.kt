@@ -257,7 +257,7 @@ private fun CommunityInsight(post: CommunityPost) {
         shape = RoundedCornerShape(10.dp),
     ) {
         Column(Modifier.padding(vertical = 14.dp)) {
-            Text("Polling komunitas", color = WaspadAIDarkBlue, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("Polling komunitas", color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 segments.forEach { segment ->
@@ -266,7 +266,7 @@ private fun CommunityInsight(post: CommunityPost) {
                         Text(
                             text = segment.label,
                             modifier = Modifier.width(66.dp),
-                            color = WaspadAIDarkBlue,
+                            color = Color.Black,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -288,7 +288,7 @@ private fun CommunityInsight(post: CommunityPost) {
                         Text(
                             text = "$percentage%",
                             modifier = Modifier.width(34.dp),
-                            color = WaspadAIDarkBlue,
+                            color = Color.Black,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.End,
@@ -299,12 +299,12 @@ private fun CommunityInsight(post: CommunityPost) {
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "$totalVotes total penilaian • ${leadingSegment.label} paling banyak",
-                color = Color(0xFF5D6B76),
+                color = Color.Black,
                 fontSize = 12.sp,
             )
             Text(
                 text = "Pilih penilaian Anda untuk ikut memperbarui hasil polling.",
-                color = Color(0xFF7B8790),
+                color = Color.Black,
                 fontSize = 11.sp,
             )
         }
