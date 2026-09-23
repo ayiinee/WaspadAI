@@ -22,6 +22,9 @@ import androidx.navigation.compose.rememberNavController
 import id.waspadai.app.feature.community.presentation.CommunityRoute
 import id.waspadai.app.feature.community.presentation.CommunityViewModel
 import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
+import id.waspadai.app.feature.home.presentation.HomeRoute
+import id.waspadai.app.feature.home.presentation.HomeViewModel
+import id.waspadai.app.feature.home.domain.LoadHomeUseCase
 import id.waspadai.app.feature.learning.presentation.LearningScreen
 import id.waspadai.app.feature.learning.presentation.LearningViewModel
 import id.waspadai.app.feature.learning.presentation.LearningAction
@@ -39,6 +42,7 @@ import id.waspadai.app.core.ui.CommunityNotificationState
 import id.waspadai.app.core.ui.LocalCommunityNotification
 
 private const val VerificationRouteName = "verification"
+private const val HomeRouteName = "home"
 private const val CommunityRouteName = "community"
 private const val LearningRouteName = "learning"
 private const val WelcomeRouteName = "welcome"
@@ -90,25 +94,26 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
     }
     val navigateToTopLevel: (String) -> Unit = { destination ->
         val targetRoute = when (destination) {
+            "Beranda" -> HomeRouteName
             "Periksa" -> VerificationRouteName
             "Koneksi" -> CommunityRouteName
             "Pelajari" -> LearningRouteName
             else -> null
         }
         if (targetRoute != null && targetRoute != currentRoute) {
-            if (targetRoute == VerificationRouteName) {
-                val returnedToVerification = navController.popBackStack(
-                    route = VerificationRouteName,
+            if (targetRoute == HomeRouteName) {
+                val returnedToHome = navController.popBackStack(
+                    route = HomeRouteName,
                     inclusive = false,
                 )
-                if (!returnedToVerification) {
-                    navController.navigate(VerificationRouteName) {
+                if (!returnedToHome) {
+                    navController.navigate(HomeRouteName) {
                         launchSingleTop = true
                     }
                 }
             } else {
                 navController.navigate(targetRoute) {
-                    popUpTo(VerificationRouteName) { saveState = true }
+                    popUpTo(HomeRouteName) { saveState = true }
                     launchSingleTop = true
                     restoreState = true
                 }
@@ -141,10 +146,23 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
                     }
                 },
                 onAuthenticated = {
-                    navController.navigate(if (sharedCaseId != null) CommunityRouteName else VerificationRouteName) {
+                    navController.navigate(if (sharedCaseId != null) CommunityRouteName else HomeRouteName) {
                         popUpTo(WelcomeRouteName) { inclusive = true }
                     }
                 },
+            )
+        }
+        composable(HomeRouteName) {
+            val viewModel: HomeViewModel = viewModel(
+                factory = HomeViewModel.Factory(
+                    loadHome = LoadHomeUseCase(app.homeRepository),
+                    accessTokenProvider = app.authRepository,
+                    baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+                ),
+            )
+            HomeRoute(
+                onDestinationSelected = navigateToTopLevel,
+                viewModel = viewModel,
             )
         }
         composable(VerificationRouteName) {

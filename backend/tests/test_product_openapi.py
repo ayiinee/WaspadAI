@@ -18,6 +18,7 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert parameters[0]["required"] is True
     assert "/api/v1/history" in specification["paths"]
     assert "/api/v1/history/{case_id}" in specification["paths"]
+    assert "/api/v1/home" in specification["paths"]
     assert "/api/v1/verifications/image" in specification["paths"]
     assert "/api/v1/verify/text" not in specification["paths"]
     assert "/api/v1/verify/image" not in specification["paths"]

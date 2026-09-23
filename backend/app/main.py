@@ -25,6 +25,7 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
+from app.api.router import api_router
 from app.auth import AuthenticatedUser, authenticate_access_token, get_current_user
 from app.community_realtime import CommunityConnectionManager
 from app.community_service import (
@@ -136,6 +137,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="WaspadAI Product API", version="0.1.0", lifespan=lifespan)
+    app.include_router(api_router)
     community_connections = CommunityConnectionManager()
 
     @app.middleware("http")

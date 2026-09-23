@@ -5,6 +5,32 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/home": {
+      "get": {
+        "tags": [
+          "Home"
+        ],
+        "summary": "Get Home Endpoint",
+        "operationId": "get_home_endpoint_api_v1_home_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -2888,6 +2914,154 @@
           "next_cursor"
         ],
         "title": "HistoryPage"
+      },
+      "HomeCaseResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "verdict": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Verdict"
+          },
+          "risk_level": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Risk Level"
+          },
+          "requires_human_review": {
+            "type": "boolean",
+            "title": "Requires Human Review"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "title",
+          "summary",
+          "verdict",
+          "risk_level",
+          "requires_human_review",
+          "created_at"
+        ],
+        "title": "HomeCaseResponse"
+      },
+      "HomeLearningRecommendationResponse": {
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "module_id",
+          "title",
+          "summary",
+          "progress_percent"
+        ],
+        "title": "HomeLearningRecommendationResponse"
+      },
+      "HomeProfileResponse": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Display Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "title": "HomeProfileResponse"
+      },
+      "HomeResponse": {
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/HomeProfileResponse"
+          },
+          "recent_cases": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCaseResponse"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Recent Cases"
+          },
+          "learning_recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/HomeLearningRecommendationResponse"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Learning Recommendations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile",
+          "recent_cases",
+          "learning_recommendations"
+        ],
+        "title": "HomeResponse"
       },
       "LearningCase": {
         "properties": {

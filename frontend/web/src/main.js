@@ -18,6 +18,11 @@ const choosePhoto = document.querySelector("#choose-photo");
 const chooseFile = document.querySelector("#choose-file");
 const authScreen = document.querySelector("#auth-screen");
 const appShell = document.querySelector("#app-shell");
+const homeScreen = document.querySelector("#home-screen");
+const homeSearchInput = document.querySelector("#home-search-input");
+const homeCaseList = document.querySelector("#home-case-list");
+const homeLearningList = document.querySelector("#home-learning-list");
+const homeFilter = document.querySelector("#home-filter");
 const authForm = document.querySelector("#auth-form");
 const authEmail = document.querySelector("#auth-email");
 const authPassword = document.querySelector("#auth-password");
@@ -46,6 +51,7 @@ const communitySearchInput = document.querySelector("#community-search-input");
 const communityFilter = document.querySelector("#community-filter");
 
 let isSignUp = false;
+let homeCautionOnly = false;
 
 const state = {
   busy: false,
@@ -99,6 +105,40 @@ const communityPosts = [
     validCount: 4,
     supported: false,
     verdict: null,
+  },
+];
+
+const homeCases = [
+  {
+    title: "Pemungutan Biaya Pendaftaran Beasiswa Pendidikan KIP Kuliah",
+    description: "Informasi ini terbukti hoaks. Pesan yang mengatasnamakan penyelenggara meminta biaya pendaftaran.",
+    status: "Hoaks",
+    tone: "hoaks",
+  },
+  {
+    title: "Undangan Digital Berisi File Berbahaya",
+    description: "Konten ini terindikasi sebagai penipuan. File undangan dengan format APK dapat membahayakan perangkat.",
+    status: "Waspada",
+    tone: "waspada",
+  },
+  {
+    title: "Website Resmi KlikBCA Menggunakan Domain klikbca.com",
+    description: "Informasi ini terbukti benar. Situs layanan internet banking BCA menggunakan domain resmi tersebut.",
+    status: "Valid",
+    tone: "valid",
+  },
+];
+
+const homeLearningRecommendations = [
+  {
+    title: "Kenali Modus Penipuan Online",
+    description: "Pelajari berbagai pola penipuan",
+    image: "/assets/home/learning-safe-info.png",
+  },
+  {
+    title: "Kenali Link Palsu",
+    description: "Mengenali tautan mencurigakan",
+    image: "/assets/home/learning-fake-link.png",
   },
 ];
 
@@ -198,8 +238,7 @@ authForm.addEventListener("submit", (event) => {
     return;
   }
   authScreen.hidden = true;
-  appShell.hidden = false;
-  input.focus();
+  showHome();
 });
 
 function renderCommunity() {
@@ -218,6 +257,7 @@ function renderCommunity() {
 }
 
 function showCommunityDetail(post) {
+  homeScreen.hidden = true;
   appShell.hidden = true;
   communityScreen.hidden = true;
   communityDetailScreen.hidden = false;
@@ -552,6 +592,9 @@ input.addEventListener("keydown", (event) => {
 });
 
 const primaryNav = appShell.querySelector(".bottom-nav");
+const homeNav = primaryNav.cloneNode(true);
+homeNav.id = "home-nav";
+document.querySelector("#home-nav").replaceWith(homeNav);
 const communityNav = primaryNav.cloneNode(true);
 communityNav.id = "community-nav";
 document.querySelector("#community-nav").replaceWith(communityNav);
@@ -582,12 +625,62 @@ function setSelectedTab(container, destination) {
 // Setiap halaman memakai salinan bottom nav yang berbeda. Sinkronkan semuanya
 // agar tidak ada salinan yang menyimpan status aktif dari halaman sebelumnya.
 function syncSelectedTab(destination) {
-  [primaryNav, communityNav, communityDetailNav, learnNav, materialNav].forEach((nav) => {
+  [homeNav, primaryNav, communityNav, communityDetailNav, learnNav, materialNav].forEach((nav) => {
     setSelectedTab(nav, destination);
   });
 }
 
+function renderHome() {
+  const query = homeSearchInput.value.trim().toLowerCase();
+  const cases = homeCases.filter((item) => {
+    const matchesQuery = !query || `${item.title} ${item.description} ${item.status}`.toLowerCase().includes(query);
+    return matchesQuery && (!homeCautionOnly || item.tone === "waspada");
+  });
+  const recommendations = homeLearningRecommendations.filter((item) =>
+    !query || `${item.title} ${item.description}`.toLowerCase().includes(query),
+  );
+
+  homeCaseList.replaceChildren(...cases.map((item) => {
+    const card = createElement("button", "home-case-card");
+    card.type = "button";
+    card.addEventListener("click", showCommunity);
+    const copy = createElement("div", "home-case-copy");
+    copy.append(createElement("h3", "", item.title), createElement("p", "", item.description));
+    card.append(copy, createElement("span", `home-case-badge ${item.tone}`, item.status));
+    return card;
+  }));
+  if (!cases.length) homeCaseList.append(createElement("p", "home-empty", "Kasus tidak ditemukan."));
+
+  homeLearningList.replaceChildren(...recommendations.map((item) => {
+    const card = createElement("button", "home-learning-card");
+    card.type = "button";
+    card.addEventListener("click", showLearning);
+    const visual = createElement("span", "home-learning-visual");
+    const image = document.createElement("img");
+    image.src = item.image;
+    image.alt = "";
+    visual.append(image);
+    card.append(visual, createElement("h3", "", item.title), createElement("p", "", item.description));
+    return card;
+  }));
+  if (!recommendations.length) homeLearningList.append(createElement("p", "home-empty", "Materi tidak ditemukan."));
+}
+
+function showHome() {
+  appShell.hidden = true;
+  communityScreen.hidden = true;
+  communityDetailScreen.hidden = true;
+  learnScreen.hidden = true;
+  materialScreen.hidden = true;
+  quizChoiceModal.hidden = true;
+  quizScreen.hidden = true;
+  homeScreen.hidden = false;
+  syncSelectedTab("Beranda");
+  renderHome();
+}
+
 function showVerification() {
+  homeScreen.hidden = true;
   communityScreen.hidden = true;
   communityDetailScreen.hidden = true;
   learnScreen.hidden = true;
@@ -620,6 +713,7 @@ function renderLearning() {
 }
 
 function showLearning() {
+  homeScreen.hidden = true;
   appShell.hidden = true;
   communityScreen.hidden = true;
   communityDetailScreen.hidden = true;
@@ -634,6 +728,7 @@ function showLearning() {
 function showMaterial(material) {
   currentMaterial = material;
   currentStage = 0;
+  homeScreen.hidden = true;
   appShell.hidden = true;
   communityScreen.hidden = true;
   communityDetailScreen.hidden = true;
@@ -722,6 +817,7 @@ document.querySelector("#quiz-choice-close").addEventListener("click", () => { q
 document.querySelector("#quiz-back").addEventListener("click", () => { quizScreen.hidden = true; });
 
 function showCommunity() {
+  homeScreen.hidden = true;
   appShell.hidden = true;
   communityDetailScreen.hidden = true;
   learnScreen.hidden = true;
@@ -736,7 +832,8 @@ function showCommunity() {
 document.querySelectorAll("[data-tab]").forEach((tab) => {
   tab.addEventListener("click", () => {
     const destination = tab.dataset.tab;
-    if (destination === "Koneksi") showCommunity();
+    if (destination === "Beranda") showHome();
+    else if (destination === "Koneksi") showCommunity();
     else if (destination === "Periksa") showVerification();
     else if (destination === "Pelajari") showLearning();
     else {
@@ -747,6 +844,16 @@ document.querySelectorAll("[data-tab]").forEach((tab) => {
 });
 
 document.querySelector("#community-back").addEventListener("click", showVerification);
+document.querySelector("#home-verify-hero").addEventListener("click", showVerification);
+document.querySelector("#home-see-cases").addEventListener("click", showCommunity);
+document.querySelector("#home-see-learning").addEventListener("click", showLearning);
+homeSearchInput.addEventListener("input", renderHome);
+homeFilter.addEventListener("click", () => {
+  homeCautionOnly = !homeCautionOnly;
+  homeFilter.setAttribute("aria-pressed", String(homeCautionOnly));
+  homeFilter.setAttribute("aria-label", homeCautionOnly ? "Tampilkan semua kasus" : "Tampilkan kasus waspada");
+  renderHome();
+});
 communitySearchInput.addEventListener("input", renderCommunity);
 communityFilter.addEventListener("change", renderCommunity);
 learnSearchInput.addEventListener("input", renderLearning);

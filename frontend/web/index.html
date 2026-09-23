@@ -7,6 +7,7 @@
       name="description"
       content="Demo browser WaspadAI untuk pemeriksaan pesan mencurigakan."
     />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23005c9e%22/><path d=%22M8 16l5 5 11-12%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
     <title>WaspadAI — Demo Browser</title>
   </head>
   <body>
@@ -33,6 +34,74 @@
           </section>
           <p class="auth-terms">Dengan melanjutkan, Anda menyetujui penggunaan aplikasi WaspadAI.</p>
         </div>
+      </section>
+    </main>
+
+    <main id="home-screen" class="page-shell" hidden>
+      <section class="home-frame" aria-label="Halaman Beranda WaspadAI">
+        <section class="home-content">
+          <div class="home-status-bar" aria-hidden="true">
+            <span>19:30</span>
+            <span class="home-status-icons">
+              <svg viewBox="0 0 24 24"><path d="M3 20h3v-4H3zm5 0h3v-7H8zm5 0h3V9h-3zm5 0h3V4h-3z" /></svg>
+              <svg viewBox="0 0 24 24"><path d="M3 9.5a14.5 14.5 0 0 1 18 0M6.5 13a9 9 0 0 1 11 0M10 16.5a3.5 3.5 0 0 1 4 0" /><circle cx="12" cy="19" r="1" /></svg>
+              <svg viewBox="0 0 28 14"><rect x="1" y="1" width="23" height="12" rx="3" /><path d="M26 5v4" /></svg>
+            </span>
+          </div>
+
+          <header class="home-hero">
+            <div class="home-brand-row">
+              <div>
+                <h1>WaspadAI</h1>
+                <div class="home-profile">
+                  <span class="home-profile-photo"><img src="/assets/home/profile.jpeg" alt="Foto profil Putu Alvin" /></span>
+                  <strong>Putu Alvin</strong>
+                </div>
+              </div>
+              <div class="home-header-actions">
+                <button type="button" aria-label="Notifikasi">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
+                </button>
+                <button type="button" aria-label="Pengaturan">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+                </button>
+              </div>
+            </div>
+            <button id="home-verify-hero" class="home-banner" type="button" aria-label="Mulai verifikasi informasi">
+              <img src="/assets/home/verification-banner.png" alt="Ragu sama informasi yang kamu terima? Mulai verifikasi dengan WaspadAI." />
+            </button>
+          </header>
+
+          <section class="home-body">
+            <div class="home-tools" role="search">
+              <label class="home-search">
+                <span class="sr-only">Cari kasus, materi, atau informasi</span>
+                <input id="home-search-input" type="search" placeholder="Cari kasus, materi, atau informasi..." />
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
+              </label>
+              <button id="home-filter" class="home-filter" type="button" aria-label="Tampilkan kasus waspada" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+              </button>
+            </div>
+
+            <section class="home-section" aria-labelledby="latest-verification-title">
+              <div class="home-section-heading">
+                <h2 id="latest-verification-title">Verifikasi Kasus Terbaru</h2>
+                <button id="home-see-cases" type="button">Lihat Semua</button>
+              </div>
+              <div id="home-case-list" class="home-case-list"></div>
+            </section>
+
+            <section class="home-section home-learning-section" aria-labelledby="learning-recommendation-title">
+              <div class="home-section-heading">
+                <h2 id="learning-recommendation-title">Rekomendasi Pembelajaran</h2>
+                <button id="home-see-learning" type="button">Lihat Semua</button>
+              </div>
+              <div id="home-learning-list" class="home-learning-list"></div>
+            </section>
+          </section>
+        </section>
+        <nav id="home-nav" aria-label="Navigasi utama"></nav>
       </section>
     </main>
 
