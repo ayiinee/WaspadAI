@@ -3265,6 +3265,30 @@
             ],
             "title": "Best Score"
           },
+          "latest_correct_answers": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Correct Answers"
+          },
+          "latest_total_questions": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Total Questions"
+          },
           "updated_at": {
             "type": "string",
             "title": "Updated At"
@@ -3577,6 +3601,18 @@
             "type": "string",
             "format": "uuid",
             "title": "Selected Option Id"
+          },
+          "correct_option_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correct Option Id"
           },
           "correct": {
             "type": "boolean",

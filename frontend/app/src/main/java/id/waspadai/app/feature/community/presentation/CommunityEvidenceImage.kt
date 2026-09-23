@@ -3,15 +3,14 @@ package id.waspadai.app.feature.community.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,8 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -36,10 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
@@ -132,65 +126,41 @@ private fun CommunityImageViewer(
     )
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-            color = Color.White,
-            shape = RoundedCornerShape(18.dp),
-            shadowElevation = 12.dp,
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 18.dp, top = 8.dp, end = 6.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = "Preview foto",
-                            color = Color.Black,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Foto ${pagerState.currentPage + 1} dari ${media.size} · $author",
-                            color = Color.Black.copy(alpha = .4f),
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "Tutup preview foto",
-                            tint = Color.Black,
-                        )
-                    }
-                }
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 620.dp).aspectRatio(4f / 3f),
-                    beyondViewportPageCount = if (media.size > 1) 1 else 0,
-                    key = { index -> media[index].id },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) { index ->
-                    StableCommunityImage(
-                        media = media[index],
-                        accessToken = accessToken,
-                        contentDescription = "Gambar ${index + 1} dari ${media.size} oleh $author",
-                        modifier = Modifier.fillMaxSize().background(Color(0xFFF2F5F7)),
-                        contentScale = ContentScale.Fit,
-                    )
-                }
-                if (media.size > 1) {
-                    MediaIndicator(
-                        currentIndex = pagerState.currentPage,
-                        total = media.size,
-                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 14.dp),
-                        dark = true,
-                    )
-                }
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                beyondViewportPageCount = if (media.size > 1) 1 else 0,
+                key = { index -> media[index].id },
+                verticalAlignment = Alignment.CenterVertically,
+            ) { index ->
+                StableCommunityImage(
+                    media = media[index],
+                    accessToken = accessToken,
+                    contentDescription = "Gambar ${index + 1} dari ${media.size} oleh $author",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp).size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Tutup gambar",
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+            if (media.size > 1) {
+                MediaIndicator(
+                    currentIndex = pagerState.currentPage,
+                    total = media.size,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
+                )
             }
         }
     }
@@ -233,7 +203,6 @@ private fun MediaIndicator(
     currentIndex: Int,
     total: Int,
     modifier: Modifier = Modifier,
-    dark: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -241,7 +210,7 @@ private fun MediaIndicator(
                 contentDescription = "Foto ${currentIndex + 1} dari $total"
             }
             .clip(RoundedCornerShape(14.dp))
-            .background(if (dark) Color.Transparent else Color.Black.copy(alpha = 0.48f))
+            .background(Color.Black.copy(alpha = 0.48f))
             .padding(horizontal = 9.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -252,11 +221,7 @@ private fun MediaIndicator(
                     .size(if (index == currentIndex) 8.dp else 6.dp)
                     .clip(androidx.compose.foundation.shape.CircleShape)
                     .background(
-                        if (dark) {
-                            if (index == currentIndex) Color.Black else Color.Black.copy(alpha = .16f)
-                        } else {
-                            if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.55f)
-                        },
+                        if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.55f),
                     ),
             )
         }

@@ -56,6 +56,10 @@ data class LearningModuleItem(
     val totalLessons: Int,
     val completedLessons: Int,
     val progressPercent: Double,
+    val latestScore: Double? = null,
+    val progressUpdatedAt: String? = null,
+    val latestCorrectAnswers: Int? = null,
+    val latestTotalQuestions: Int? = null,
 )
 
 data class LearningLesson(
@@ -129,6 +133,7 @@ data class QuizQuestionFeedback(
     val selectedOptionId: String,
     val correct: Boolean,
     val explanation: String,
+    val correctOptionId: String? = null,
 )
 
 data class QuizAttemptResult(
@@ -147,5 +152,9 @@ data class LearningProgressItem(
     val latestScore: Double?,
     val bestScore: Double?,
     val updatedAt: String,
+    val latestCorrectAnswers: Int? = null,
+    val latestTotalQuestions: Int? = null,
+    val firstOpenedAt: String? = null,
+    val lastOpenedAt: String? = null,
 )
 

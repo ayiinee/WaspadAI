@@ -99,6 +99,10 @@ class CommunityViewModel(
                 )
             }
 
+            is CommunityAction.FeedScopeSelected -> _uiState.update {
+                it.copy(selectedFeedScope = action.scope)
+            }
+
             is CommunityAction.SupportClicked -> submitLike(action.postId)
 
             is CommunityAction.ShareClicked -> sharePost(action.postId)

@@ -4,6 +4,7 @@ import android.app.Application
 import id.waspadai.app.core.network.ApiClient
 import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.auth.data.SupabaseAuthRepository
+import id.waspadai.app.feature.auth.data.RememberedCredentialsStore
 import id.waspadai.app.feature.community.data.CommunityRepositoryImpl
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.learning.data.LearningRepositoryImpl
@@ -33,6 +34,8 @@ class WaspadAIApplication : Application() {
             initialAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
         )
     }
+
+    val rememberedCredentialsStore by lazy { RememberedCredentialsStore(this) }
 
     val verificationRepository: VerificationRepository by lazy {
         if (BuildConfig.WASPADAI_REMOTE_ENABLED) {

@@ -248,7 +248,7 @@ begin
     values
         -- Modul 1: Phishing, OTP, dan PIN
         ('00000000-0000-0000-0000-000000000311', '00000000-0000-0000-0000-000000000301',
-         'Bahaya Membagikan Kode OTP & PIN',
+         'Jaga Kerahasiaan OTP dan PIN',
          '## Mengapa OTP dan PIN Sangat Rahasia?
 
 One-Time Password (OTP) dan Personal Identification Number (PIN) adalah garis pertahanan terakhir akun digital Anda.
@@ -458,7 +458,47 @@ Sebelum meneruskan pesan berantai ke keluarga atau grup:
         ('00000000-0000-0000-0000-000000000535', '00000000-0000-0000-0000-000000000523',
          'Menyediakan analisis multi-dimensi faktual dan panduan tindakan pengguna.', 1, true),
         ('00000000-0000-0000-0000-000000000536', '00000000-0000-0000-0000-000000000523',
-         'Menghapus secara otomatis kontak pengirim pesan berantai dari telepon.', 2, false)
+         'Menghapus secara otomatis kontak pengirim pesan berantai dari telepon.', 2, false),
+
+        -- Tambahan opsi C dan D agar setiap soal memiliki empat pilihan
+        ('00000000-0000-0000-0000-000000000337', '00000000-0000-0000-0000-000000000321',
+         'Boleh jika permintaan disampaikan melalui telepon kantor bank.', 3, false),
+        ('00000000-0000-0000-0000-000000000338', '00000000-0000-0000-0000-000000000321',
+         'Boleh selama kode tersebut belum pernah digunakan sebelumnya.', 4, false),
+        ('00000000-0000-0000-0000-000000000339', '00000000-0000-0000-0000-000000000322',
+         'Balas SMS tersebut dan minta pengirim menjelaskan transaksinya.', 3, false),
+        ('00000000-0000-0000-0000-000000000340', '00000000-0000-0000-0000-000000000322',
+         'Teruskan tautannya kepada teman untuk meminta pendapat.', 4, false),
+        ('00000000-0000-0000-0000-000000000341', '00000000-0000-0000-0000-000000000323',
+         'Karena tanggal lahir hanya dapat digunakan untuk PIN kartu kredit.', 3, false),
+        ('00000000-0000-0000-0000-000000000342', '00000000-0000-0000-0000-000000000323',
+         'Karena PIN dengan angka berurutan selalu diblokir oleh bank.', 4, false),
+
+        ('00000000-0000-0000-0000-000000000437', '00000000-0000-0000-0000-000000000421',
+         'Balas pesan dan minta kurir mengirim file APK versi terbaru.', 3, false),
+        ('00000000-0000-0000-0000-000000000438', '00000000-0000-0000-0000-000000000421',
+         'Buka file menggunakan ponsel milik orang lain terlebih dahulu.', 4, false),
+        ('00000000-0000-0000-0000-000000000439', '00000000-0000-0000-0000-000000000422',
+         'Akun tersebut sering mengadakan undian berhadiah untuk pengikutnya.', 3, false),
+        ('00000000-0000-0000-0000-000000000440', '00000000-0000-0000-0000-000000000422',
+         'Nama akun menggunakan huruf kapital dan logo perusahaan.', 4, false),
+        ('00000000-0000-0000-0000-000000000441', '00000000-0000-0000-0000-000000000423',
+         'Layanan percepatan perkara yang berlaku untuk keadaan darurat.', 3, false),
+        ('00000000-0000-0000-0000-000000000442', '00000000-0000-0000-0000-000000000423',
+         'Prosedur pembayaran denda resmi melalui rekening pribadi aparat.', 4, false),
+
+        ('00000000-0000-0000-0000-000000000537', '00000000-0000-0000-0000-000000000521',
+         'Ditulis singkat dan selalu menggunakan bahasa yang baku.', 3, false),
+        ('00000000-0000-0000-0000-000000000538', '00000000-0000-0000-0000-000000000521',
+         'Memiliki banyak komentar dan sudah diteruskan berkali-kali.', 4, false),
+        ('00000000-0000-0000-0000-000000000539', '00000000-0000-0000-0000-000000000522',
+         'Tambahkan catatan bahwa informasi tersebut belum tentu benar.', 3, false),
+        ('00000000-0000-0000-0000-000000000540', '00000000-0000-0000-0000-000000000522',
+         'Tanyakan kepada pengirim apakah ia sudah mencoba pengobatannya.', 4, false),
+        ('00000000-0000-0000-0000-000000000541', '00000000-0000-0000-0000-000000000523',
+         'Menentukan kebenaran hanya berdasarkan jumlah orang yang membagikan.', 3, false),
+        ('00000000-0000-0000-0000-000000000542', '00000000-0000-0000-0000-000000000523',
+         'Meneruskan semua klaim mencurigakan langsung kepada seluruh kontak.', 4, false)
     on conflict (id) do nothing;
 
     -- Publikasikan modul setelah seluruh lesson dan pertanyaan siap (validasi trigger)

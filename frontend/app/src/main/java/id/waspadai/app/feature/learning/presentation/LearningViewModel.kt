@@ -87,6 +87,10 @@ class LearningViewModel(
                                     completedLessons = it.completedLessons,
                                     totalLessons = it.totalLessons,
                                     progressPercent = it.progressPercent,
+                                    latestScore = it.latestScore,
+                                    progressUpdatedAt = it.updatedAt,
+                                    latestCorrectAnswers = it.latestCorrectAnswers,
+                                    latestTotalQuestions = it.latestTotalQuestions,
                                 )
                             } ?: module
                         },

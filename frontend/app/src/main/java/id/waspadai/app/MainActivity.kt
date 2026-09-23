@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.WHITE, Color.WHITE),
         )
         val app = application as WaspadAIApplication
         val sharedCaseId = intent?.data
@@ -131,6 +131,9 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
     NavHost(navController = navController, startDestination = WelcomeRouteName) {
         composable(WelcomeRouteName) {
             AuthLandingScreen(
+                rememberedCredentials = app.rememberedCredentialsStore.load(),
+                onRememberCredentials = app.rememberedCredentialsStore::save,
+                onForgetCredentials = app.rememberedCredentialsStore::clear,
                 onAuthenticate = { email, password, isSignUp ->
                     runCatching {
                         if (isSignUp) {
@@ -139,6 +142,15 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
                             app.authRepository.signIn(email, password)
                         }
                     }
+                },
+                onRequestPasswordReset = { email ->
+                    runCatching { app.authRepository.requestPasswordReset(email) }
+                },
+                onVerifyPasswordResetCode = { email, code ->
+                    runCatching { app.authRepository.verifyPasswordResetCode(email, code) }
+                },
+                onUpdatePassword = { newPassword ->
+                    runCatching { app.authRepository.updatePassword(newPassword) }
                 },
                 onAuthenticated = {
                     navController.navigate(if (sharedCaseId != null) CommunityRouteName else VerificationRouteName) {

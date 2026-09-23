@@ -5,12 +5,15 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -90,14 +93,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -112,13 +120,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 import id.waspadai.app.feature.community.domain.CommunityRepository
+import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
@@ -132,6 +145,9 @@ import id.waspadai.app.ui.theme.WaspadAITheme
 import id.waspadai.app.ui.theme.WaspadAIValid
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun CommunityRoute(
@@ -251,7 +267,7 @@ fun CommunityScreen(
         keyboardController?.hide()
         isSearchVisible = false
         onAction(CommunityAction.SearchChanged(""))
-        onAction(CommunityAction.FilterSelected(CommunityFeedFilter.Semua))
+        onAction(CommunityAction.FilterSelected(CommunityFeedFilter.BelumDinilai))
     }
 
     Scaffold(
@@ -279,6 +295,12 @@ fun CommunityScreen(
                 isSearchVisible = isSearchVisible,
                 onSearchClick = {
                     if (isSearchVisible) closeSearch() else isSearchVisible = true
+                },
+            )
+            CommunityFeedTabs(
+                selectedScope = uiState.selectedFeedScope,
+                onScopeSelected = { scope ->
+                    onAction(CommunityAction.FeedScopeSelected(scope))
                 },
             )
             AnimatedVisibility(
@@ -317,7 +339,7 @@ fun CommunityScreen(
                         state = pullToRefreshState,
                         isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
                         modifier = Modifier.align(Alignment.TopCenter),
-                        color = Color.Black,
+                        color = WaspadAIBlue,
                     )
                 },
             ) {
@@ -338,6 +360,9 @@ fun CommunityScreen(
                             CommunityPostCard(
                                 post = post,
                                 accessToken = uiState.accessTokenDraft,
+                                imageBaseUrl = uiState.baseUrlDraft,
+                                detail = uiState.detailByPostId[post.id],
+                                isResponsesLoading = uiState.detailLoadingPostId == post.id,
                                 onSupportClick = {
                                     onAction(CommunityAction.SupportClicked(post.id))
                                 },
@@ -345,6 +370,9 @@ fun CommunityScreen(
                                     onAction(CommunityAction.VerdictSelected(post.id, verdict))
                                 },
                                 onShareClick = { onSharePost(post) },
+                                onLoadResponses = {
+                                    onAction(CommunityAction.LoadPostDetail(post.id))
+                                },
                                 onOpenDetails = { onOpenPost(post) },
                                 onEdit = { editingPost = post },
                                 onDelete = { deletingPost = post },
@@ -413,7 +441,7 @@ internal fun CommunityPageHeader(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.Black),
+            .background(WaspadAIBlue),
     ) {
         Image(
             painter = painterResource(id = R.drawable.community_header_background),
@@ -421,7 +449,6 @@ internal fun CommunityPageHeader(
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop,
             alpha = .6f,
-            colorFilter = ColorFilter.tint(Color.Black),
         )
         Box(
             modifier = Modifier
@@ -460,6 +487,43 @@ internal fun CommunityPageHeader(
                         modifier = Modifier.size(25.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommunityFeedTabs(
+    selectedScope: CommunityFeedScope,
+    onScopeSelected: (CommunityFeedScope) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White),
+    ) {
+        CommunityFeedScope.entries.forEach { scope ->
+            val selected = scope == selectedScope
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onScopeSelected(scope) }
+                    .padding(top = 11.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = scope.label,
+                    color = if (selected) WaspadAIBlue else Color.Black.copy(alpha = .48f),
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                Spacer(Modifier.height(9.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(if (selected) WaspadAIBlue else Color.Transparent),
+                )
             }
         }
     }
@@ -593,6 +657,7 @@ private fun CommunitySearchBar(
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val filterPopupOffset = with(LocalDensity.current) { IntOffset(0, 52.dp.roundToPx()) }
     val horizontalPadding = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 22.dp
     LaunchedEffect(requestFocus) {
         if (requestFocus) {
@@ -656,7 +721,7 @@ private fun CommunitySearchBar(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.Black)
+                    .background(WaspadAIBlue)
                     .clickable {
                         focusManager.clearFocus()
                         keyboardController?.hide()
@@ -674,35 +739,61 @@ private fun CommunitySearchBar(
                     modifier = Modifier.size(26.dp),
                 )
             }
-            DropdownMenu(
-                expanded = isFilterMenuVisible,
-                onDismissRequest = { onAction(CommunityAction.FilterDismissed) },
-                modifier = Modifier
-                    .widthIn(min = 180.dp)
-                    .border(1.dp, Color.Black.copy(alpha = .18f), RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                containerColor = Color.White,
-                shadowElevation = 10.dp,
-            ) {
-                CommunityFeedFilter.entries.forEach { filter ->
+            if (isFilterMenuVisible) {
+                Popup(
+                    alignment = Alignment.TopEnd,
+                    offset = filterPopupOffset,
+                    onDismissRequest = { onAction(CommunityAction.FilterDismissed) },
+                    properties = PopupProperties(focusable = true),
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .width(152.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        shadowElevation = 8.dp,
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(16.dp)),
+                        ) {
+                val visibleFilters = CommunityFeedFilter.entries.filterNot { it == CommunityFeedFilter.Semua }
+                visibleFilters.forEachIndexed { index, filter ->
                     val isSelected = filter == selectedFilter
-                    DropdownMenuItem(
-                        text = {
+                    val itemShape = when (index) {
+                        0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                        visibleFilters.lastIndex -> RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                        else -> RoundedCornerShape(0.dp)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(itemShape)
+                            .background(if (isSelected) WaspadAIBlue else Color.White)
+                            .clickable(
+                                interactionSource = remember(filter) { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { onAction(CommunityAction.FilterSelected(filter)) },
+                            )
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
                             Text(
                                 text = filter.label,
-                                color = if (isSelected) Color.Black else Color.Black.copy(alpha = .4f),
+                                color = if (isSelected) Color.White else Color.Black.copy(alpha = .6f),
+                                fontSize = 12.sp,
                                 fontWeight = if (isSelected) {
                                     FontWeight.Bold
                                 } else {
                                     FontWeight.Normal
                                 },
                             )
-                        },
-                        onClick = { onAction(CommunityAction.FilterSelected(filter)) },
-                        modifier = Modifier.background(
-                            if (isSelected) Color.Black.copy(alpha = .09f) else Color.White,
-                        ),
-                    )
+                    }
+                }
+                        }
+                    }
                 }
             }
         }
@@ -713,9 +804,13 @@ private fun CommunitySearchBar(
 private fun CommunityPostCard(
     post: CommunityPost,
     accessToken: String,
+    imageBaseUrl: String,
+    detail: CommunityDetailSnapshot?,
+    isResponsesLoading: Boolean,
     onSupportClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
     onShareClick: () -> Unit,
+    onLoadResponses: () -> Unit,
     onOpenDetails: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -728,6 +823,8 @@ private fun CommunityPostCard(
         else -> 32.dp
     }
     var ownerMenuExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
+    var areResponsesExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
+    val likeAnimation = rememberCommunityLikeAnimation(post.id, post.isSupported)
     Column(
         modifier = modifier.fillMaxWidth(),
     ) {
@@ -759,7 +856,7 @@ private fun CommunityPostCard(
                     )
                     Text(
                         text = post.statusLabel,
-                        color = Color.Black,
+                        color = post.statusTextColor(),
                         fontSize = 10.sp,
                         lineHeight = 13.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -803,27 +900,26 @@ private fun CommunityPostCard(
                     }
                 }
             }
-            Spacer(Modifier.height(9.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-            ) {
+            if (post.title.isNotBlank()) {
+                Spacer(Modifier.height(9.dp))
                 Text(
                     text = post.title,
                     color = Color.Black,
                     fontSize = 14.sp,
                     lineHeight = 17.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Normal,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Spacer(Modifier.height(7.dp))
-            Text(
-                text = post.body,
-                color = Color.Black,
-                fontSize = 12.sp,
-                lineHeight = 15.sp,
-            )
+            if (post.hasDistinctBodyFromTitle()) {
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    text = post.body,
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    lineHeight = 15.sp,
+                )
+            }
             if (post.media.isNotEmpty()) {
                 Spacer(Modifier.height(7.dp))
                 CommunityMediaCarousel(
@@ -868,33 +964,71 @@ private fun CommunityPostCard(
                     },
                     label = post.likeCount.toString(),
                     contentDescription = "Total penilaian komunitas",
-                    tint = Color.Black,
+                    tint = if (post.isSupported) CommunityLikePink else CommunityActionGray,
+                    iconModifier = Modifier.communityLikeEffect(likeAnimation),
                     onClick = onSupportClick,
+                )
+                InlineAction(
+                    icon = null,
+                    label = post.commentCount.toString(),
+                    contentDescription = "Komentar",
+                    tint = if (areResponsesExpanded) CommunityCommentYellow else CommunityActionGray,
+                    labelTint = CommunityActionGray,
+                    iconContent = {
+                        RoundCommentIcon(
+                            tint = if (areResponsesExpanded) CommunityCommentYellow else CommunityActionGray,
+                            contentDescription = "Komentar",
+                            filled = areResponsesExpanded,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    onClick = {
+                        areResponsesExpanded = !areResponsesExpanded
+                        if (areResponsesExpanded) onLoadResponses()
+                    },
                 )
                 InlineAction(
                     icon = Icons.Rounded.Visibility,
                     label = post.viewCount.toString(),
                     contentDescription = "Dilihat ${post.viewCount} kali",
-                    tint = Color.Black,
-                    onClick = {},
-                )
-                InlineAction(
-                    icon = Icons.Rounded.ChatBubble,
-                    label = post.commentCount.toString(),
-                    contentDescription = "Komentar",
-                    tint = Color.Black,
+                    tint = CommunityActionGray,
                     onClick = {},
                 )
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onShareClick, modifier = Modifier.size(36.dp)) {
+                val shareInteractionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable(
+                            interactionSource = shareInteractionSource,
+                            indication = null,
+                            onClick = onShareClick,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.Share,
                         contentDescription = "Bagikan kasus",
-                        tint = Color.Black,
-                        modifier = Modifier.size(20.dp),
+                        tint = CommunityActionGray,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
+        }
+        AnimatedVisibility(
+            visible = areResponsesExpanded,
+            enter = fadeIn(tween(180)) + expandVertically(tween(240)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(180)),
+        ) {
+            InlineCommunityResponses(
+                responses = detail?.responses,
+                isLoading = isResponsesLoading,
+                avatarRes = post.avatarRes,
+                caseId = post.id,
+                imageBaseUrl = imageBaseUrl,
+                accessToken = accessToken,
+                contentModifier = Modifier.padding(horizontal = horizontalPadding),
+            )
         }
         HorizontalDivider(color = Color.Black.copy(alpha = .16f), thickness = 1.dp)
     }
@@ -1325,38 +1459,271 @@ private fun VerdictButton(
 
 @Composable
 private fun InlineAction(
-    icon: ImageVector,
+    icon: ImageVector?,
     label: String,
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Color.Black,
+    tint: Color = CommunityActionGray,
+    labelTint: Color = CommunityActionGray,
+    iconModifier: Modifier = Modifier,
+    iconContent: (@Composable () -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
             .clickable(
                 interactionSource = interactionSource,
+                indication = null,
                 onClick = onClick,
             )
             .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(20.dp),
-        )
+        if (iconContent != null) {
+            iconContent()
+        } else {
+            Icon(
+                imageVector = requireNotNull(icon),
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = iconModifier.size(22.dp),
+            )
+        }
         Text(
             text = label,
-            color = Color.Black,
-            fontSize = 13.sp,
+            color = labelTint,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
     }
 }
+
+private val CommunityActionGray = Color.Black.copy(alpha = .52f)
+internal val CommunityLikePink = Color(0xFFF21D4B)
+private val CommunityCommentYellow = Color(0xFFF2B705)
+
+@Composable
+internal fun RoundCommentIcon(
+    tint: Color,
+    contentDescription: String,
+    filled: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(
+        modifier = modifier.semantics {
+            this.contentDescription = contentDescription
+        },
+    ) {
+        val bubble = Path().apply {
+            moveTo(size.width * .50f, size.height * .08f)
+            cubicTo(
+                size.width * .25f, size.height * .08f,
+                size.width * .08f, size.height * .24f,
+                size.width * .08f, size.height * .48f,
+            )
+            cubicTo(
+                size.width * .08f, size.height * .63f,
+                size.width * .15f, size.height * .75f,
+                size.width * .28f, size.height * .82f,
+            )
+            lineTo(size.width * .20f, size.height * .95f)
+            lineTo(size.width * .42f, size.height * .87f)
+            cubicTo(
+                size.width * .70f, size.height * .91f,
+                size.width * .92f, size.height * .74f,
+                size.width * .92f, size.height * .48f,
+            )
+            cubicTo(
+                size.width * .92f, size.height * .24f,
+                size.width * .75f, size.height * .08f,
+                size.width * .50f, size.height * .08f,
+            )
+            close()
+        }
+        if (filled) {
+            drawPath(path = bubble, color = tint)
+        } else {
+            drawPath(
+                path = bubble,
+                color = tint,
+                style = Stroke(width = 1.8.dp.toPx(), join = StrokeJoin.Round),
+            )
+        }
+        listOf(.36f, .50f, .64f).forEach { x ->
+            drawCircle(
+                color = if (filled) Color.White else tint,
+                radius = 1.15.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(size.width * x, size.height * .48f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InlineCommunityResponses(
+    responses: List<CommunityResponseItem>?,
+    isLoading: Boolean,
+    avatarRes: Int,
+    caseId: String,
+    imageBaseUrl: String,
+    accessToken: String,
+    contentModifier: Modifier = Modifier,
+) {
+    Column(modifier = Modifier.padding(top = 4.dp)) {
+        HorizontalDivider(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.Black.copy(alpha = .10f),
+        )
+        Column(modifier = contentModifier) {
+            Text(
+                text = "Tanggapan komunitas",
+                color = Color.Black.copy(alpha = .72f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+            )
+            when {
+                isLoading -> Row(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = WaspadAIBlue,
+                    )
+                    Text("Memuat tanggapan...", color = CommunityActionGray, fontSize = 12.sp)
+                }
+                responses.isNullOrEmpty() -> Text(
+                    text = "Belum ada tanggapan komunitas.",
+                    color = CommunityActionGray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(vertical = 14.dp),
+                )
+                else -> responses.forEachIndexed { index, response ->
+                    Row(modifier = Modifier.padding(vertical = 10.dp)) {
+                        Image(
+                            painter = painterResource(avatarRes),
+                            contentDescription = "Foto ${response.author}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(34.dp).clip(CircleShape),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    response.author,
+                                    color = Color.Black.copy(alpha = .82f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(response.createdAt, color = Color.Black.copy(alpha = .38f), fontSize = 10.sp)
+                            }
+                            Text(
+                                response.reasoning,
+                                color = Color.Black.copy(alpha = .72f),
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp,
+                                modifier = Modifier.padding(top = 3.dp),
+                            )
+                            Text(
+                                text = when (response.vote.wireValue) {
+                                    "HOAKS" -> "Hoaks"
+                                    "WASPADA" -> "Waspada"
+                                    else -> "Valid"
+                                },
+                                color = WaspadAIBlue,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 5.dp),
+                            )
+                            if (response.hasImage) {
+                                CommunityEvidenceImage(
+                                    imageUrl = "${imageBaseUrl.trimEnd('/')}/api/v1/community/$caseId/responses/${response.responseId}/image",
+                                    accessToken = accessToken,
+                                    author = response.author,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(150.dp)
+                                        .padding(top = 7.dp),
+                                )
+                            }
+                        }
+                    }
+                    if (index != responses.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 44.dp),
+                            color = Color.Black.copy(alpha = .08f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+internal data class CommunityLikeAnimation(
+    val scale: Float,
+    val burstProgress: Float,
+)
+
+@Composable
+internal fun rememberCommunityLikeAnimation(
+    postId: String,
+    isSupported: Boolean,
+): CommunityLikeAnimation {
+    val scale = remember(postId) { Animatable(1f) }
+    val burst = remember(postId) { Animatable(1f) }
+    var previousSupportState by remember(postId) { mutableStateOf(isSupported) }
+    LaunchedEffect(isSupported) {
+        if (isSupported && !previousSupportState) {
+            burst.snapTo(0f)
+            launch { burst.animateTo(1f, tween(durationMillis = 620)) }
+            scale.snapTo(.72f)
+            scale.animateTo(1.3f, spring(dampingRatio = .38f, stiffness = 720f))
+            scale.animateTo(1f, spring(dampingRatio = .55f, stiffness = 520f))
+        } else if (!isSupported) {
+            scale.animateTo(1f)
+            burst.snapTo(1f)
+        }
+        previousSupportState = isSupported
+    }
+    return CommunityLikeAnimation(scale.value, burst.value)
+}
+
+internal fun Modifier.communityLikeEffect(animation: CommunityLikeAnimation): Modifier =
+    graphicsLayer {
+        scaleX = animation.scale
+        scaleY = animation.scale
+    }.drawWithContent {
+        drawContent()
+        val progress = animation.burstProgress
+        if (progress < 1f) {
+            repeat(10) { index ->
+                val angle = (2.0 * PI * index / 10.0) - (PI / 2.0)
+                val distance = 8.dp.toPx() + (14.dp.toPx() * progress)
+                val particleCenter = androidx.compose.ui.geometry.Offset(
+                    x = center.x + (cos(angle) * distance).toFloat(),
+                    y = center.y + (sin(angle) * distance).toFloat(),
+                )
+                drawCircle(
+                    color = CommunityLikePink.copy(alpha = 1f - progress),
+                    radius = (2.4.dp.toPx() * (1f - progress)).coerceAtLeast(.6f),
+                    center = particleCenter,
+                )
+            }
+        }
+    }
+
+internal fun CommunityPost.hasVisibleTitle(): Boolean =
+    title.isNotBlank() && !title.trim().equals("Bukti belum cukup kuat", ignoreCase = true)
+
+private fun CommunityPost.hasDistinctBodyFromTitle(): Boolean =
+    body.isNotBlank() && !body.trim().equals(title.trim(), ignoreCase = true)
 
 private fun CommunityPost.countFor(verdict: CommunityVerdict): Int = when (verdict) {
     CommunityVerdict.Hoaks -> hoaksCount
