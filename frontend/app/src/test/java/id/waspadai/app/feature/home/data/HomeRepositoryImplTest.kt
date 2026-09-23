@@ -51,6 +51,7 @@ private const val HOME_RESPONSE = """
   "profile": {"display_name": "Putu Alvin"},
   "recent_cases": [{
     "case_id": "3a2fd727-87c0-4bb6-9ac6-1ab50fd02430",
+    "community_id": "0eb7025d-4627-4cc3-862c-6c0ed709b4e8",
     "title": "Kasus",
     "summary": "Ringkasan",
     "verdict": "HOAX",

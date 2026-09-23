@@ -62,6 +62,7 @@ def test_home_route_delegates_to_service(monkeypatch: pytest.MonkeyPatch) -> Non
             profile={"display_name": "Putu Alvin"},
             recent_cases=[
                 {
+                    "community_id": uuid4(),
                     "case_id": uuid4(),
                     "title": "Undangan APK berbahaya",
                     "summary": "File APK tidak berasal dari kanal resmi.",
@@ -104,6 +105,7 @@ def test_home_service_maps_domain_snapshot() -> None:
                 profile=HomeProfile("Putu Alvin"),
                 recent_cases=[
                     HomeCase(
+                        community_id=uuid4(),
                         case_id=case_id,
                         title="Kasus uji",
                         summary="Ringkasan aman untuk halaman beranda.",
@@ -137,6 +139,7 @@ def test_postgres_home_repository_uses_scoped_queries(
 ) -> None:
     user_id = uuid4()
     case_id = uuid4()
+    community_id = uuid4()
     module_id = uuid4()
     now = datetime.now(UTC)
     connection = FakeConnection(
@@ -144,8 +147,9 @@ def test_postgres_home_repository_uses_scoped_queries(
             [{"display_name": "Putu Alvin"}],
             [
                 {
-                    "id": case_id,
-                    "headline": "Kasus terbaru",
+                    "community_id": community_id,
+                    "case_id": case_id,
+                    "title": "Kasus terbaru",
                     "summary": "Alasan utama pemeriksaan.",
                     "verdict": "UNVERIFIED",
                     "risk_level": "HIGH",
@@ -180,6 +184,7 @@ def test_postgres_home_repository_uses_scoped_queries(
 
     assert result.profile == HomeProfile("Putu Alvin")
     assert result.recent_cases[0].case_id == case_id
+    assert result.recent_cases[0].community_id == community_id
     assert result.learning_recommendations[0].progress_percent == 50.0
-    assert connection.executed[1][1] == (user_id, 3)
+    assert connection.executed[1][1] == (3,)
     assert connection.executed[2][1] == (user_id, 2)

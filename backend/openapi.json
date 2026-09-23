@@ -2917,6 +2917,11 @@
       },
       "HomeCaseResponse": {
         "properties": {
+          "community_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Community Id"
+          },
           "case_id": {
             "type": "string",
             "format": "uuid",
@@ -2959,6 +2964,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "community_id",
           "case_id",
           "title",
           "summary",

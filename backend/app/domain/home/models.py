@@ -12,6 +12,7 @@ class HomeProfile:
 
 @dataclass(frozen=True)
 class HomeCase:
+    community_id: UUID
     case_id: UUID
     title: str
     summary: str

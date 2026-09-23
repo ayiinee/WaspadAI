@@ -48,6 +48,7 @@ private fun HomeResponseDto.toDomain(baseUrl: String) = HomeDashboard(
     displayName = profile.displayName,
     recentCases = recentCases.map { item ->
         HomeCase(
+            communityId = item.communityId,
             caseId = item.caseId,
             title = item.title,
             summary = item.summary,

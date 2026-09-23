@@ -77,6 +77,7 @@ private class FakeHomeRepository : HomeRepository {
             displayName = "Putu Alvin",
             recentCases = listOf(
                 HomeCase(
+                    communityId = "community-1",
                     caseId = "case-1",
                     title = "Biaya pendaftaran beasiswa",
                     summary = "Informasi ini terbukti hoaks.",
@@ -86,6 +87,7 @@ private class FakeHomeRepository : HomeRepository {
                     createdAt = "2026-09-24T00:00:00Z",
                 ),
                 HomeCase(
+                    communityId = "community-2",
                     caseId = "case-2",
                     title = "Undangan digital berbahaya",
                     summary = "File masih perlu diperiksa.",

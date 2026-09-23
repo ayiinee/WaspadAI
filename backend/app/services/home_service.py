@@ -26,6 +26,7 @@ async def get_home_dashboard(
         profile=HomeProfileResponse(display_name=display_name),
         recent_cases=[
             HomeCaseResponse(
+                community_id=item.community_id,
                 case_id=item.case_id,
                 title=item.title,
                 summary=item.summary,

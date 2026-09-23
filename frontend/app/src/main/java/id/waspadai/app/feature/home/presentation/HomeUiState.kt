@@ -7,6 +7,7 @@ enum class HomeCaseTone {
 }
 
 data class HomeCaseUiModel(
+    val communityId: String,
     val title: String,
     val description: String,
     val status: String,

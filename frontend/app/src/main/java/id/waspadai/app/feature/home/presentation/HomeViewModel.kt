@@ -74,6 +74,7 @@ private fun HomeUiState.withDashboard(dashboard: HomeDashboard) = copy(
     displayName = dashboard.displayName,
     cases = dashboard.recentCases.map { item ->
         HomeCaseUiModel(
+            communityId = item.communityId,
             title = item.title,
             description = item.summary,
             status = item.displayStatus(),

@@ -162,6 +162,12 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
             )
             HomeRoute(
                 onDestinationSelected = navigateToTopLevel,
+                onCommunityCaseSelected = { communityId ->
+                    communityViewModel.onAction(
+                        CommunityAction.OpenPublishedPost(communityId),
+                    )
+                    navigateToTopLevel("Koneksi")
+                },
                 viewModel = viewModel,
             )
         }

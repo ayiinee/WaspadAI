@@ -18,6 +18,7 @@ data class HomeProfileDto(
 
 @Serializable
 data class HomeCaseDto(
+    @SerialName("community_id") val communityId: String,
     @SerialName("case_id") val caseId: String,
     val title: String,
     val summary: String,

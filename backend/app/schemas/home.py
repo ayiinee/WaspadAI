@@ -15,6 +15,7 @@ class HomeProfileResponse(BaseModel):
 class HomeCaseResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    community_id: UUID
     case_id: UUID
     title: str = Field(min_length=1, max_length=1000)
     summary: str = Field(min_length=1, max_length=5000)

@@ -13,6 +13,7 @@ data class HomeDashboard(
 )
 
 data class HomeCase(
+    val communityId: String,
     val caseId: String,
     val title: String,
     val summary: String,

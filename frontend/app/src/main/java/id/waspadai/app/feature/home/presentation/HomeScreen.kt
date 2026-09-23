@@ -78,6 +78,7 @@ private val HomeProfileBackground = Color(0xFF263847)
 @Composable
 fun HomeRoute(
     onDestinationSelected: (String) -> Unit,
+    onCommunityCaseSelected: (String) -> Unit,
     viewModel: HomeViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -85,6 +86,7 @@ fun HomeRoute(
         uiState = uiState,
         onAction = viewModel::onAction,
         onDestinationSelected = onDestinationSelected,
+        onCommunityCaseSelected = onCommunityCaseSelected,
     )
 }
 
@@ -93,6 +95,7 @@ fun HomeScreen(
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
     onDestinationSelected: (String) -> Unit,
+    onCommunityCaseSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -124,6 +127,7 @@ fun HomeScreen(
                     uiState = uiState,
                     onAction = onAction,
                     onCasesClick = { onDestinationSelected("Koneksi") },
+                    onCaseClick = onCommunityCaseSelected,
                     onLearningClick = { onDestinationSelected("Pelajari") },
                 )
             }
@@ -245,6 +249,7 @@ private fun HomeBody(
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
     onCasesClick: () -> Unit,
+    onCaseClick: (String) -> Unit,
     onLearningClick: () -> Unit,
 ) {
     Column(
@@ -307,7 +312,10 @@ private fun HomeBody(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 uiState.visibleCases.forEach { item ->
-                    HomeCaseCard(item = item, onClick = onCasesClick)
+                    HomeCaseCard(
+                        item = item,
+                        onClick = { onCaseClick(item.communityId) },
+                    )
                 }
             }
         }

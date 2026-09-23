@@ -38,18 +38,25 @@ class PostgresHomeRepository:
             profile_row = await profile_query.fetchone()
 
             cases_query = await connection.execute(
-                """select c.id, c.headline, c.verdict, c.risk_level,
-                          c.requires_human_review, c.created_at,
-                          coalesce(
-                              nullif(r.result_json -> 'why' ->> 0, ''),
-                              c.headline
-                          ) as summary
-                     from public.verification_cases c
-                     left join public.verification_results r on r.case_id = c.id
-                    where c.user_id = %s and c.deleted_at is null
-                    order by c.created_at desc, c.id desc
+                """select p.id as community_id, p.case_id, p.title,
+                          p.redacted_text as summary, c.verdict, c.risk_level,
+                          c.requires_human_review, p.published_at as created_at
+                     from public.community_posts p
+                     join public.verification_cases c on c.id = p.case_id
+                    where p.withdrawn_at is null
+                      and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+                      and p.publication_consent_id is not null
+                      and exists (
+                          select 1
+                            from private.consent_records consent
+                           where consent.id = p.publication_consent_id
+                             and consent.scope = 'COMMUNITY_PUBLICATION'
+                             and consent.revoked_at is null
+                             and (consent.expires_at is null or consent.expires_at > now())
+                      )
+                    order by p.published_at desc, p.case_id desc
                     limit %s""",
-                (user_id, case_limit),
+                (case_limit,),
             )
             case_rows = await cases_query.fetchall()
 
@@ -84,8 +91,9 @@ class PostgresHomeRepository:
         )
         recent_cases = [
             HomeCase(
-                case_id=row["id"],
-                title=row["headline"],
+                community_id=row["community_id"],
+                case_id=row["case_id"],
+                title=row["title"],
                 summary=row["summary"],
                 verdict=row["verdict"],
                 risk_level=row["risk_level"],
