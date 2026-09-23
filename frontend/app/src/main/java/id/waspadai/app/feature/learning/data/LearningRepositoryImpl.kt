@@ -268,6 +268,7 @@ private fun LearningQuizDto.toDomain(): LearningQuiz = LearningQuiz(
 private fun QuizQuestionFeedbackDto.toDomain(): QuizQuestionFeedback = QuizQuestionFeedback(
     questionId = questionId,
     selectedOptionId = selectedOptionId,
+    correctOptionId = correctOptionId,
     correct = correct,
     explanation = explanation,
 )
@@ -288,6 +289,10 @@ private fun LearningProgressItemDto.toDomain(): LearningProgressItem = LearningP
     latestScore = latestScore,
     bestScore = bestScore,
     updatedAt = updatedAt,
+    latestCorrectAnswers = latestCorrectAnswers,
+    latestTotalQuestions = latestTotalQuestions,
+    firstOpenedAt = firstOpenedAt,
+    lastOpenedAt = lastOpenedAt,
 )
 
 private fun HttpStatusCode.toSafeMessage(): String = when (value) {

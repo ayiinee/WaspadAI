@@ -106,6 +106,7 @@ data class QuizAttemptRequestDto(
 data class QuizQuestionFeedbackDto(
     @SerialName("question_id") val questionId: String = "",
     @SerialName("selected_option_id") val selectedOptionId: String = "",
+    @SerialName("correct_option_id") val correctOptionId: String? = null,
     val correct: Boolean = false,
     val explanation: String = "",
 )
@@ -127,7 +128,11 @@ data class LearningProgressItemDto(
     @SerialName("progress_percent") val progressPercent: Double = 0.0,
     @SerialName("latest_score") val latestScore: Double? = null,
     @SerialName("best_score") val bestScore: Double? = null,
+    @SerialName("latest_correct_answers") val latestCorrectAnswers: Int? = null,
+    @SerialName("latest_total_questions") val latestTotalQuestions: Int? = null,
     @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("first_opened_at") val firstOpenedAt: String? = null,
+    @SerialName("last_opened_at") val lastOpenedAt: String? = null,
 )
 
 @Serializable

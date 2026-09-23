@@ -41,6 +41,7 @@ from app.community_service import (
     like_community,
     list_community,
     publish_community_case,
+    record_community_refresh,
     record_community_share,
     record_community_view,
     remove_community_vote,
@@ -331,9 +332,11 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/community", tags=["Community"], response_model=CommunityPage)
     async def list_community_endpoint(
+        request: Request,
         response: Response,
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None, max_length=2048),
+        refresh: bool = Query(default=False),
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> CommunityPage:
         pool = app.state.db_pool
@@ -342,7 +345,16 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         response.headers["Cache-Control"] = "no-store"
-        return await list_community(pool, app.state.settings, user.id, limit, cursor)
+        result = await list_community(pool, app.state.settings, user.id, limit, cursor)
+        if refresh:
+            await record_community_refresh(
+                pool,
+                app.state.settings,
+                user.id,
+                UUID(_request_id(request)),
+                len(result.items),
+            )
+        return result
 
     @app.get(
         "/api/v1/community/bootstrap",
@@ -350,9 +362,11 @@ def create_app() -> FastAPI:
         response_model=CommunityBootstrap,
     )
     async def get_community_bootstrap_endpoint(
+        request: Request,
         response: Response,
         limit: int = Query(default=20, ge=1, le=100),
         cursor: str | None = Query(default=None, max_length=2048),
+        refresh: bool = Query(default=False),
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> CommunityBootstrap:
         pool = app.state.db_pool
@@ -361,7 +375,16 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         response.headers["Cache-Control"] = "no-store"
-        return await get_community_bootstrap(pool, app.state.settings, user.id, limit, cursor)
+        result = await get_community_bootstrap(pool, app.state.settings, user.id, limit, cursor)
+        if refresh:
+            await record_community_refresh(
+                pool,
+                app.state.settings,
+                user.id,
+                UUID(_request_id(request)),
+                len(result.feed.items),
+            )
+        return result
 
     @app.get(
         "/api/v1/community/me/summary",

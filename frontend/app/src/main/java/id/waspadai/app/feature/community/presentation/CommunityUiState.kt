@@ -16,6 +16,11 @@ enum class CommunityFeedFilter(val label: String) {
     SudahDinilai("Sudah dinilai"),
 }
 
+enum class CommunityFeedScope(val label: String) {
+    Umum("Umum"),
+    RiwayatSaya("Riwayat Saya"),
+}
+
 data class CommunityPost(
     val id: String,
     val historyCaseId: String = "",
@@ -64,7 +69,8 @@ enum class CommunityBackendPhase {
 
 data class CommunityUiState(
     val searchQuery: String = "",
-    val selectedFilter: CommunityFeedFilter = CommunityFeedFilter.Semua,
+    val selectedFilter: CommunityFeedFilter = CommunityFeedFilter.BelumDinilai,
+    val selectedFeedScope: CommunityFeedScope = CommunityFeedScope.Umum,
     val isFilterMenuVisible: Boolean = false,
     val baseUrlDraft: String = "",
     val accessTokenDraft: String = "",
@@ -97,7 +103,11 @@ data class CommunityUiState(
                 CommunityFeedFilter.BelumDinilai -> post.selectedVerdict == null
                 CommunityFeedFilter.SudahDinilai -> post.selectedVerdict != null
             }
-            matchesQuery && matchesFilter
+            val matchesScope = when (selectedFeedScope) {
+                CommunityFeedScope.Umum -> !post.isOwner
+                CommunityFeedScope.RiwayatSaya -> post.isOwner
+            }
+            matchesQuery && matchesFilter && matchesScope
         }
 }
 
@@ -111,6 +121,7 @@ sealed interface CommunityAction {
     data object FilterClicked : CommunityAction
     data object FilterDismissed : CommunityAction
     data class FilterSelected(val filter: CommunityFeedFilter) : CommunityAction
+    data class FeedScopeSelected(val scope: CommunityFeedScope) : CommunityAction
     data class SupportClicked(val postId: String) : CommunityAction
     data class ShareClicked(val postId: String) : CommunityAction
     data class EditPost(val postId: String, val caption: String) : CommunityAction

@@ -271,6 +271,8 @@ async def get_learning_progress(
                    count(distinct lp.lesson_id)::int as completed_lessons,
                    max(lp.completed_at) as last_lesson_completed_at,
                    latest.score::float as latest_score,
+                   latest.correct_answers::int as latest_correct_answers,
+                   latest.total_questions::int as latest_total_questions,
                    best.best_score::float as best_score,
                    latest.completed_at as latest_quiz_completed_at,
                    module_progress.first_opened_at, module_progress.last_opened_at
@@ -279,7 +281,7 @@ async def get_learning_progress(
               left join public.lesson_progress lp
                 on lp.lesson_id = l.id and lp.user_id = %s
               left join lateral (
-                  select a.score, a.completed_at
+                  select a.score, a.correct_answers, a.total_questions, a.completed_at
                     from public.quiz_attempts a
                    where a.user_id = %s and a.module_id = m.id
                    order by a.completed_at desc, a.id desc
@@ -292,7 +294,8 @@ async def get_learning_progress(
               ) best on true
               left join public.learning_module_progress module_progress
                 on module_progress.module_id = m.id and module_progress.user_id = %s
-             group by m.id, m.display_order, latest.score, latest.completed_at, best.best_score,
+             group by m.id, m.display_order, latest.score, latest.correct_answers,
+                      latest.total_questions, latest.completed_at, best.best_score,
                       module_progress.first_opened_at, module_progress.last_opened_at
              order by m.display_order, m.id
             """,
@@ -528,6 +531,11 @@ def _score_answers(rows: list[DictRow], payload: QuizAttemptRequest) -> dict[str
                 "question_version": question["version"],
                 "selected_option_id": str(selected_option_id),
                 "selected_option_text": selected["option_text"],
+                "correct_option_id": str(next(
+                    option_id
+                    for option_id, option in question["options"].items()
+                    if option["is_correct"]
+                )),
                 "is_correct": is_correct,
                 "explanation": question["explanation"],
             }
@@ -550,6 +558,7 @@ def _attempt_result(row: DictRow) -> QuizAttemptResult:
         QuizQuestionFeedback(
             question_id=item["question_id"],
             selected_option_id=item["selected_option_id"],
+            correct_option_id=item.get("correct_option_id"),
             correct=item["is_correct"],
             explanation=item["explanation"],
         )
@@ -575,6 +584,8 @@ def _progress_item(row: DictRow) -> LearningProgressItem:
         progress_percent=_progress_percent(row["completed_lessons"], row["total_lessons"]),
         latest_score=float(row["latest_score"]) if row["latest_score"] is not None else None,
         best_score=float(row["best_score"]) if row["best_score"] is not None else None,
+        latest_correct_answers=row.get("latest_correct_answers"),
+        latest_total_questions=row.get("latest_total_questions"),
         updated_at=_iso8601(updated_at),
         first_opened_at=_iso8601(row["first_opened_at"]) if row.get("first_opened_at") else None,
         last_opened_at=_iso8601(row["last_opened_at"]) if row.get("last_opened_at") else None,

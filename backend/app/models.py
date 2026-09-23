@@ -505,6 +505,7 @@ class QuizQuestionFeedback(BaseModel):
 
     question_id: UUID
     selected_option_id: UUID
+    correct_option_id: UUID | None = None
     correct: bool
     explanation: str
 
@@ -528,6 +529,8 @@ class LearningProgressItem(BaseModel):
     progress_percent: float = Field(ge=0, le=100)
     latest_score: float | None = Field(default=None, ge=0, le=100)
     best_score: float | None = Field(default=None, ge=0, le=100)
+    latest_correct_answers: int | None = Field(default=None, ge=0)
+    latest_total_questions: int | None = Field(default=None, ge=1)
     updated_at: str
     first_opened_at: str | None = None
     last_opened_at: str | None = None

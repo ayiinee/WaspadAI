@@ -63,6 +63,7 @@ fun WaspadAIBottomNavigation(
 ) {
     val centerNavigationInteraction = remember { MutableInteractionSource() }
     val communityNotification = LocalCommunityNotification.current
+    val isVerificationSelected = selectedDestination == "Periksa"
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -122,7 +123,10 @@ fun WaspadAIBottomNavigation(
                 .offset(y = 8.dp)
                 .size(CenterCtaDiameter)
                 .shadow(8.dp, CircleShape)
-                .background(WaspadAIBlue, CircleShape)
+                .background(
+                    if (isVerificationSelected) WaspadAIBlue else Color(0xFFAAB4BE),
+                    CircleShape,
+                )
                 .border(4.dp, Color.White, CircleShape)
                 .clickable(
                     interactionSource = centerNavigationInteraction,

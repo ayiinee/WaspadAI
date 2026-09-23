@@ -3,7 +3,9 @@ package id.waspadai.app.feature.community.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -30,9 +31,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
@@ -93,9 +94,9 @@ fun CommunityMediaCarousel(
         }
         if (orderedMedia.size > 1) {
             MediaIndicator(
-                current = pagerState.currentPage + 1,
+                currentIndex = pagerState.currentPage,
                 total = orderedMedia.size,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp),
             )
         }
     }
@@ -156,7 +157,7 @@ private fun CommunityImageViewer(
             }
             if (media.size > 1) {
                 MediaIndicator(
-                    current = pagerState.currentPage + 1,
+                    currentIndex = pagerState.currentPage,
                     total = media.size,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
                 )
@@ -198,15 +199,31 @@ private fun StableCommunityImage(
 }
 
 @Composable
-private fun MediaIndicator(current: Int, total: Int, modifier: Modifier = Modifier) {
-    Text(
-        text = "$current / $total",
-        color = Color.White,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
+private fun MediaIndicator(
+    currentIndex: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+) {
+    Row(
         modifier = modifier
+            .semantics {
+                contentDescription = "Foto ${currentIndex + 1} dari $total"
+            }
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.Black.copy(alpha = 0.62f))
-            .padding(horizontal = 9.dp, vertical = 5.dp),
-    )
+            .background(Color.Black.copy(alpha = 0.48f))
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(total) { index ->
+            Box(
+                modifier = Modifier
+                    .size(if (index == currentIndex) 8.dp else 6.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(
+                        if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.55f),
+                    ),
+            )
+        }
+    }
 }

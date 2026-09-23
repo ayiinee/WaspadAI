@@ -6,6 +6,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.accept
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -51,21 +52,67 @@ class SupabaseAuthRepository(
         saveSession(session)
     }
 
+    suspend fun requestPasswordReset(email: String) {
+        ensureConfigured()
+        val response = client.post("${supabaseUrl.trimEnd('/')}/auth/v1/recover") {
+            authHeaders(useSession = false)
+            setBody(RecoveryEmailRequestDto(email = email.trim()))
+        }
+        if (!response.status.isSuccess()) {
+            throw SupabaseAuthException(response.safeMessage())
+        }
+    }
+
+    suspend fun verifyPasswordResetCode(email: String, code: String) {
+        val session = requestSession(
+            path = "verify",
+            body = RecoveryVerifyRequestDto(
+                email = email.trim(),
+                token = code.trim(),
+                type = "recovery",
+            ),
+        )
+        saveSession(session)
+    }
+
+    suspend fun updatePassword(newPassword: String) {
+        ensureConfigured()
+        val recoveryAccessToken = accessToken.takeIf(String::isNotBlank)
+            ?: throw SupabaseAuthException("Kode pemulihan belum diverifikasi.")
+        val response = client.put("${supabaseUrl.trimEnd('/')}/auth/v1/user") {
+            authHeaders(useSession = true, sessionToken = recoveryAccessToken)
+            setBody(UpdatePasswordRequestDto(password = newPassword))
+        }
+        if (!response.status.isSuccess()) {
+            throw SupabaseAuthException(response.safeMessage())
+        }
+    }
+
     private suspend inline fun <reified T> requestSession(path: String, body: T): SupabaseSessionDto {
         ensureConfigured()
         val response = client.post("${supabaseUrl.trimEnd('/')}/auth/v1/$path") {
-            headers {
-                append("apikey", publishableKey)
-                append(HttpHeaders.Authorization, "Bearer $publishableKey")
-                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            }
-            accept(ContentType.Application.Json)
+            authHeaders(useSession = false)
             setBody(body)
         }
         if (!response.status.isSuccess()) {
             throw SupabaseAuthException(response.safeMessage())
         }
         return response.body()
+    }
+
+    private fun io.ktor.client.request.HttpRequestBuilder.authHeaders(
+        useSession: Boolean,
+        sessionToken: String = accessToken,
+    ) {
+        headers {
+            append("apikey", publishableKey)
+            append(
+                HttpHeaders.Authorization,
+                "Bearer ${if (useSession) sessionToken else publishableKey}",
+            )
+            append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+        }
+        accept(ContentType.Application.Json)
     }
 
     private fun saveSession(session: SupabaseSessionDto) {
@@ -95,6 +142,10 @@ class SupabaseAuthRepository(
                 "Email sudah terdaftar. Gunakan mode Masuk."
             raw.contains("Email not confirmed", ignoreCase = true) ->
                 "Email belum dikonfirmasi. Periksa kotak masuk lalu coba lagi."
+            raw.contains("expired", ignoreCase = true) || raw.contains("invalid", ignoreCase = true) ->
+                "Kode verifikasi salah atau sudah kedaluwarsa."
+            raw.contains("same password", ignoreCase = true) ->
+                "Gunakan kata sandi baru yang berbeda dari sebelumnya."
             else -> "Autentikasi Supabase belum berhasil. Coba lagi."
         }
     }
@@ -111,6 +162,23 @@ private data class EmailPasswordRequestDto(
 @Serializable
 private data class RefreshRequestDto(
     @SerialName("refresh_token") val refreshToken: String,
+)
+
+@Serializable
+private data class RecoveryEmailRequestDto(
+    val email: String,
+)
+
+@Serializable
+private data class RecoveryVerifyRequestDto(
+    val email: String,
+    val token: String,
+    val type: String,
+)
+
+@Serializable
+private data class UpdatePasswordRequestDto(
+    val password: String,
 )
 
 @Serializable

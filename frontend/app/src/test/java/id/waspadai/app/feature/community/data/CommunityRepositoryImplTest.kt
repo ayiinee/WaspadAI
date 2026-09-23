@@ -21,6 +21,33 @@ import org.junit.Test
 
 class CommunityRepositoryImplTest {
     @Test
+    fun `forced refresh requests a backend-recorded fresh snapshot`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals(
+                "https://api.example.test/api/v1/community/bootstrap?refresh=true",
+                request.url.toString(),
+            )
+            respond(
+                """
+                {
+                  "summary":{"assessments_count":0,"evidence_added_count":0,"resolved_cases_count":0},
+                  "feed":{"items":[],"next_cursor":null}
+                }
+                """.trimIndent(),
+                headers = jsonHeaders(),
+            )
+        })
+
+        val result = repository.loadCommunity(
+            baseUrl = "https://api.example.test",
+            accessToken = "token",
+            forceRefresh = true,
+        )
+
+        assertTrue(result is AppResult.Success)
+    }
+
+    @Test
     fun `feed maps one to four ordered media with absolute stable URLs`() = runTest {
         for (count in 1..4) {
             val mediaJson = (0 until count).joinToString(",") { index ->
