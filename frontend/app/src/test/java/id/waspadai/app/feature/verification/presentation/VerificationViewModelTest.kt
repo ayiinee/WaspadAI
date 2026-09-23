@@ -115,6 +115,43 @@ class VerificationViewModelTest {
     }
 
     @Test
+    fun `multiple picker result is appended atomically including duplicate files`() {
+        val viewModel = viewModel(FakeRepository())
+        val duplicate = VerificationAction.ImageSelected(
+            imageBytes = byteArrayOf(1, 2, 3),
+            contentType = "image/png",
+            fileName = "bukti-sama.png",
+        )
+
+        viewModel.onAction(
+            VerificationAction.AttachmentsSelected(listOf(duplicate, duplicate, duplicate))
+        )
+
+        assertEquals(3, viewModel.state.value.pendingAttachments.size)
+        assertEquals(
+            listOf("bukti-sama.png", "bukti-sama.png", "bukti-sama.png"),
+            viewModel.state.value.pendingAttachments.map { it.fileName },
+        )
+    }
+
+    @Test
+    fun `multiple picker result only fills remaining attachment slots`() {
+        val viewModel = viewModel(FakeRepository())
+        val selections = (0 until 7).map { index ->
+            VerificationAction.ImageSelected(
+                imageBytes = byteArrayOf(index.toByte()),
+                contentType = "image/png",
+                fileName = "bukti-$index.png",
+            )
+        }
+
+        viewModel.onAction(VerificationAction.AttachmentsSelected(selections))
+
+        assertEquals(5, viewModel.state.value.pendingAttachments.size)
+        assertTrue(viewModel.state.value.phase is VerificationPhase.Failure)
+    }
+
+    @Test
     fun `overlay switch is active while confirmation is visible and resets when cancelled`() {
         val viewModel = viewModel(FakeRepository())
 

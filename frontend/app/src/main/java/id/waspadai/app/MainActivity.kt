@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -18,6 +19,8 @@ import id.waspadai.app.feature.community.presentation.CommunityRoute
 import id.waspadai.app.feature.community.presentation.CommunityViewModel
 import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
 import id.waspadai.app.feature.learning.presentation.LearningScreen
+import id.waspadai.app.feature.learning.presentation.LearningViewModel
+import id.waspadai.app.feature.learning.presentation.LearningAction
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
@@ -67,6 +70,17 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
             defaultAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
         ),
     )
+    val learningViewModel: LearningViewModel = viewModel(
+        factory = LearningViewModel.Factory(
+            repository = app.learningRepository,
+            accessTokenProvider = app.authRepository,
+            baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+        ),
+    )
+    val learningUiState by learningViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == LearningRouteName) learningViewModel.onAction(LearningAction.Refresh)
+    }
     val navigateToTopLevel: (String) -> Unit = { destination ->
         val targetRoute = when (destination) {
             "Periksa" -> VerificationRouteName
@@ -157,6 +171,8 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
         }
         composable(LearningRouteName) {
             LearningScreen(
+                uiState = learningUiState,
+                onAction = learningViewModel::onAction,
                 onDestinationSelected = navigateToTopLevel,
             )
         }

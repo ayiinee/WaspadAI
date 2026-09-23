@@ -8,32 +8,25 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import org.junit.Rule
 import org.junit.Test
+import id.waspadai.app.feature.learning.domain.LearningModuleItem
 
 class LearningScreenTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun materialListDetailAndQuizAreVisible() {
-        composeRule.setContent { LearningScreen() }
-
-        composeRule.onNodeWithText("Misi harian").assertIsDisplayed()
-        composeRule.onNodeWithText("Jadi detektif hoaks hari ini").assertIsDisplayed()
-        composeRule.onNodeWithText("Misi cek sumber selesai").assertIsDisplayed()
-        composeRule.onNodeWithText("LANJUTKAN BELAJAR").assertDoesNotExist()
-        composeRule.onNodeWithText("Materi untukmu").assertIsDisplayed()
-        composeRule.onNodeWithText("Kenali ciri-ciri hoaks").assertIsDisplayed()
-        composeRule.onNodeWithText("Jadi detektif hoaks hari ini").performClick()
-        composeRule.onNodeWithText("URUTAN MATERI").assertIsDisplayed()
-        composeRule.onNodeWithText("Visual materi").assertIsDisplayed()
-
-        repeat(2) {
-            composeRule.onNodeWithText("Lanjut ke tahap berikutnya").performScrollTo().performClick()
+    fun backendMaterialListIsVisibleAndDispatchesOpen() {
+        var openedModule: String? = null
+        val module = LearningModuleItem("module-1", "phishing", "Phishing, OTP, dan PIN", "Materi dari backend", 1, 1, 2, 0, 0.0)
+        composeRule.setContent {
+            LearningScreen(
+                uiState = LearningUiState(modules = listOf(module), loading = false),
+                onAction = { if (it is LearningAction.OpenModule) openedModule = it.moduleId },
+            )
         }
-        composeRule.onNodeWithText("Selesai membaca").performScrollTo().performClick()
-        composeRule.onNodeWithText("Mulai latihan soal").performClick()
 
-        composeRule.onNodeWithText("Kalimat mana yang paling perlu dicurigai?").assertIsDisplayed()
-        composeRule.onNodeWithText("Sebarkan sekarang juga sebelum dihapus!").assertIsDisplayed()
+        composeRule.onNodeWithText("Materi untukmu").assertIsDisplayed()
+        composeRule.onNodeWithText("Phishing, OTP, dan PIN").performClick()
+        composeRule.runOnIdle { assert(openedModule == "module-1") }
     }
 }

@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -74,6 +75,9 @@ import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.core.ui.WaspadAIBottomNavigationHeight
 import id.waspadai.app.ui.theme.WaspadAITheme
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun VerificationRoute(
@@ -102,6 +106,7 @@ fun VerificationScreen(
 ) {
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    val pickerScope = rememberCoroutineScope()
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
     val mediaProjectionManager = context.getSystemService(MediaProjectionManager::class.java)
     val mediaProjectionConsent = rememberLauncherForActivityResult(
@@ -237,42 +242,48 @@ fun VerificationScreen(
         CommunitySharePhase.Idle -> Unit
     }
 
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val selection = runCatching { context.readImageSelection(uri) }.getOrNull()
-        if (selection == null) {
-            onAction(
-                VerificationAction.ImageSelectionFailed(
-                    "Gambar belum dapat dibaca. Pilih file JPG, PNG, atau WEBP lain."
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        pickerScope.launch {
+            val selections = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    runCatching { context.readImageSelection(uri) }.getOrNull()
+                }
+            }
+            if (selections.isNotEmpty()) {
+                onAction(VerificationAction.AttachmentsSelected(selections.map(ImageSelection::toAction)))
+            }
+            if (selections.size < uris.size) {
+                onAction(
+                    VerificationAction.ImageSelectionFailed(
+                        "Sebagian gambar belum dapat dibaca. Gunakan file JPG, PNG, atau WEBP."
+                    )
                 )
-            )
-        } else {
-            onAction(
-                VerificationAction.ImageSelected(
-                    imageBytes = selection.bytes,
-                    contentType = selection.contentType,
-                    fileName = selection.fileName,
-                )
-            )
+            }
         }
     }
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val selection = runCatching { context.readPdfSelection(uri) }.getOrNull()
-        if (selection == null) {
-            onAction(
-                VerificationAction.ImageSelectionFailed(
-                    "File belum dapat dipreview. Pilih PDF yang tidak terkunci dan coba lagi."
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        pickerScope.launch {
+            val selections = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    runCatching { context.readPdfSelection(uri) }.getOrNull()
+                }
+            }
+            if (selections.isNotEmpty()) {
+                onAction(VerificationAction.AttachmentsSelected(selections.map(ImageSelection::toAction)))
+            }
+            if (selections.size < uris.size) {
+                onAction(
+                    VerificationAction.ImageSelectionFailed(
+                        "Sebagian file belum dapat dipreview. Gunakan PDF yang tidak terkunci."
+                    )
                 )
-            )
-        } else {
-            onAction(
-                VerificationAction.ImageSelected(
-                    imageBytes = selection.bytes,
-                    contentType = selection.contentType,
-                    fileName = selection.fileName,
-                )
-            )
+            }
         }
     }
 
@@ -562,6 +573,12 @@ private data class ImageSelection(
     val bytes: ByteArray,
     val contentType: String,
     val fileName: String,
+)
+
+private fun ImageSelection.toAction() = VerificationAction.ImageSelected(
+    imageBytes = bytes,
+    contentType = contentType,
+    fileName = fileName,
 )
 
 private fun Context.readImageSelection(uri: Uri): ImageSelection? {

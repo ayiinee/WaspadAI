@@ -14,6 +14,10 @@ sealed interface VerificationAction {
         val overlayModeEnabled: Boolean = false,
     ) : VerificationAction
 
+    data class AttachmentsSelected(
+        val attachments: List<ImageSelected>,
+    ) : VerificationAction
+
     data object SubmitPendingImage : VerificationAction
 
     data object DismissImagePreview : VerificationAction

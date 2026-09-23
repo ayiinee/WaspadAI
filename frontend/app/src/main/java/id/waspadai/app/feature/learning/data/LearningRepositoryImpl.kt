@@ -2,6 +2,8 @@ package id.waspadai.app.feature.learning.data
 
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.feature.learning.data.dto.LearningLessonDto
+import id.waspadai.app.feature.learning.data.dto.LearningCaseDto
+import id.waspadai.app.feature.learning.data.dto.LearningMediaDto
 import id.waspadai.app.feature.learning.data.dto.LearningModuleDetailDto
 import id.waspadai.app.feature.learning.data.dto.LearningModuleItemDto
 import id.waspadai.app.feature.learning.data.dto.LearningProgressItemDto
@@ -15,6 +17,8 @@ import id.waspadai.app.feature.learning.data.dto.QuizOptionDto
 import id.waspadai.app.feature.learning.data.dto.QuizQuestionDto
 import id.waspadai.app.feature.learning.data.dto.QuizQuestionFeedbackDto
 import id.waspadai.app.feature.learning.domain.LearningLesson
+import id.waspadai.app.feature.learning.domain.LearningCase
+import id.waspadai.app.feature.learning.domain.LearningMedia
 import id.waspadai.app.feature.learning.domain.LearningModuleDetail
 import id.waspadai.app.feature.learning.domain.LearningModuleItem
 import id.waspadai.app.feature.learning.domain.LearningProgressItem
@@ -68,7 +72,7 @@ class LearningRepositoryImpl(
         if (!response.status.isSuccess()) {
             throw LearningApiException(response.status)
         }
-        response.body<LearningModuleDetailDto>().toDomain()
+        response.body<LearningModuleDetailDto>().toDomain(baseUrl.normalized())
     }
 
     override suspend fun completeLesson(
@@ -144,6 +148,26 @@ class LearningRepositoryImpl(
         response.body<LearningProgressResponseDto>().items.map(LearningProgressItemDto::toDomain)
     }
 
+    override suspend fun openModule(baseUrl: String, accessToken: String, moduleId: String): AppResult<Unit> =
+        runLearningRequest {
+            val response = client.post("${baseUrl.normalized()}/api/v1/learning/modules/$moduleId/open") {
+                authorize(accessToken)
+            }
+            if (!response.status.isSuccess()) throw LearningApiException(response.status)
+        }
+
+    override suspend fun loadCases(
+        baseUrl: String,
+        accessToken: String,
+        moduleId: String,
+    ): AppResult<List<LearningCase>> = runLearningRequest {
+        val response = client.get("${baseUrl.normalized()}/api/v1/learning/modules/$moduleId/cases") {
+            authorize(accessToken)
+        }
+        if (!response.status.isSuccess()) throw LearningApiException(response.status)
+        response.body<List<LearningCaseDto>>().map(LearningCaseDto::toDomain)
+    }
+
     private suspend fun <T> runLearningRequest(block: suspend () -> T): AppResult<T> = try {
         AppResult.Success(block())
     } catch (error: CancellationException) {
@@ -189,7 +213,7 @@ private fun LearningLessonDto.toDomain(): LearningLesson = LearningLesson(
     completed = completed,
 )
 
-private fun LearningModuleDetailDto.toDomain(): LearningModuleDetail = LearningModuleDetail(
+private fun LearningModuleDetailDto.toDomain(baseUrl: String): LearningModuleDetail = LearningModuleDetail(
     moduleId = moduleId,
     slug = slug,
     title = title,
@@ -200,6 +224,20 @@ private fun LearningModuleDetailDto.toDomain(): LearningModuleDetail = LearningM
     completedLessons = completedLessons,
     progressPercent = progressPercent,
     lessons = lessons.map(LearningLessonDto::toDomain),
+    topic = topic,
+    coverImageUrl = coverImageUrl,
+    cases = cases.map(LearningCaseDto::toDomain),
+    media = media.map { it.toDomain(baseUrl) },
+)
+
+private fun LearningCaseDto.toDomain(): LearningCase = LearningCase(caseId, title, description, referenceUrl)
+
+private fun LearningMediaDto.toDomain(baseUrl: String): LearningMedia = LearningMedia(
+    mediaId,
+    mediaType,
+    if (url.startsWith("/")) "$baseUrl$url" else url,
+    title,
+    altText,
 )
 
 private fun LessonCompleteResponseDto.toDomain(): LessonCompleteResult = LessonCompleteResult(

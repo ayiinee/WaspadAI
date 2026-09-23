@@ -46,6 +46,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +70,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import com.mikepenz.markdown.m3.Markdown
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAIContribution
@@ -76,7 +84,7 @@ import id.waspadai.app.ui.theme.WaspadAILightBlue
 import id.waspadai.app.ui.theme.WaspadAIMuted
 import id.waspadai.app.ui.theme.WaspadAIValid
 
-private data class LearningStage(val title: String, val body: String)
+private data class LearningStage(val title: String, val body: String, val lessonId: String = "")
 
 @Composable
 private fun learningContentGutter() =
@@ -85,7 +93,9 @@ private fun learningContentGutter() =
 private data class LearningQuestion(
     val question: String,
     val answers: List<String>,
-    val correctAnswer: Int,
+    val correctAnswer: Int = -1,
+    val questionId: String = "",
+    val optionIds: List<String> = emptyList(),
 )
 
 private data class LearningMaterial(
@@ -95,6 +105,12 @@ private data class LearningMaterial(
     val iconColor: Color,
     val stages: List<LearningStage>,
     val questions: List<LearningQuestion>,
+    val moduleId: String = "",
+    val moduleVersion: Int = 1,
+    val featured: Boolean = false,
+    val mediaId: String = "",
+    val imageUrl: String? = null,
+    val imageAltText: String = "",
 )
 
 private data class LearningStatus(
@@ -171,37 +187,75 @@ private val learningMaterials = listOf(
 
 @Composable
 fun LearningScreen(
+    uiState: LearningUiState = LearningUiState(loading = false),
+    onAction: (LearningAction) -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
 ) {
-    var selectedMaterial by remember { mutableStateOf<LearningMaterial?>(null) }
-    var progressEntries by rememberSaveable { mutableStateOf(emptyList<String>()) }
-
-    fun statusFor(material: LearningMaterial): LearningStatus? = progressEntries
-        .firstOrNull { it.startsWith("${material.title}|") }
-        ?.split('|')
-        ?.let { parts -> LearningStatus(parts.getOrNull(1).orEmpty(), parts.getOrNull(2)?.toIntOrNull() ?: 0) }
-
-    fun updateStatus(material: LearningMaterial, status: LearningStatus) {
-        progressEntries = progressEntries
-            .filterNot { it.startsWith("${material.title}|") }
-            .plus("${material.title}|${status.kind}|${status.questionIndex}")
+    val materials = uiState.modules.mapIndexed { index, module ->
+        LearningMaterial(
+            title = module.title,
+            description = module.summary,
+            icon = listOf(Icons.Rounded.MenuBook, Icons.Rounded.CollectionsBookmark, Icons.Rounded.Warning, Icons.Rounded.Lightbulb)[index % 4],
+            iconColor = listOf(WaspadAIBlue, Color(0xFF635BBA), Color(0xFFCF7B12), Color(0xFF277B59))[index % 4],
+            stages = emptyList(),
+            questions = emptyList(),
+            moduleId = module.moduleId,
+            moduleVersion = module.version,
+            featured = index == 0,
+        )
     }
+    val selectedMaterial = uiState.selectedModule?.let { detail ->
+        LearningMaterial(
+            title = detail.title,
+            description = detail.summary,
+            icon = Icons.Rounded.MenuBook,
+            iconColor = WaspadAIBlue,
+            stages = detail.lessons.sortedBy { it.displayOrder }.map { LearningStage(it.title, it.bodyMd, it.lessonId) },
+            questions = uiState.quiz?.questions.orEmpty().map { question ->
+                LearningQuestion(
+                    question = question.text,
+                    answers = question.options.map { it.text },
+                    questionId = question.questionId,
+                    optionIds = question.options.map { it.optionId },
+                )
+            },
+            moduleId = detail.moduleId,
+            moduleVersion = detail.version,
+            featured = materials.firstOrNull()?.moduleId == detail.moduleId,
+            mediaId = detail.media.firstOrNull { it.mediaType == "IMAGE" }?.mediaId.orEmpty(),
+            imageUrl = detail.media.firstOrNull { it.mediaType == "IMAGE" }?.url,
+            imageAltText = detail.media.firstOrNull { it.mediaType == "IMAGE" }?.altText.orEmpty(),
+        )
+    }
+    fun statusFor(material: LearningMaterial): LearningStatus? = uiState.modules
+        .firstOrNull { it.moduleId == material.moduleId }
+        ?.let { module ->
+            when {
+                module.progressPercent >= 100 -> LearningStatus("completed")
+                module.completedLessons > 0 -> LearningStatus("in_progress")
+                else -> null
+            }
+        }
 
     if (selectedMaterial == null) {
         LearningListScreen(
+            materials = materials,
             statusFor = ::statusFor,
-            onMaterialSelected = {
-                updateStatus(it, statusFor(it) ?: LearningStatus("in_progress"))
-                selectedMaterial = it
-            },
+            onMaterialSelected = { onAction(LearningAction.OpenModule(it.moduleId)) },
             onDestinationSelected = onDestinationSelected,
         )
     } else {
         LearningDetailScreen(
-            material = selectedMaterial!!,
-            savedQuestionIndex = statusFor(selectedMaterial!!)?.questionIndex ?: 0,
-            onStatusChanged = { updateStatus(selectedMaterial!!, it) },
-            onBack = { selectedMaterial = null },
+            material = selectedMaterial,
+            savedQuestionIndex = 0,
+            quizResult = uiState.quizResult,
+            submitting = uiState.submitting,
+            onAnswerSelected = { questionId, optionId -> onAction(LearningAction.SelectAnswer(questionId, optionId)) },
+            onSubmitQuiz = { onAction(LearningAction.SubmitQuiz) },
+            onLessonCompleted = { onAction(LearningAction.CompleteLesson(it)) },
+            accessToken = uiState.accessToken,
+            onStatusChanged = {},
+            onBack = { onAction(LearningAction.CloseModule) },
             onDestinationSelected = onDestinationSelected,
         )
     }
@@ -209,11 +263,12 @@ fun LearningScreen(
 
 @Composable
 private fun LearningListScreen(
+    materials: List<LearningMaterial>,
     statusFor: (LearningMaterial) -> LearningStatus?,
     onMaterialSelected: (LearningMaterial) -> Unit,
     onDestinationSelected: (String) -> Unit,
 ) {
-    val completedCount = learningMaterials.count { statusFor(it)?.kind == "completed" }
+    val completedCount = materials.count { statusFor(it)?.kind == "completed" }
     Scaffold(
         containerColor = WaspadAIBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -237,10 +292,12 @@ private fun LearningListScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item {
-                    LearningDailyMissions(
-                        isCurrentMissionComplete = statusFor(learningMaterials.first())?.kind == "completed",
-                        onCurrentMissionClick = { onMaterialSelected(learningMaterials.first()) },
-                    )
+                    materials.firstOrNull()?.let { first ->
+                        LearningDailyMissions(
+                            isCurrentMissionComplete = statusFor(first)?.kind == "completed",
+                            onCurrentMissionClick = { onMaterialSelected(first) },
+                        )
+                    }
                 }
                 item {
                     Column(modifier = Modifier.padding(horizontal = learningContentGutter(), vertical = 5.dp)) {
@@ -250,7 +307,7 @@ private fun LearningListScreen(
                             verticalAlignment = Alignment.Bottom,
                         ) {
                             Text("Materi untukmu", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                            Text("$completedCount dari ${learningMaterials.size}", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("$completedCount dari ${materials.size}", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(10.dp))
                         Box(
@@ -261,14 +318,14 @@ private fun LearningListScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(completedCount.toFloat() / learningMaterials.size)
+                                    .fillMaxWidth(if (materials.isEmpty()) 0f else completedCount.toFloat() / materials.size)
                                     .height(6.dp)
                                     .background(WaspadAIBlue, RoundedCornerShape(8.dp)),
                             )
                         }
                     }
                 }
-                items(learningMaterials) { material ->
+                items(materials, key = { it.moduleId }) { material ->
                     LearningMaterialCard(material = material, status = statusFor(material), onClick = { onMaterialSelected(material) })
                 }
             }
@@ -412,7 +469,7 @@ private fun LearningMaterialCard(
         shadowElevation = 2.dp,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (material == learningMaterials.first()) Color(0xFF7EAECA) else Color(0xFFD8E4EC),
+            if (material.featured) Color(0xFF7EAECA) else Color(0xFFD8E4EC),
         ),
     ) {
         Row(
@@ -451,6 +508,12 @@ private fun LearningMaterialCard(
 private fun LearningDetailScreen(
     material: LearningMaterial,
     savedQuestionIndex: Int,
+    quizResult: id.waspadai.app.feature.learning.domain.QuizAttemptResult?,
+    submitting: Boolean,
+    onAnswerSelected: (String, String) -> Unit,
+    onSubmitQuiz: () -> Unit,
+    onLessonCompleted: (String) -> Unit,
+    accessToken: String,
     onStatusChanged: (LearningStatus) -> Unit,
     onBack: () -> Unit,
     onDestinationSelected: (String) -> Unit,
@@ -485,12 +548,13 @@ private fun LearningDetailScreen(
                     completedStages = completedStages,
                 )
                 Spacer(Modifier.height(18.dp))
-                LearningMaterialPlaceholders()
+                LearningMaterialPlaceholders(material, accessToken)
                 Spacer(Modifier.height(17.dp))
                 LearningStageCard(stage = material.stages[stageIndex])
                 Spacer(Modifier.height(15.dp))
                 Button(
                     onClick = {
+                        material.stages.getOrNull(stageIndex)?.lessonId?.takeIf { it.isNotBlank() }?.let(onLessonCompleted)
                         if (stageIndex < material.stages.lastIndex) {
                             completedStages = maxOf(completedStages, stageIndex + 1)
                             stageIndex += 1
@@ -553,6 +617,10 @@ private fun LearningDetailScreen(
         LearningQuizScreen(
             material = material,
             startQuestionIndex = savedQuestionIndex.coerceIn(0, material.questions.lastIndex),
+            quizResult = quizResult,
+            submitting = submitting,
+            onAnswerSelected = onAnswerSelected,
+            onSubmitQuiz = onSubmitQuiz,
             onProgress = { index -> onStatusChanged(LearningStatus("in_progress", index)) },
             onComplete = { onStatusChanged(LearningStatus("completed", material.questions.size)) },
             onDismiss = { showQuiz = false },
@@ -566,7 +634,10 @@ private fun LearningStageCard(stage: LearningStage) {
         Column(modifier = Modifier.padding(17.dp)) {
             Text(stage.title, color = WaspadAIDarkBlue, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(7.dp))
-            Text(stage.body, color = Color(0xFF557383), fontSize = 13.sp, lineHeight = 20.sp)
+            Markdown(
+                content = stage.body,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -597,17 +668,21 @@ private fun LearningStageStepper(
 }
 
 @Composable
-private fun LearningMaterialPlaceholders() {
+private fun LearningMaterialPlaceholders(material: LearningMaterial, accessToken: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        LearningPlaceholder(
-            modifier = Modifier.weight(1f),
-            title = "Visual materi",
-            subtitle = "Ilustrasi atau video",
-            icon = Icons.Rounded.CollectionsBookmark,
-        )
+        if (material.imageUrl != null) {
+            LearningMediaImage(material, accessToken, Modifier.weight(1f))
+        } else {
+            LearningPlaceholder(
+                modifier = Modifier.weight(1f),
+                title = "Visual materi",
+                subtitle = "Ilustrasi atau video",
+                icon = Icons.Rounded.CollectionsBookmark,
+            )
+        }
         LearningPlaceholder(
             modifier = Modifier.weight(1f),
             title = "Contoh kasus",
@@ -615,6 +690,30 @@ private fun LearningMaterialPlaceholders() {
             icon = Icons.Rounded.Visibility,
         )
     }
+}
+
+@Composable
+private fun LearningMediaImage(material: LearningMaterial, accessToken: String, modifier: Modifier) {
+    val context = LocalContext.current
+    val request = remember(context, material.mediaId, material.imageUrl, accessToken) {
+        val headers = NetworkHeaders.Builder().apply {
+            if (accessToken.isNotBlank()) set("Authorization", "Bearer ${accessToken.trim()}")
+        }.build()
+        ImageRequest.Builder(context)
+            .data(material.imageUrl)
+            .httpHeaders(headers)
+            .memoryCacheKey("learning-media:${material.mediaId}")
+            .diskCacheKey("learning-media:${material.mediaId}")
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = material.imageAltText,
+        modifier = modifier.height(118.dp).clip(RoundedCornerShape(14.dp)),
+        contentScale = ContentScale.Crop,
+    )
 }
 
 @Composable
@@ -645,15 +744,19 @@ private fun LearningPlaceholder(
 private fun LearningQuizScreen(
     material: LearningMaterial,
     startQuestionIndex: Int,
+    quizResult: id.waspadai.app.feature.learning.domain.QuizAttemptResult?,
+    submitting: Boolean,
+    onAnswerSelected: (String, String) -> Unit,
+    onSubmitQuiz: () -> Unit,
     onProgress: (Int) -> Unit,
     onComplete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var questionIndex by remember(material.title, startQuestionIndex) { mutableIntStateOf(startQuestionIndex) }
     var selectedAnswer by remember(material.title, startQuestionIndex) { mutableIntStateOf(-1) }
-    var score by remember(material.title, startQuestionIndex) { mutableIntStateOf(0) }
-    var finished by remember(material.title, startQuestionIndex) { mutableStateOf(false) }
+    val finished = quizResult != null
     val question = material.questions[questionIndex]
+    LaunchedEffect(quizResult?.attemptId) { if (quizResult != null) onComplete() }
 
     fun leaveQuiz() {
         if (!finished) onProgress(questionIndex)
@@ -735,7 +838,7 @@ private fun LearningQuizScreen(
                             Spacer(Modifier.height(18.dp))
                             Text("Latihan selesai", color = WaspadAIDarkBlue, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(8.dp))
-                            Text("${score} dari ${material.questions.size} jawaban benar", color = WaspadAIMuted, fontSize = 17.sp, textAlign = TextAlign.Center)
+                            Text("${quizResult?.correctAnswers ?: 0} dari ${quizResult?.totalQuestions ?: material.questions.size} jawaban benar", color = WaspadAIMuted, fontSize = 17.sp, textAlign = TextAlign.Center)
                             Spacer(Modifier.height(28.dp))
                             Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue), modifier = Modifier.fillMaxWidth()) {
                                 Text("Kembali ke materi", fontWeight = FontWeight.Bold)
@@ -754,14 +857,16 @@ private fun LearningQuizScreen(
                             Spacer(Modifier.height(25.dp))
                             question.answers.forEachIndexed { index, answer ->
                                 val selected = selectedAnswer == index
-                                val isCorrect = selected && index == question.correctAnswer
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(if (selected) Color(0xFFE2F1FB) else Color.White)
                                         .border(1.dp, if (selected) WaspadAIBlue else Color(0xFFD8E4EC), RoundedCornerShape(14.dp))
-                                        .clickable { selectedAnswer = index }
+                                        .clickable {
+                                            selectedAnswer = index
+                                            question.optionIds.getOrNull(index)?.let { onAnswerSelected(question.questionId, it) }
+                                        }
                                         .padding(13.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -775,7 +880,6 @@ private fun LearningQuizScreen(
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Text(answer, color = WaspadAIDarkBlue, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                                    if (isCorrect) Icon(Icons.Rounded.Check, contentDescription = "Jawaban benar", tint = WaspadAIValid, modifier = Modifier.size(23.dp))
                                 }
                                 Spacer(Modifier.height(11.dp))
                             }
@@ -788,10 +892,8 @@ private fun LearningQuizScreen(
                                 Spacer(Modifier.height(22.dp))
                                 Button(
                                     onClick = {
-                                        if (selectedAnswer == question.correctAnswer) score += 1
                                         if (questionIndex == material.questions.lastIndex) {
-                                            finished = true
-                                            onComplete()
+                                            onSubmitQuiz()
                                         } else {
                                             questionIndex += 1
                                             selectedAnswer = -1
@@ -801,7 +903,8 @@ private fun LearningQuizScreen(
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
                                     shape = RoundedCornerShape(24.dp),
-                                ) { Text(if (questionIndex == material.questions.lastIndex) "Lihat hasil" else "Soal berikutnya", fontWeight = FontWeight.Bold) }
+                                    enabled = !submitting,
+                                ) { Text(if (submitting) "Mengirim..." else if (questionIndex == material.questions.lastIndex) "Lihat hasil" else "Soal berikutnya", fontWeight = FontWeight.Bold) }
                             }
                         }
                     }

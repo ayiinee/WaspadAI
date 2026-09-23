@@ -40,6 +40,10 @@ interface LearningRepository {
         baseUrl: String,
         accessToken: String,
     ): AppResult<List<LearningProgressItem>>
+
+    suspend fun openModule(baseUrl: String, accessToken: String, moduleId: String): AppResult<Unit>
+
+    suspend fun loadCases(baseUrl: String, accessToken: String, moduleId: String): AppResult<List<LearningCase>>
 }
 
 data class LearningModuleItem(
@@ -74,6 +78,25 @@ data class LearningModuleDetail(
     val completedLessons: Int,
     val progressPercent: Double,
     val lessons: List<LearningLesson>,
+    val topic: String?,
+    val coverImageUrl: String?,
+    val cases: List<LearningCase>,
+    val media: List<LearningMedia>,
+)
+
+data class LearningCase(
+    val caseId: String,
+    val title: String,
+    val description: String,
+    val referenceUrl: String?,
+)
+
+data class LearningMedia(
+    val mediaId: String,
+    val mediaType: String,
+    val url: String,
+    val title: String,
+    val altText: String,
 )
 
 data class LessonCompleteResult(

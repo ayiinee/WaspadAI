@@ -54,7 +54,7 @@ begin
     select id into seed_user from auth.users order by created_at limit 1;
     if seed_user is null then
         raise notice 'No local Auth user found; community seed skipped.';
-        return;
+    else
     end if;
 
     insert into public.profiles (id, display_name)
@@ -222,7 +222,10 @@ begin
         verified_at = excluded.verified_at,
         withdrawn_at = null;
 
-    -- Seed konten Pelajari (Learning Modules, Lessons, Quiz Questions & Options)
+    end if;
+
+    -- LEARNING_SEED_BEGIN
+    -- Seed konten Pelajari secara independen dari fixture user/community.
     insert into public.learning_modules
         (id, slug, title, summary, difficulty, display_order, version, status)
     values
@@ -308,6 +311,36 @@ Sebelum meneruskan pesan berantai ke keluarga atau grup:
 3. **Gunakan WaspadAI**: Masukkan teks atau tangkapan layar untuk verifikasi berbasis bukti.',
          5, 2, true)
     on conflict (id) do nothing;
+
+    insert into public.learning_cases
+        (id, module_id, title, description, display_order)
+    values
+        ('00000000-0000-0000-0000-000000000341', '00000000-0000-0000-0000-000000000301',
+         'Pesan meminta OTP', 'Pengirim mengaku petugas resmi dan meminta OTP untuk membatalkan transaksi.', 1),
+        ('00000000-0000-0000-0000-000000000441', '00000000-0000-0000-0000-000000000401',
+         'Kurir mengirim APK', 'Pengirim mengaku kurir dan meminta pengguna memasang file APK.', 1),
+        ('00000000-0000-0000-0000-000000000541', '00000000-0000-0000-0000-000000000501',
+         'Pesan broadcast tanpa sumber', 'Pesan sensasional meminta penerima segera menyebarkan klaim tanpa rujukan primer.', 1)
+    on conflict (id) do update set
+        title = excluded.title,
+        description = excluded.description,
+        display_order = excluded.display_order;
+
+    insert into public.learning_media
+        (id, module_id, media_type, url, title, alt_text, display_order)
+    values
+        ('00000000-0000-0000-0000-000000000342', '00000000-0000-0000-0000-000000000301', 'IMAGE',
+         'https://placehold.co/1200x675/png?text=Phishing+OTP+PIN', 'Ilustrasi keamanan OTP dan PIN', 'Ilustrasi keamanan OTP dan PIN', 1),
+        ('00000000-0000-0000-0000-000000000442', '00000000-0000-0000-0000-000000000401', 'IMAGE',
+         'https://placehold.co/1200x675/png?text=Impersonation', 'Ilustrasi impersonation instansi resmi', 'Ilustrasi impersonation instansi resmi', 1),
+        ('00000000-0000-0000-0000-000000000542', '00000000-0000-0000-0000-000000000501', 'IMAGE',
+         'https://placehold.co/1200x675/png?text=Cek+Misinformasi', 'Ilustrasi pemeriksaan misinformasi', 'Ilustrasi pemeriksaan misinformasi', 1)
+    on conflict (id) do update set
+        media_type = excluded.media_type,
+        url = excluded.url,
+        title = excluded.title,
+        alt_text = excluded.alt_text,
+        display_order = excluded.display_order;
 
     insert into public.quiz_questions
         (id, module_id, lesson_id, question_text, explanation, version, display_order, is_active)
@@ -430,4 +463,5 @@ Sebelum meneruskan pesan berantai ke keluarga atau grup:
         '00000000-0000-0000-0000-000000000401',
         '00000000-0000-0000-0000-000000000501'
      );
+    -- LEARNING_SEED_END
 end $$;

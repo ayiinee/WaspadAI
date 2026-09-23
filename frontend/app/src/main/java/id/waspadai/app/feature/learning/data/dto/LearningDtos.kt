@@ -38,6 +38,27 @@ data class LearningModuleDetailDto(
     @SerialName("completed_lessons") val completedLessons: Int = 0,
     @SerialName("progress_percent") val progressPercent: Double = 0.0,
     val lessons: List<LearningLessonDto> = emptyList(),
+    val topic: String? = null,
+    @SerialName("cover_image_url") val coverImageUrl: String? = null,
+    val cases: List<LearningCaseDto> = emptyList(),
+    val media: List<LearningMediaDto> = emptyList(),
+)
+
+@Serializable
+data class LearningCaseDto(
+    @SerialName("case_id") val caseId: String = "",
+    val title: String = "",
+    val description: String = "",
+    @SerialName("reference_url") val referenceUrl: String? = null,
+)
+
+@Serializable
+data class LearningMediaDto(
+    @SerialName("media_id") val mediaId: String = "",
+    @SerialName("media_type") val mediaType: String = "IMAGE",
+    val url: String = "",
+    val title: String = "",
+    @SerialName("alt_text") val altText: String = "",
 )
 
 @Serializable

@@ -39,6 +39,7 @@ class VerificationViewModel(
             VerificationAction.SubmitText -> submitText()
             VerificationAction.RequestImageCapture -> Unit
             is VerificationAction.ImageSelected -> showImagePreview(action)
+            is VerificationAction.AttachmentsSelected -> addAttachments(action.attachments)
             VerificationAction.SubmitPendingImage -> submitPendingImage()
             VerificationAction.DismissImagePreview -> dismissImagePreview()
             is VerificationAction.RemovePendingAttachment -> removePendingAttachment(action.index)
@@ -216,22 +217,36 @@ class VerificationViewModel(
     }
 
     private fun showImagePreview(action: VerificationAction.ImageSelected) {
-        val attachment = ImageVerificationPreview(
-            imageBytes = action.imageBytes,
-            contentType = action.contentType,
-            fileName = action.fileName,
-            overlayModeEnabled = action.overlayModeEnabled,
-        )
+        addAttachments(listOf(action))
+    }
+
+    private fun addAttachments(selections: List<VerificationAction.ImageSelected>) {
+        if (selections.isEmpty()) return
         _state.update { current ->
-            if (current.pendingAttachments.size >= MAXIMUM_PENDING_ATTACHMENTS) {
+            val availableSlots = MAXIMUM_PENDING_ATTACHMENTS - current.pendingAttachments.size
+            if (availableSlots <= 0) {
                 return@update current.copy(
                     phase = VerificationPhase.Failure("Maksimal 5 lampiran dapat ditambahkan dalam satu pesan."),
                 )
             }
+            val accepted = selections.take(availableSlots).map { selection ->
+                ImageVerificationPreview(
+                    imageBytes = selection.imageBytes,
+                    contentType = selection.contentType,
+                    fileName = selection.fileName,
+                    overlayModeEnabled = selection.overlayModeEnabled,
+                )
+            }
             current.copy(
                 isOverlayModeEnabled = false,
-                pendingAttachments = current.pendingAttachments + attachment,
-                phase = VerificationPhase.Idle,
+                pendingAttachments = current.pendingAttachments + accepted,
+                phase = if (accepted.size < selections.size) {
+                    VerificationPhase.Failure(
+                        "${accepted.size} lampiran ditambahkan. Maksimal 5 lampiran dalam satu pesan."
+                    )
+                } else {
+                    VerificationPhase.Idle
+                },
             )
         }
     }
