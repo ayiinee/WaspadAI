@@ -196,15 +196,6 @@ private fun HistoryRow(item: VerificationHistoryItem, onOpen: (String) -> Unit) 
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Text(
-            item.headline,
-            color = Ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(3.dp))
-        Text(
             "${item.verdict} • ${item.createdAt}",
             color = Color(0xFF557383),
             fontSize = 12.sp,

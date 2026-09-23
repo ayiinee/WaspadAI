@@ -129,7 +129,6 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
-import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
@@ -360,9 +359,6 @@ fun CommunityScreen(
                             CommunityPostCard(
                                 post = post,
                                 accessToken = uiState.accessTokenDraft,
-                                imageBaseUrl = uiState.baseUrlDraft,
-                                detail = uiState.detailByPostId[post.id],
-                                isResponsesLoading = uiState.detailLoadingPostId == post.id,
                                 onSupportClick = {
                                     onAction(CommunityAction.SupportClicked(post.id))
                                 },
@@ -370,9 +366,6 @@ fun CommunityScreen(
                                     onAction(CommunityAction.VerdictSelected(post.id, verdict))
                                 },
                                 onShareClick = { onSharePost(post) },
-                                onLoadResponses = {
-                                    onAction(CommunityAction.LoadPostDetail(post.id))
-                                },
                                 onOpenDetails = { onOpenPost(post) },
                                 onEdit = { editingPost = post },
                                 onDelete = { deletingPost = post },
@@ -804,13 +797,9 @@ private fun CommunitySearchBar(
 private fun CommunityPostCard(
     post: CommunityPost,
     accessToken: String,
-    imageBaseUrl: String,
-    detail: CommunityDetailSnapshot?,
-    isResponsesLoading: Boolean,
     onSupportClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
     onShareClick: () -> Unit,
-    onLoadResponses: () -> Unit,
     onOpenDetails: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -823,7 +812,6 @@ private fun CommunityPostCard(
         else -> 32.dp
     }
     var ownerMenuExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
-    var areResponsesExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
     val likeAnimation = rememberCommunityLikeAnimation(post.id, post.isSupported)
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -900,19 +888,8 @@ private fun CommunityPostCard(
                     }
                 }
             }
-            if (post.title.isNotBlank()) {
+            if (post.body.isNotBlank()) {
                 Spacer(Modifier.height(9.dp))
-                Text(
-                    text = post.title,
-                    color = Color.Black,
-                    fontSize = 14.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.Normal,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (post.hasDistinctBodyFromTitle()) {
-                Spacer(Modifier.height(7.dp))
                 Text(
                     text = post.body,
                     color = Color.Black,
@@ -931,17 +908,19 @@ private fun CommunityPostCard(
                 Spacer(Modifier.height(7.dp))
                 CommunityEvidenceImage(imageUrl, accessToken, post.author)
             }
-            Spacer(Modifier.height(10.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(WaspadAIBlue)
-                    .clickable(onClick = onOpenDetails),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("Beri penilaian", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (!post.isOwner) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(WaspadAIBlue)
+                        .clickable(onClick = onOpenDetails),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Beri penilaian", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -972,20 +951,17 @@ private fun CommunityPostCard(
                     icon = null,
                     label = post.commentCount.toString(),
                     contentDescription = "Komentar",
-                    tint = if (areResponsesExpanded) CommunityCommentYellow else CommunityActionGray,
+                    tint = CommunityActionGray,
                     labelTint = CommunityActionGray,
                     iconContent = {
                         RoundCommentIcon(
-                            tint = if (areResponsesExpanded) CommunityCommentYellow else CommunityActionGray,
+                            tint = CommunityActionGray,
                             contentDescription = "Komentar",
-                            filled = areResponsesExpanded,
+                            filled = false,
                             modifier = Modifier.size(20.dp),
                         )
                     },
-                    onClick = {
-                        areResponsesExpanded = !areResponsesExpanded
-                        if (areResponsesExpanded) onLoadResponses()
-                    },
+                    onClick = {},
                 )
                 InlineAction(
                     icon = Icons.Rounded.Visibility,
@@ -1014,21 +990,6 @@ private fun CommunityPostCard(
                     )
                 }
             }
-        }
-        AnimatedVisibility(
-            visible = areResponsesExpanded,
-            enter = fadeIn(tween(180)) + expandVertically(tween(240)),
-            exit = fadeOut(tween(120)) + shrinkVertically(tween(180)),
-        ) {
-            InlineCommunityResponses(
-                responses = detail?.responses,
-                isLoading = isResponsesLoading,
-                avatarRes = post.avatarRes,
-                caseId = post.id,
-                imageBaseUrl = imageBaseUrl,
-                accessToken = accessToken,
-                contentModifier = Modifier.padding(horizontal = horizontalPadding),
-            )
         }
         HorizontalDivider(color = Color.Black.copy(alpha = .16f), thickness = 1.dp)
     }
@@ -1502,7 +1463,6 @@ private fun InlineAction(
 
 private val CommunityActionGray = Color.Black.copy(alpha = .52f)
 internal val CommunityLikePink = Color(0xFFF21D4B)
-private val CommunityCommentYellow = Color(0xFFF2B705)
 
 @Composable
 internal fun RoundCommentIcon(
@@ -1718,12 +1678,6 @@ internal fun Modifier.communityLikeEffect(animation: CommunityLikeAnimation): Mo
             }
         }
     }
-
-internal fun CommunityPost.hasVisibleTitle(): Boolean =
-    title.isNotBlank() && !title.trim().equals("Bukti belum cukup kuat", ignoreCase = true)
-
-private fun CommunityPost.hasDistinctBodyFromTitle(): Boolean =
-    body.isNotBlank() && !body.trim().equals(title.trim(), ignoreCase = true)
 
 private fun CommunityPost.countFor(verdict: CommunityVerdict): Int = when (verdict) {
     CommunityVerdict.Hoaks -> hoaksCount

@@ -117,17 +117,6 @@ fun CommunityDetailScreen(
                 item {
                     Column(Modifier.padding(horizontal = contentGutter)) {
                     DetailAuthor(post)
-                    if (post.hasVisibleTitle()) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = post.title,
-                            modifier = Modifier.fillMaxWidth(),
-                            color = Color.Black,
-                            fontSize = 16.sp,
-                            lineHeight = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
                     Spacer(Modifier.height(10.dp))
                     Text(post.body, color = Color.Black, fontSize = 15.sp, lineHeight = 22.sp)
                     if (displayPost.media.isNotEmpty()) {
