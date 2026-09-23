@@ -4,7 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,14 +15,19 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,13 +37,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -50,8 +62,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
@@ -62,8 +72,6 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -90,6 +98,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,13 +121,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
@@ -143,6 +152,7 @@ import id.waspadai.app.ui.theme.WaspadAIMuted
 import id.waspadai.app.ui.theme.WaspadAITheme
 import id.waspadai.app.ui.theme.WaspadAIValid
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
@@ -170,6 +180,7 @@ fun CommunityRoute(
     val context = LocalContext.current
     var selectedPostId by rememberSaveable { mutableStateOf(initialPostId) }
     val selectedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
+    val timelineState = rememberCommunityTimelineState(uiState.selectedFeedScope)
 
     // Trigger auto-refresh saat layar pertama kali ditampilkan
     LaunchedEffect(Unit) {
@@ -203,49 +214,75 @@ fun CommunityRoute(
         viewModel.onAction(CommunityAction.ShareLinkConsumed)
     }
 
-    if (selectedPost != null) {
-        CommunityDetailScreen(
-            post = selectedPost,
-            accessToken = uiState.accessTokenDraft,
-            onBack = { selectedPostId = null },
-            onSupportClick = { viewModel.onAction(CommunityAction.SupportClicked(selectedPost.id)) },
-            onVerdictClick = { verdict -> viewModel.onAction(CommunityAction.VerdictSelected(selectedPost.id, verdict)) },
-            detail = uiState.detailByPostId[selectedPost.id],
-            imageBaseUrl = defaultBaseUrl,
-            isDetailLoading = uiState.detailLoadingPostId == selectedPost.id,
-            isResponseSubmitting = uiState.responseSubmittingPostId == selectedPost.id,
-            detailError = uiState.detailError,
-            onRetryDetail = { viewModel.onAction(CommunityAction.LoadPostDetail(selectedPost.id)) },
-            onSubmitResponse = { verdict, reasoning, bytes, fileName, contentType ->
-                viewModel.onAction(
-                    CommunityAction.SubmitCommunityResponse(
-                        postId = selectedPost.id,
-                        verdict = verdict,
-                        reasoning = reasoning,
-                        evidenceBytes = bytes,
-                        evidenceFileName = fileName,
-                        evidenceContentType = contentType,
-                    )
-                )
-            },
-            onDestinationSelected = onDestinationSelected,
-        )
-        return
-    }
+    BackHandler(enabled = selectedPost != null) { selectedPostId = null }
 
-    CommunityScreen(
-        uiState = uiState,
-        onAction = viewModel::onAction,
-        onBack = onBack,
-        onSharePost = { post -> viewModel.onAction(CommunityAction.ShareClicked(post.id)) },
-        onOpenPost = { selectedPostId = it.id },
-        onDestinationSelected = onDestinationSelected,
-    )
+    AnimatedContent(
+        targetState = selectedPost?.id,
+        transitionSpec = {
+            if (targetState != null) {
+                slideInHorizontally(tween(250)) { width -> width } togetherWith
+                    slideOutHorizontally(tween(180)) { width -> -width / 4 }
+            } else {
+                slideInHorizontally(tween(220)) { width -> -width / 4 } togetherWith
+                    slideOutHorizontally(tween(220)) { width -> width }
+            }
+        },
+        label = "communityTimelineDetail",
+    ) { visiblePostId ->
+        val visiblePost = uiState.posts.firstOrNull { it.id == visiblePostId }
+        if (visiblePost != null) {
+            CommunityDetailScreen(
+                post = visiblePost,
+                accessToken = uiState.accessTokenDraft,
+                onBack = { selectedPostId = null },
+                onSupportClick = {
+                    viewModel.onAction(CommunityAction.SupportClicked(visiblePost.id))
+                },
+                onVerdictClick = { verdict ->
+                    viewModel.onAction(CommunityAction.VerdictSelected(visiblePost.id, verdict))
+                },
+                detail = uiState.detailByPostId[visiblePost.id],
+                imageBaseUrl = defaultBaseUrl,
+                isDetailLoading = uiState.detailLoadingPostId == visiblePost.id,
+                isResponseSubmitting = uiState.responseSubmittingPostId == visiblePost.id,
+                detailError = uiState.detailError,
+                onRetryDetail = {
+                    viewModel.onAction(CommunityAction.LoadPostDetail(visiblePost.id))
+                },
+                onSubmitResponse = { verdict, reasoning, bytes, fileName, contentType ->
+                    viewModel.onAction(
+                        CommunityAction.SubmitCommunityResponse(
+                            postId = visiblePost.id,
+                            verdict = verdict,
+                            reasoning = reasoning,
+                            evidenceBytes = bytes,
+                            evidenceFileName = fileName,
+                            evidenceContentType = contentType,
+                        )
+                    )
+                },
+                onDestinationSelected = onDestinationSelected,
+            )
+        } else {
+            CommunityScreen(
+                uiState = uiState,
+                timelineState = timelineState,
+                onAction = viewModel::onAction,
+                onBack = onBack,
+                onSharePost = { post ->
+                    viewModel.onAction(CommunityAction.ShareClicked(post.id))
+                },
+                onOpenPost = { selectedPostId = it.id },
+                onDestinationSelected = onDestinationSelected,
+            )
+        }
+    }
 }
 
 @Composable
 fun CommunityScreen(
     uiState: CommunityUiState,
+    timelineState: CommunityTimelineState,
     onAction: (CommunityAction) -> Unit,
     onBack: () -> Unit,
     onSharePost: (CommunityPost) -> Unit,
@@ -253,20 +290,36 @@ fun CommunityScreen(
     onDestinationSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var editingPost by remember { mutableStateOf<CommunityPost?>(null) }
     var deletingPost by remember { mutableStateOf<CommunityPost?>(null) }
     var isSearchVisible by rememberSaveable {
         mutableStateOf(uiState.searchQuery.isNotBlank())
     }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val pullToRefreshState = rememberPullToRefreshState()
+    val coroutineScope = rememberCoroutineScope()
+    val scopes = CommunityFeedScope.entries
     val closeSearch: () -> Unit = {
         focusManager.clearFocus()
         keyboardController?.hide()
         isSearchVisible = false
         onAction(CommunityAction.SearchChanged(""))
         onAction(CommunityAction.FilterSelected(CommunityFeedFilter.BelumDinilai))
+    }
+
+    LaunchedEffect(uiState.selectedFeedScope) {
+        val targetPage = scopes.indexOf(uiState.selectedFeedScope)
+        if (targetPage >= 0 && timelineState.pagerState.settledPage != targetPage) {
+            timelineState.pagerState.animateScrollToPage(targetPage)
+        }
+    }
+    LaunchedEffect(timelineState.pagerState) {
+        snapshotFlow { timelineState.pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                scopes.getOrNull(page)?.let { scope ->
+                    onAction(CommunityAction.FeedScopeSelected(scope))
+                }
+            }
     }
 
     Scaffold(
@@ -297,9 +350,11 @@ fun CommunityScreen(
                 },
             )
             CommunityFeedTabs(
-                selectedScope = uiState.selectedFeedScope,
+                pagerState = timelineState.pagerState,
                 onScopeSelected = { scope ->
-                    onAction(CommunityAction.FeedScopeSelected(scope))
+                    coroutineScope.launch {
+                        timelineState.pagerState.animateScrollToPage(scopes.indexOf(scope))
+                    }
                 },
             )
             AnimatedVisibility(
@@ -328,67 +383,35 @@ fun CommunityScreen(
                     )
                 }
             }
-            PullToRefreshBox(
-                isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
-                onRefresh = { onAction(CommunityAction.RefreshBackend) },
-                modifier = Modifier.fillMaxSize(),
-                state = pullToRefreshState,
-                indicator = {
-                    PullToRefreshDefaults.Indicator(
-                        state = pullToRefreshState,
-                        isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
-                        modifier = Modifier.align(Alignment.TopCenter),
-                        color = WaspadAIBlue,
-                    )
-                },
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
-                ) {
-                    if (uiState.visiblePosts.isEmpty()) {
-                        item {
-                            EmptyCommunityResult()
-                        }
-                    } else {
-                        items(
-                            items = uiState.visiblePosts,
-                            key = CommunityPost::id,
-                        ) { post ->
-                            CommunityPostCard(
-                                post = post,
-                                accessToken = uiState.accessTokenDraft,
-                                onSupportClick = {
-                                    onAction(CommunityAction.SupportClicked(post.id))
-                                },
-                                onVerdictClick = { verdict ->
-                                    onAction(CommunityAction.VerdictSelected(post.id, verdict))
-                                },
-                                onShareClick = { onSharePost(post) },
-                                onOpenDetails = { onOpenPost(post) },
-                                onEdit = { editingPost = post },
-                                onDelete = { deletingPost = post },
-                                modifier = Modifier.animateItem(),
-                            )
-                        }
-                    }
-                }
+            HorizontalPager(
+                state = timelineState.pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("community-feed-pager"),
+                key = { page -> scopes[page].name },
+            ) { page ->
+                val scope = scopes[page]
+                CommunityFeedPage(
+                    scope = scope,
+                    posts = uiState.visiblePosts(scope),
+                    listState = timelineState.listState(scope),
+                    accessToken = uiState.accessTokenDraft,
+                    isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
+                    onRefresh = { onAction(CommunityAction.RefreshBackend) },
+                    onSupportPost = { post ->
+                        onAction(CommunityAction.SupportClicked(post.id))
+                    },
+                    onVerdictPost = { post, verdict ->
+                        onAction(CommunityAction.VerdictSelected(post.id, verdict))
+                    },
+                    onSharePost = onSharePost,
+                    onOpenPost = onOpenPost,
+                    onDeletePost = { deletingPost = it },
+                )
             }
         }
     }
 
-    editingPost?.let { post ->
-        EditCommunityPostDialog(
-            post = post,
-            isSaving = uiState.managingPostId == post.id,
-            onDismiss = { if (uiState.managingPostId == null) editingPost = null },
-            onSave = { caption ->
-                onAction(CommunityAction.EditPost(post.id, caption))
-                editingPost = null
-            },
-        )
-    }
     deletingPost?.let { post ->
         AlertDialog(
             onDismissRequest = { if (uiState.managingPostId == null) deletingPost = null },
@@ -487,36 +510,105 @@ internal fun CommunityPageHeader(
 
 @Composable
 private fun CommunityFeedTabs(
-    selectedScope: CommunityFeedScope,
+    pagerState: PagerState,
     onScopeSelected: (CommunityFeedScope) -> Unit,
 ) {
-    Row(
+    val scopes = CommunityFeedScope.entries
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White),
     ) {
-        CommunityFeedScope.entries.forEach { scope ->
-            val selected = scope == selectedScope
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onScopeSelected(scope) }
-                    .padding(top = 11.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = scope.label,
-                    color = if (selected) WaspadAIBlue else Color.Black.copy(alpha = .48f),
-                    fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                )
-                Spacer(Modifier.height(9.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            scopes.forEachIndexed { page, scope ->
+                val selected = page == pagerState.currentPage
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(if (selected) WaspadAIBlue else Color.Transparent),
-                )
+                        .weight(1f)
+                        .clickable { onScopeSelected(scope) }
+                        .padding(vertical = 11.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = scope.label,
+                        color = if (selected) WaspadAIBlue else Color.Black.copy(alpha = .48f),
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp),
+        ) {
+            val indicatorWidth = maxWidth / scopes.size
+            val indicatorOffset = indicatorWidth *
+                (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(indicatorWidth)
+                    .height(2.dp)
+                    .background(WaspadAIBlue),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CommunityFeedPage(
+    scope: CommunityFeedScope,
+    posts: List<CommunityPost>,
+    listState: LazyListState,
+    accessToken: String,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    onSupportPost: (CommunityPost) -> Unit,
+    onVerdictPost: (CommunityPost, CommunityVerdict) -> Unit,
+    onSharePost: (CommunityPost) -> Unit,
+    onOpenPost: (CommunityPost) -> Unit,
+    onDeletePost: (CommunityPost) -> Unit,
+) {
+    val pullToRefreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullToRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+                color = WaspadAIBlue,
+            )
+        },
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("community-feed-${scope.name}"),
+            contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            if (posts.isEmpty()) {
+                item { EmptyCommunityResult() }
+            } else {
+                items(items = posts, key = CommunityPost::id) { post ->
+                    CommunityPostCard(
+                        post = post,
+                        accessToken = accessToken,
+                        onSupportClick = { onSupportPost(post) },
+                        onVerdictClick = { verdict -> onVerdictPost(post, verdict) },
+                        onShareClick = { onSharePost(post) },
+                        onOpenDetails = { onOpenPost(post) },
+                        onDelete = { onDeletePost(post) },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
             }
         }
     }
@@ -801,7 +893,6 @@ private fun CommunityPostCard(
     onVerdictClick: (CommunityVerdict) -> Unit,
     onShareClick: () -> Unit,
     onOpenDetails: () -> Unit,
-    onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -811,10 +902,40 @@ private fun CommunityPostCard(
         screenWidth < 600 -> 20.dp
         else -> 32.dp
     }
-    var ownerMenuExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
     val likeAnimation = rememberCommunityLikeAnimation(post.id, post.isSupported)
+    val cardInteractionSource = remember(post.id) { MutableInteractionSource() }
+    val isPressed by cardInteractionSource.collectIsPressedAsState()
+    var isOpening by remember(post.id) { mutableStateOf(false) }
+    val cardBackground by animateColorAsState(
+        targetValue = if (isPressed || isOpening) {
+            Color.Black.copy(alpha = .05f)
+        } else {
+            Color.Transparent
+        },
+        animationSpec = tween(durationMillis = if (isPressed || isOpening) 70 else 100),
+        label = "communityCardPressed",
+    )
+    val coroutineScope = rememberCoroutineScope()
+    val openDetailsWithFeedback = {
+        if (!isOpening) {
+            isOpening = true
+            coroutineScope.launch {
+                delay(90)
+                onOpenDetails()
+                isOpening = false
+            }
+        }
+    }
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(cardBackground)
+            .clickable(
+                interactionSource = cardInteractionSource,
+                indication = null,
+                enabled = !isOpening,
+                onClick = openDetailsWithFeedback,
+            ),
     ) {
         Column(modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -851,40 +972,15 @@ private fun CommunityPostCard(
                     )
                 }
                 if (post.isOwner) {
-                    Box {
-                        IconButton(
-                            onClick = { ownerMenuExpanded = true },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = "Kelola postingan",
-                                tint = WaspadAIDarkBlue,
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = ownerMenuExpanded,
-                            onDismissRequest = { ownerMenuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Edit Postingan") },
-                                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                                onClick = {
-                                    ownerMenuExpanded = false
-                                    onEdit()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete Postingan", color = WaspadAIHoax) },
-                                leadingIcon = {
-                                    Icon(Icons.Rounded.Delete, contentDescription = null, tint = WaspadAIHoax)
-                                },
-                                onClick = {
-                                    ownerMenuExpanded = false
-                                    onDelete()
-                                },
-                            )
-                        }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = "Hapus postingan",
+                            tint = WaspadAIHoax,
+                        )
                     }
                 }
             }
@@ -961,7 +1057,7 @@ private fun CommunityPostCard(
                             modifier = Modifier.size(20.dp),
                         )
                     },
-                    onClick = {},
+                    onClick = onOpenDetails,
                 )
                 InlineAction(
                     icon = Icons.Rounded.Visibility,
@@ -993,40 +1089,6 @@ private fun CommunityPostCard(
         }
         HorizontalDivider(color = Color.Black.copy(alpha = .16f), thickness = 1.dp)
     }
-}
-
-@Composable
-private fun EditCommunityPostDialog(
-    post: CommunityPost,
-    isSaving: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit,
-) {
-    var caption by rememberSaveable(post.id) { mutableStateOf(post.body) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Postingan") },
-        text = {
-            OutlinedTextField(
-                value = caption,
-                onValueChange = { if (it.length <= 5000) caption = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Isi postingan") },
-                minLines = 4,
-                maxLines = 10,
-                supportingText = { Text("${caption.length}/5000") },
-            )
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !isSaving && caption.isNotBlank() && caption.trim() != post.body,
-                onClick = { onSave(caption.trim()) },
-            ) { Text(if (isSaving) "Menyimpan..." else "Simpan") }
-        },
-        dismissButton = {
-            TextButton(enabled = !isSaving, onClick = onDismiss) { Text("Batal") }
-        },
-    )
 }
 
 @Composable
@@ -1719,6 +1781,7 @@ private fun CommunityScreenPreview() {
     WaspadAITheme {
         CommunityScreen(
             uiState = CommunityUiState(),
+            timelineState = rememberCommunityTimelineState(),
             onAction = {},
             onBack = {},
             onSharePost = {},

@@ -89,7 +89,10 @@ data class CommunityUiState(
     val postManagementError: String? = null,
 ) {
     val visiblePosts: List<CommunityPost>
-        get() = posts.filter { post ->
+        get() = visiblePosts(selectedFeedScope)
+
+    fun visiblePosts(scope: CommunityFeedScope): List<CommunityPost> =
+        posts.filter { post ->
             val matchesQuery = searchQuery.isBlank() || listOf(
                 post.author,
                 post.title,
@@ -103,7 +106,7 @@ data class CommunityUiState(
                 CommunityFeedFilter.BelumDinilai -> post.selectedVerdict == null
                 CommunityFeedFilter.SudahDinilai -> post.selectedVerdict != null
             }
-            val matchesScope = when (selectedFeedScope) {
+            val matchesScope = when (scope) {
                 CommunityFeedScope.Umum -> !post.isOwner
                 CommunityFeedScope.RiwayatSaya -> post.isOwner
             }
