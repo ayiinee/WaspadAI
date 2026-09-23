@@ -11,7 +11,7 @@ import pytest
 
 from app import community_service
 from app.errors import ProductAPIError
-from app.models import CommunityUpdateRequest
+from app.schemas.community import CommunityUpdateRequest
 
 
 class Cursor:

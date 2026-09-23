@@ -14,7 +14,8 @@ from pydantic import ValidationError
 from app.community_evidence_fixture import hardcoded_community_evidence
 from app.config import Settings
 from app.database import user_transaction
-from app.models import CommunityEvidenceRecord, CommunityEvidenceSource, TextVerificationRequest
+from app.models import TextVerificationRequest
+from app.schemas.community import CommunityEvidenceRecord, CommunityEvidenceSource
 
 MAX_COMMUNITY_EVIDENCE_RECORDS = 5
 MAX_COMMUNITY_EVIDENCE_SOURCES = 3

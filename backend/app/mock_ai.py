@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from app.models import AIResult, TextVerificationRequest
+from app.models import TextVerificationRequest
+from app.schemas.verification import AIResult
 
 
 def build_review_required_result(request: TextVerificationRequest, payload_hash: str) -> AIResult:

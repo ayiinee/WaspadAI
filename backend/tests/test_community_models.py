@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.models import (
+from app.models import ImageVerificationRequest
+from app.schemas.community import (
     CommunityItem,
     CommunityPublishRequest,
     CommunityVoteRequest,
-    ImageVerificationRequest,
 )
 
 
@@ -36,9 +36,12 @@ def test_community_publish_requires_caption() -> None:
         CommunityPublishRequest.model_validate(valid)
     with pytest.raises(ValidationError):
         CommunityPublishRequest.model_validate({**valid, "caption": ""})
-    assert CommunityPublishRequest.model_validate(
-        {**valid, "caption": "Mohon bantu cek informasi ini."}
-    ).caption == "Mohon bantu cek informasi ini."
+    assert (
+        CommunityPublishRequest.model_validate(
+            {**valid, "caption": "Mohon bantu cek informasi ini."}
+        ).caption
+        == "Mohon bantu cek informasi ini."
+    )
 
 
 def test_image_question_is_trimmed_and_bounded() -> None:

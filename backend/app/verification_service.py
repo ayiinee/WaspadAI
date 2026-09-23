@@ -21,7 +21,6 @@ from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_image_review_required_result, build_review_required_result
 from app.models import (
-    AIResult,
     HistoryItem,
     HistoryMeta,
     HistoryPage,
@@ -29,6 +28,7 @@ from app.models import (
     TextVerificationRequest,
     VerificationEnvelope,
 )
+from app.schemas.verification import AIResult
 from app.supabase_storage import upload_verification_input
 
 VERIFY_TEXT_ROUTE = "POST /api/v1/verifications/text"
