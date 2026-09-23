@@ -168,16 +168,24 @@ fun CommunityDetailScreen(
                     }
                     CommunityInsight(displayPost)
                     Spacer(Modifier.height(8.dp))
-                    CommunityAssessmentPanel(
-                        post = displayPost,
-                        expanded = assessmentExpanded,
-                        onToggle = { assessmentExpanded = !assessmentExpanded },
-                        onSubmit = { verdict, reason, bytes, fileName, contentType ->
-                            onSubmitResponse(verdict, reason, bytes, fileName, contentType)
-                        },
-                        isSubmitting = isResponseSubmitting,
-                        submitError = detailError,
-                    )
+                    if (!displayPost.isOwner) {
+                        CommunityAssessmentPanel(
+                            post = displayPost,
+                            expanded = assessmentExpanded,
+                            onToggle = { assessmentExpanded = !assessmentExpanded },
+                            onSubmit = { verdict, reason, bytes, fileName, contentType ->
+                                onSubmitResponse(verdict, reason, bytes, fileName, contentType)
+                            },
+                            isSubmitting = isResponseSubmitting,
+                            submitError = detailError,
+                        )
+                    } else {
+                        Text(
+                            text = "Anda tidak dapat memberi penilaian pada kasus milik sendiri.",
+                            color = WaspadAIMuted,
+                            fontSize = 12.sp,
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
                     val responses = detail?.responses.orEmpty()
                     DetailActions(displayPost, responses.size, onSupportClick)

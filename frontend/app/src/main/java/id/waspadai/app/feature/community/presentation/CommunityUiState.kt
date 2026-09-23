@@ -18,6 +18,8 @@ enum class CommunityFeedFilter(val label: String) {
 
 data class CommunityPost(
     val id: String,
+    val historyCaseId: String = "",
+    val isOwner: Boolean = false,
     val author: String,
     val timestamp: String,
     val title: String,
@@ -76,6 +78,7 @@ data class CommunityUiState(
     val summary: CommunitySummary = CommunitySummary(),
     val posts: List<CommunityPost> = emptyList(),
     val shareLink: String? = null,
+    val requestedPostId: String? = null,
 ) {
     val visiblePosts: List<CommunityPost>
         get() = posts.filter { post ->
@@ -114,6 +117,8 @@ sealed interface CommunityAction {
         val verdict: CommunityVerdict,
     ) : CommunityAction
     data class LoadPostDetail(val postId: String) : CommunityAction
+    data class OpenPublishedPost(val postId: String) : CommunityAction
+    data object PublishedPostOpened : CommunityAction
     data class SubmitCommunityResponse(
         val postId: String,
         val verdict: CommunityVerdict,

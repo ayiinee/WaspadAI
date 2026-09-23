@@ -102,9 +102,12 @@ class CommunityRepositoryImplTest {
             respond(
                 """
                 {
+                  "id": "community-1",
                   "case_id": "case-1",
-                  "community_state": "PUBLISHED_UNVERIFIED",
-                  "revision": 2
+                  "creator": {"display_name":"Anda","is_current_user":true},
+                  "title":"Kasus","redacted_text":"Aman",
+                  "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-22T00:00:00Z",
+                  "counts":{},"media":[]
                 }
                 """.trimIndent(),
                 headers = jsonHeaders(),
@@ -120,10 +123,10 @@ class CommunityRepositoryImplTest {
         )
 
         assertTrue(result is AppResult.Success)
-        assertEquals(
-            "PUBLISHED_UNVERIFIED",
-            (result as AppResult.Success).value.communityState,
-        )
+        assertEquals("community-1", (result as AppResult.Success).value.caseId)
+        assertEquals("case-1", result.value.historyCaseId)
+        assertTrue(result.value.isOwner)
+        assertEquals("community-1", repository.feedState.value?.posts?.first()?.caseId)
     }
 
     private fun repositoryWith(engine: MockEngine): CommunityRepositoryImpl {

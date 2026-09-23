@@ -445,9 +445,8 @@ class VerificationViewModel(
                 )
             ) {
                 is AppResult.Success -> _state.update { current ->
-                    communityRepository?.invalidateCommunityCache()
                     val updatedResult = result.copy(
-                        communityState = published.value.communityState,
+                        communityState = "PUBLISHED_UNVERIFIED",
                         communityEligible = false,
                     )
                     current.copy(

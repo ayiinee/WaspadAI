@@ -2,9 +2,13 @@ package id.waspadai.app.feature.community.domain
 
 import id.waspadai.app.core.common.AppResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 
 interface CommunityRepository {
+    val feedState: StateFlow<CommunitySnapshot?>
+        get() = EmptyCommunityFeedState
     /**
      * Tandai snapshot feed sebagai stale setelah mutation yang dapat mengubah Koneksi.
      * Implementasi yang tidak memiliki cache boleh membiarkan method ini kosong.
@@ -73,7 +77,7 @@ interface CommunityRepository {
         caseId: String,
         previewId: String,
         ragReuseConsent: Boolean,
-    ): AppResult<CommunityState>
+    ): AppResult<CommunityFeedPost>
 }
 
 data class CommunitySnapshot(
@@ -83,7 +87,9 @@ data class CommunitySnapshot(
 )
 
 data class CommunityDetailSnapshot(
-    val caseId: String,
+    val communityId: String,
+    val historyCaseId: String = "",
+    val isOwner: Boolean = false,
     val counts: CommunityVoteCounts,
     val userVote: CommunityVote?,
     val responses: List<CommunityResponseItem>,
@@ -112,6 +118,9 @@ data class CommunityUserSummary(
 
 data class CommunityFeedPost(
     val caseId: String,
+    val historyCaseId: String = "",
+    val creatorName: String = "Pengguna WaspadAI",
+    val isOwner: Boolean = false,
     val title: String,
     val redactedText: String,
     val status: CommunityPostStatus,
@@ -144,13 +153,13 @@ data class CommunityVoteCounts(
 )
 
 data class CommunityVoteUpdate(
-    val caseId: String,
+    val communityId: String,
     val userVote: CommunityVote?,
     val counts: CommunityVoteCounts,
 )
 
 data class CommunityResponseUpdate(
-    val caseId: String,
+    val communityId: String,
     val userVote: CommunityVote,
     val counts: CommunityVoteCounts,
     val response: CommunityResponseItem,
@@ -165,10 +174,11 @@ data class CommunityRealtimeEvent(
     val shareCount: Int? = null,
     val counts: CommunityVoteCounts? = null,
     val response: CommunityResponseItem? = null,
+    val post: CommunityFeedPost? = null,
 )
 
 data class CommunitySocialUpdate(
-    val caseId: String,
+    val communityId: String,
     val liked: Boolean,
     val likeCount: Int,
     val viewCount: Int,
@@ -186,11 +196,7 @@ data class CommunityPreview(
     val media: List<CommunityMedia> = emptyList(),
 )
 
-data class CommunityState(
-    val caseId: String,
-    val communityState: String,
-    val revision: Int,
-)
+private val EmptyCommunityFeedState = MutableStateFlow<CommunitySnapshot?>(null)
 
 enum class CommunityPostStatus {
     PublishedUnverified,

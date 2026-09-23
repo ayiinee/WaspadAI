@@ -11,7 +11,6 @@ import id.waspadai.app.feature.community.data.dto.CommunityRealtimeEventDto
 import id.waspadai.app.feature.community.data.dto.CommunityResponseItemDto
 import id.waspadai.app.feature.community.data.dto.CommunityResponseResultDto
 import id.waspadai.app.feature.community.data.dto.CommunityPublishRequestDto
-import id.waspadai.app.feature.community.data.dto.CommunityStateDto
 import id.waspadai.app.feature.community.data.dto.CommunityUserSummaryDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteCountsDto
 import id.waspadai.app.feature.community.data.dto.CommunityVoteRequestDto
@@ -24,7 +23,6 @@ import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.community.domain.CommunityRepository
-import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
 import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
@@ -64,6 +62,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
@@ -74,6 +75,8 @@ import kotlinx.serialization.json.Json
 class CommunityRepositoryImpl(
     private val client: HttpClient,
 ) : CommunityRepository {
+    private val _feedState = MutableStateFlow<CommunitySnapshot?>(null)
+    override val feedState: StateFlow<CommunitySnapshot?> = _feedState.asStateFlow()
     private val cacheMutex = Mutex()
     @Volatile
     private var cachedCommunity: CachedCommunity? = null
@@ -119,6 +122,7 @@ class CommunityRepositoryImpl(
                 inFlightKey = null
             }
             if (result is AppResult.Success) {
+                _feedState.value = result.value
                 cachedCommunity = CachedCommunity(
                     key = key,
                     snapshot = result.value,
@@ -307,7 +311,10 @@ class CommunityRepositoryImpl(
                 try {
                     for (frame in session.incoming) {
                         if (frame is Frame.Text) {
-                            emit(Json.decodeFromString<CommunityRealtimeEventDto>(frame.readText()).toDomain())
+                            emit(
+                                Json.decodeFromString<CommunityRealtimeEventDto>(frame.readText())
+                                    .toDomain(baseUrl.normalized())
+                            )
                         }
                     }
                 } finally {
@@ -353,7 +360,7 @@ class CommunityRepositoryImpl(
         caseId: String,
         previewId: String,
         ragReuseConsent: Boolean,
-    ): AppResult<CommunityState> = runCommunityRequest {
+    ): AppResult<CommunityFeedPost> = runCommunityRequest {
         val response = client.post("${baseUrl.normalized()}/api/v1/history/$caseId/community") {
             authorize(accessToken)
             headers {
@@ -370,9 +377,28 @@ class CommunityRepositoryImpl(
         if (!response.status.isSuccess()) {
             throw CommunityApiException(response.status, response.safeError())
         }
-        response.body<CommunityStateDto>().toDomain()
+        response.body<CommunityItemDto>().toDomain(baseUrl.normalized())
     }.also { result ->
-        if (result is AppResult.Success) invalidateCommunityCache()
+        if (result is AppResult.Success) {
+            val current = _feedState.value
+            val updated = if (current == null) {
+                CommunitySnapshot(
+                    summary = CommunityUserSummary(0, 0, 0),
+                    posts = listOf(result.value),
+                    nextCursor = null,
+                )
+            } else {
+                current.copy(posts = listOf(result.value) + current.posts.filterNot { it.caseId == result.value.caseId })
+            }
+            _feedState.value = updated
+            cacheMutex.withLock {
+                cachedCommunity = CachedCommunity(
+                    key = CommunityCacheKey(baseUrl.normalized(), accessToken.trim()),
+                    snapshot = updated,
+                    storedAtMillis = System.currentTimeMillis(),
+                )
+            }
+        }
     }
 
     private suspend fun <T> runCommunityRequest(block: suspend () -> T): AppResult<T> = try {
@@ -435,7 +461,10 @@ private fun CommunityUserSummaryDto.toDomain(): CommunityUserSummary = Community
 )
 
 private fun CommunityItemDto.toDomain(baseUrl: String): CommunityFeedPost = CommunityFeedPost(
-    caseId = caseId,
+    caseId = id.ifBlank { caseId },
+    historyCaseId = caseId,
+    creatorName = creator.displayName,
+    isOwner = creator.isCurrentUser,
     title = title,
     redactedText = redactedText,
     status = status.toStatus(),
@@ -452,7 +481,7 @@ private fun CommunityItemDto.toDomain(baseUrl: String): CommunityFeedPost = Comm
 )
 
 private fun CommunityVoteResultDto.toDomain(): CommunityVoteUpdate = CommunityVoteUpdate(
-    caseId = caseId,
+    communityId = communityId.ifBlank { caseId },
     userVote = userVote.toVoteOrNull(),
     counts = counts.toDomain(),
 )
@@ -467,13 +496,13 @@ private fun CommunityPreviewDto.toDomain(baseUrl: String): CommunityPreview = Co
 )
 
 private fun CommunityResponseResultDto.toDomain(): CommunityResponseUpdate = CommunityResponseUpdate(
-    caseId = caseId,
+    communityId = communityId.ifBlank { caseId },
     userVote = userVote.toVoteOrNull() ?: CommunityVote.Valid,
     counts = counts.toDomain(),
     response = response.toDomain(),
 )
 
-private fun CommunityRealtimeEventDto.toDomain(): CommunityRealtimeEvent = CommunityRealtimeEvent(
+private fun CommunityRealtimeEventDto.toDomain(baseUrl: String): CommunityRealtimeEvent = CommunityRealtimeEvent(
     type = type,
     communityId = communityId,
     likeCount = payload.likeCount,
@@ -488,6 +517,7 @@ private fun CommunityRealtimeEventDto.toDomain(): CommunityRealtimeEvent = Commu
         )
     } else null,
     response = payload.response?.toDomain(),
+    post = payload.post?.toDomain(baseUrl),
 )
 
 private fun CommunityResponseItemDto.toDomain(): CommunityResponseItem = CommunityResponseItem(
@@ -500,7 +530,9 @@ private fun CommunityResponseItemDto.toDomain(): CommunityResponseItem = Communi
 )
 
 private fun CommunityDetailDto.toDomain(baseUrl: String): CommunityDetailSnapshot = CommunityDetailSnapshot(
-    caseId = caseId,
+    communityId = id.ifBlank { caseId },
+    historyCaseId = caseId,
+    isOwner = creator.isCurrentUser,
     counts = counts.toDomain(),
     userVote = userVote.toVoteOrNull(),
     likeCount = likeCount,
@@ -524,7 +556,7 @@ private fun CommunityDetailDto.toDomain(baseUrl: String): CommunityDetailSnapsho
 private fun CommunityItemDto.canonicalMedia(baseUrl: String): List<CommunityMedia> =
     media.take(4).map { it.toDomain(baseUrl) }.ifEmpty {
         imageUrl?.takeIf(String::isNotBlank)?.let { url ->
-            listOf(CommunityMedia(id = "$caseId-legacy", url = url.resolveAgainst(baseUrl)))
+            listOf(CommunityMedia(id = "${id.ifBlank { caseId }}-legacy", url = url.resolveAgainst(baseUrl)))
         }.orEmpty()
     }
 
@@ -552,19 +584,13 @@ private fun String.resolveAgainst(baseUrl: String): String = when {
 }
 
 private fun CommunitySocialResultDto.toDomain(): CommunitySocialUpdate = CommunitySocialUpdate(
-    caseId = caseId,
+    communityId = communityId.ifBlank { caseId },
     liked = liked,
     likeCount = likeCount,
     viewCount = viewCount,
     commentCount = commentCount,
     shareCount = shareCount,
     shareUrl = shareUrl,
-)
-
-private fun CommunityStateDto.toDomain(): CommunityState = CommunityState(
-    caseId = caseId,
-    communityState = communityState,
-    revision = revision,
 )
 
 private fun CommunityVoteCountsDto.toDomain(): CommunityVoteCounts = CommunityVoteCounts(

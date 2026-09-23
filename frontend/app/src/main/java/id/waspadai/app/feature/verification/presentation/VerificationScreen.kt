@@ -79,8 +79,14 @@ import java.io.ByteArrayOutputStream
 fun VerificationRoute(
     viewModel: VerificationViewModel,
     onDestinationSelected: (String) -> Unit = {},
+    onCommunityPublished: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.communityShare.phase) {
+        (state.communityShare.phase as? CommunitySharePhase.Published)?.let { published ->
+            onCommunityPublished(published.post.caseId)
+        }
+    }
     VerificationScreen(
         state = state,
         onAction = viewModel::onAction,

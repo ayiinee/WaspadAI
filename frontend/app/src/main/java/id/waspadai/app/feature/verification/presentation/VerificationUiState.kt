@@ -2,7 +2,7 @@ package id.waspadai.app.feature.verification.presentation
 
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.community.domain.CommunityPreview
-import id.waspadai.app.feature.community.domain.CommunityState
+import id.waspadai.app.feature.community.domain.CommunityFeedPost
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 
 data class VerificationUiState(
@@ -66,7 +66,7 @@ sealed interface CommunitySharePhase {
     data object RequestingPreview : CommunitySharePhase
     data class PreviewReady(val preview: CommunityPreview) : CommunitySharePhase
     data object Publishing : CommunitySharePhase
-    data class Published(val state: CommunityState) : CommunitySharePhase
+    data class Published(val post: CommunityFeedPost) : CommunitySharePhase
     data class Failure(val message: String) : CommunitySharePhase
 }
 

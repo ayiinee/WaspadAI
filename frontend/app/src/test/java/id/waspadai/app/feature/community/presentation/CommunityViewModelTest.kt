@@ -9,7 +9,6 @@ import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
-import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.community.domain.CommunityUserSummary
 import id.waspadai.app.feature.community.domain.CommunityVote
 import id.waspadai.app.feature.community.domain.CommunityVoteCounts
@@ -24,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -244,8 +244,38 @@ class CommunityViewModelTest {
         assertEquals(4, viewModel.uiState.value.posts.first().likeCount)
     }
 
+    @Test
+    fun `realtime created prepends post without refetch`() = runTest {
+        val repository = FakeCommunityRepository()
+        val viewModel = viewModel(repository, token = "token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        runCurrent()
+
+        repository.events.emit(
+            CommunityRealtimeEvent(
+                type = "community.created",
+                communityId = "community-new",
+                post = CommunityFeedPost(
+                    caseId = "community-new",
+                    historyCaseId = "history-new",
+                    creatorName = "Pengguna WaspadAI",
+                    title = "Kasus baru",
+                    redactedText = "Konten aman",
+                    status = CommunityPostStatus.PublishedUnverified,
+                    publishedAt = "2026-09-22T01:00:00Z",
+                    counts = CommunityVoteCounts(0, 0, 0),
+                    userVote = null,
+                ),
+            )
+        )
+        runCurrent()
+
+        assertEquals("community-new", viewModel.uiState.value.posts.first().id)
+        assertEquals(1, repository.loadCommunityCallCount)
+    }
+
     private fun social(liked: Boolean, count: Int) = CommunitySocialUpdate(
-        caseId = "fake-case-1",
+        communityId = "fake-case-1",
         liked = liked,
         likeCount = count,
         viewCount = 2,
@@ -282,6 +312,7 @@ class CommunityViewModelTest {
         var unlikeCalls = 0
         val likeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
         val unlikeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
+        val events = MutableSharedFlow<CommunityRealtimeEvent>(extraBufferCapacity = 1)
 
         private val fakePosts = listOf(
             CommunityFeedPost(
@@ -340,7 +371,7 @@ class CommunityViewModelTest {
             caseId: String,
         ): AppResult<CommunityDetailSnapshot> = AppResult.Success(
             CommunityDetailSnapshot(
-                caseId = caseId,
+                communityId = caseId,
                 counts = CommunityVoteCounts(3, 5, 1),
                 userVote = null,
                 responses = emptyList(),
@@ -380,8 +411,7 @@ class CommunityViewModelTest {
             caseId: String,
         ): AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
 
-        override fun observeCommunityEvents(baseUrl: String, accessToken: String) =
-            emptyFlow<CommunityRealtimeEvent>()
+        override fun observeCommunityEvents(baseUrl: String, accessToken: String) = events
 
         override suspend fun requestPreview(
             baseUrl: String,
@@ -395,6 +425,6 @@ class CommunityViewModelTest {
             caseId: String,
             previewId: String,
             ragReuseConsent: Boolean,
-        ): AppResult<CommunityState> = AppResult.Failure("not used")
+        ): AppResult<CommunityFeedPost> = AppResult.Failure("not used")
     }
 }

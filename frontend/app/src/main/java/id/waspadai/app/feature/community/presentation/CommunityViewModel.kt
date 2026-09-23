@@ -54,6 +54,16 @@ class CommunityViewModel(
     private val detailJobs = mutableMapOf<String, Job>()
     private val likeMutations = mutableMapOf<String, LikeMutationState>()
 
+    init {
+        repository?.let { communityRepository ->
+            viewModelScope.launch {
+                communityRepository.feedState.collect { snapshot ->
+                    snapshot?.let(::applySnapshot)
+                }
+            }
+        }
+    }
+
     fun onAction(action: CommunityAction) {
         when (action) {
             is CommunityAction.SearchChanged -> _uiState.update {
@@ -106,6 +116,14 @@ class CommunityViewModel(
             }
 
             is CommunityAction.LoadPostDetail -> loadPostDetail(action.postId)
+
+            is CommunityAction.OpenPublishedPost -> _uiState.update {
+                it.copy(requestedPostId = action.postId)
+            }
+
+            CommunityAction.PublishedPostOpened -> _uiState.update {
+                it.copy(requestedPostId = null)
+            }
 
             is CommunityAction.SubmitCommunityResponse -> submitCommunityResponse(action)
         }
@@ -506,7 +524,7 @@ class CommunityViewModel(
 
     private fun applyVoteUpdate(update: CommunityVoteUpdate) {
         _uiState.update { state ->
-            val previous = state.posts.firstOrNull { it.id == update.caseId }?.selectedVerdict
+            val previous = state.posts.firstOrNull { it.id == update.communityId }?.selectedVerdict
             val next = update.userVote.toPresentation()
             state.copy(
                 isVoteSubmitting = false,
@@ -520,7 +538,7 @@ class CommunityViewModel(
                     }).coerceAtLeast(0),
                 ),
                 posts = state.posts.map { post ->
-                    if (post.id == update.caseId) post.withBackendVote(update.counts, next) else post
+                    if (post.id == update.communityId) post.withBackendVote(update.counts, next) else post
                 },
             )
         }
@@ -528,18 +546,18 @@ class CommunityViewModel(
 
     private fun applyResponseUpdate(update: CommunityResponseUpdate) {
         _uiState.update { state ->
-            val detail = state.detailByPostId[update.caseId]
+            val detail = state.detailByPostId[update.communityId]
             val selected = update.userVote.toPresentation()
             state.copy(
                 backendPhase = CommunityBackendPhase.Connected,
                 backendMessage = "Tanggapan tersimpan. Polling diperbarui.",
                 posts = state.posts.map { item ->
-                    if (item.id == update.caseId) item.withBackendVote(update.counts, selected) else item
+                    if (item.id == update.communityId) item.withBackendVote(update.counts, selected) else item
                 },
                 detailByPostId = if (detail == null) {
                     state.detailByPostId
                 } else {
-                    state.detailByPostId + (update.caseId to detail.copy(
+                    state.detailByPostId + (update.communityId to detail.copy(
                         counts = update.counts,
                         userVote = update.userVote,
                         commentCount = (detail.commentCount + 1).coerceAtLeast(1),
@@ -557,14 +575,14 @@ class CommunityViewModel(
             state.copy(
                 backendPhase = CommunityBackendPhase.Connected,
                 posts = state.posts.map { post ->
-                    if (post.id == update.caseId) post.copy(
+                    if (post.id == update.communityId) post.copy(
                         viewCount = update.viewCount,
                         commentCount = update.commentCount,
                         shareCount = update.shareCount,
                     ) else post
                 },
                 detailByPostId = state.detailByPostId.mapValues { (id, detail) ->
-                    if (id == update.caseId) detail.copy(
+                    if (id == update.communityId) detail.copy(
                         viewCount = update.viewCount,
                         commentCount = update.commentCount,
                         shareCount = update.shareCount,
@@ -593,8 +611,14 @@ class CommunityViewModel(
             likeMutations[event.communityId]?.confirmedServerCount = event.likeCount
         }
         _uiState.update { state ->
+            val realtimePost = event.post?.toPresentation(communityBaseUrl)
+            val postsWithCreated = if (realtimePost == null) {
+                state.posts
+            } else {
+                listOf(realtimePost) + state.posts.filterNot { it.id == realtimePost.id }
+            }
             state.copy(
-                posts = state.posts.map { post ->
+                posts = postsWithCreated.map { post ->
                     if (post.id != event.communityId) post else post.copy(
                         likeCount = if (pendingLike == null) event.likeCount ?: post.likeCount else post.likeCount,
                         viewCount = event.viewCount ?: post.viewCount,
@@ -684,7 +708,9 @@ private fun formatPublishedAt(raw: String): String {
 
 private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = CommunityPost(
     id = caseId,
-    author = "Komunitas WaspadAI",
+    historyCaseId = historyCaseId,
+    isOwner = isOwner,
+    author = creatorName,
     timestamp = formatPublishedAt(publishedAt),
     title = title,
     body = redactedText,
@@ -721,7 +747,9 @@ private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = C
 )
 
 private fun CommunityPost.toDetailSnapshot(): CommunityDetailSnapshot = CommunityDetailSnapshot(
-    caseId = id,
+    communityId = id,
+    historyCaseId = historyCaseId,
+    isOwner = isOwner,
     counts = CommunityVoteCounts(hoaksCount, waspadaCount, validCount),
     userVote = selectedVerdict?.toDomain(),
     responses = emptyList(),

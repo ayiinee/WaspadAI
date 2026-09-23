@@ -138,6 +138,10 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
             VerificationRoute(
                 viewModel = viewModel,
                 onDestinationSelected = navigateToTopLevel,
+                onCommunityPublished = { communityId ->
+                    communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
+                    navigateToTopLevel("Koneksi")
+                },
             )
         }
         composable(CommunityRouteName) {

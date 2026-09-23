@@ -156,6 +156,12 @@ fun CommunityRoute(
             viewModel.onAction(CommunityAction.LoadPostDetail(postId))
         }
     }
+    LaunchedEffect(uiState.requestedPostId) {
+        uiState.requestedPostId?.let { postId ->
+            selectedPostId = postId
+            viewModel.onAction(CommunityAction.PublishedPostOpened)
+        }
+    }
     LaunchedEffect(uiState.shareLink) {
         val sharePath = uiState.shareLink ?: return@LaunchedEffect
         val sharedPost = uiState.posts.firstOrNull { it.id == selectedPostId }

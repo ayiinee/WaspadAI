@@ -4,10 +4,12 @@ import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.community.domain.CommunityPreview
+import id.waspadai.app.feature.community.domain.CommunityFeedPost
+import id.waspadai.app.feature.community.domain.CommunityPostStatus
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunitySnapshot
-import id.waspadai.app.feature.community.domain.CommunityState
 import id.waspadai.app.feature.community.domain.CommunityVote
+import id.waspadai.app.feature.community.domain.CommunityVoteCounts
 import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
@@ -174,7 +176,7 @@ class VerificationViewModelTest {
 
         val phase = viewModel.state.value.communityShare.phase
         assertTrue(phase is CommunitySharePhase.Published)
-        assertEquals("PUBLISHED_UNVERIFIED", (phase as CommunitySharePhase.Published).state.communityState)
+        assertEquals("community-1", (phase as CommunitySharePhase.Published).post.caseId)
         assertTrue(communityRepository.publishedWithRagConsent)
     }
 
@@ -287,12 +289,19 @@ class VerificationViewModelTest {
             caseId: String,
             previewId: String,
             ragReuseConsent: Boolean,
-        ): AppResult<CommunityState> =
+        ): AppResult<CommunityFeedPost> =
             AppResult.Success(
-                CommunityState(
-                    caseId = caseId,
-                    communityState = "PUBLISHED_UNVERIFIED",
-                    revision = 2,
+                CommunityFeedPost(
+                    caseId = "community-1",
+                    historyCaseId = caseId,
+                    creatorName = "Anda",
+                    isOwner = true,
+                    title = "Kasus",
+                    redactedText = "Aman",
+                    status = CommunityPostStatus.PublishedUnverified,
+                    publishedAt = "2026-09-22T00:00:00Z",
+                    counts = CommunityVoteCounts(0, 0, 0),
+                    userVote = null,
                 ).also {
                     publishedWithRagConsent = ragReuseConsent
                 }
