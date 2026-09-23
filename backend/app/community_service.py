@@ -8,13 +8,13 @@ from uuid import UUID, uuid4
 import httpx
 from psycopg.errors import UniqueViolation
 from psycopg.rows import DictRow
+from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import Settings
 from app.database import user_transaction
 from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
-from app.supabase_storage import upload_verification_input
 from app.models import (
     AIResult,
     CommunityBootstrap,
@@ -24,18 +24,42 @@ from app.models import (
     CommunityMediaItem,
     CommunityPage,
     CommunityPreviewResponse,
+    CommunityPublishRequest,
     CommunityResponseItem,
     CommunityResponseResult,
     CommunitySocialResult,
-    CommunityPublishRequest,
     CommunityStateResponse,
     CommunityUserSummary,
     CommunityVoteCounts,
     CommunityVoteRequest,
     CommunityVoteResult,
 )
+from app.supabase_storage import upload_verification_input
 
 COMMUNITY_PUBLIC_STATUSES = ("PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE")
+
+
+async def record_community_refresh(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    request_id: UUID,
+    item_count: int,
+) -> None:
+    """Persist a successful, user-triggered connection-feed refresh."""
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        await connection.execute(
+            """
+            insert into private.audit_logs
+                (actor_id, action, resource_type, resource_id, request_id, safe_metadata)
+            values (%s, 'COMMUNITY_FEED_REFRESHED', 'community_feed', 'connection-feed', %s, %s)
+            """,
+            (
+                user_id,
+                request_id,
+                Jsonb({"source": "pull_to_refresh", "item_count": max(0, item_count)}),
+            ),
+        )
 
 
 async def list_community(

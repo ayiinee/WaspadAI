@@ -55,3 +55,31 @@ def test_community_user_summary_counts_user_activity(monkeypatch: pytest.MonkeyP
     assert result.evidence_added_count == 5
     assert result.resolved_cases_count == 2
     assert connection.parameters == (user_id, user_id, user_id)
+
+
+def test_successful_community_refresh_is_written_to_audit_log(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_id = uuid4()
+    request_id = uuid4()
+    connection = FakeConnection({})
+
+    @asynccontextmanager
+    async def transaction(*_args: object, **_kwargs: object) -> AsyncIterator[FakeConnection]:
+        yield connection
+
+    monkeypatch.setattr(community_service, "user_transaction", transaction)
+
+    asyncio.run(
+        community_service.record_community_refresh(
+            object(),
+            SimpleNamespace(db_statement_timeout_seconds=15),
+            user_id,
+            request_id,
+            7,
+        )
+    )
+
+    assert connection.parameters is not None
+    assert connection.parameters[:2] == (user_id, request_id)
+    assert connection.parameters[2].obj == {"source": "pull_to_refresh", "item_count": 7}

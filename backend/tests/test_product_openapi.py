@@ -22,6 +22,14 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert "/api/v1/verify/text" not in specification["paths"]
     assert "/api/v1/verify/image" not in specification["paths"]
     assert "/api/v1/community" in specification["paths"]
+    assert "refresh" in {
+        parameter["name"]
+        for parameter in specification["paths"]["/api/v1/community"]["get"]["parameters"]
+    }
+    assert "refresh" in {
+        parameter["name"]
+        for parameter in specification["paths"]["/api/v1/community/bootstrap"]["get"]["parameters"]
+    }
     assert "/api/v1/community/me/summary" in specification["paths"]
     assert "/api/v1/community/{case_id}" in specification["paths"]
     assert "/api/v1/community/{case_id}/media/{media_id}" in specification["paths"]

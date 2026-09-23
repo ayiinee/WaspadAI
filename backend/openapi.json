@@ -370,6 +370,16 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
+            }
           }
         ],
         "responses": {
@@ -436,6 +446,16 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
             }
           }
         ],
