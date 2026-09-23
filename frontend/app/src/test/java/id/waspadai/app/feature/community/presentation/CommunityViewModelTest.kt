@@ -425,6 +425,7 @@ class CommunityViewModelTest {
             caseId: String,
             previewId: String,
             ragReuseConsent: Boolean,
+            caption: String,
         ): AppResult<CommunityFeedPost> = AppResult.Failure("not used")
     }
 }

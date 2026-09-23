@@ -11,11 +11,13 @@ class PublishCommunityCaseUseCase(
         caseId: String,
         previewId: String,
         ragReuseConsent: Boolean,
+        caption: String,
     ): AppResult<CommunityFeedPost> = repository.publishCase(
         baseUrl = baseUrl,
         accessToken = accessToken,
         caseId = caseId,
         previewId = previewId,
         ragReuseConsent = ragReuseConsent,
+        caption = caption,
     )
 }

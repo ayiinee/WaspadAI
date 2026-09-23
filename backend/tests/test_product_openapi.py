@@ -54,6 +54,9 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert publication["responses"]["200"]["content"]["application/json"]["schema"][
         "$ref"
     ].endswith("/CommunityItem")
+    publish_request = specification["components"]["schemas"]["CommunityPublishRequest"]
+    assert "caption" in publish_request["required"]
+    assert publish_request["properties"]["caption"]["maxLength"] == 5000
     community_item = specification["components"]["schemas"]["CommunityItem"]
     assert {"id", "case_id", "creator", "media"} <= set(community_item["properties"])
     social_result = specification["components"]["schemas"]["CommunitySocialResult"]

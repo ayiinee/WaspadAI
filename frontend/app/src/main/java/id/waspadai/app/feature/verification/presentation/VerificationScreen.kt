@@ -16,6 +16,8 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +45,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -203,9 +206,26 @@ fun VerificationScreen(
             )
         }
         is CommunitySharePhase.PreviewReady -> {
+            val sourceAttachment = state.conversation.asReversed()
+                .filterIsInstance<VerificationConversationItem.UserMessage>()
+                .firstOrNull()
+                ?.let { message ->
+                    message.attachmentGroup.lastOrNull() ?: message.attachmentBytes?.let { bytes ->
+                        ImageVerificationPreview(
+                            imageBytes = bytes,
+                            contentType = message.attachmentContentType.orEmpty(),
+                            fileName = message.attachmentName.orEmpty(),
+                        )
+                    }
+                }
             CommunityConsentDialog(
                 preview = sharePhase.preview,
+                sourceAttachment = sourceAttachment,
+                caption = state.communityShare.caption,
                 ragReuseConsent = state.communityShare.ragReuseConsent,
+                onCaptionChanged = {
+                    onAction(VerificationAction.CommunityCaptionChanged(it))
+                },
                 onRagReuseConsentChanged = {
                     onAction(VerificationAction.CommunityRagConsentChanged(it))
                 },
@@ -435,25 +455,59 @@ fun VerificationScreen(
 @Composable
 private fun CommunityConsentDialog(
     preview: id.waspadai.app.feature.community.domain.CommunityPreview,
+    sourceAttachment: ImageVerificationPreview?,
+    caption: String,
     ragReuseConsent: Boolean,
+    onCaptionChanged: (String) -> Unit,
     onRagReuseConsentChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onPublish: () -> Unit,
 ) {
+    val sourceBitmap = remember(sourceAttachment?.imageBytes) {
+        sourceAttachment?.imageBytes?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Preview Bagikan ke Koneksi") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
-                    "Periksa teks aman berikut sebelum dipublikasikan. " +
-                        "Identitas pribadi dan data mentah tidak ikut dibagikan."
+                    "Tambahkan caption sebelum kasus dipublikasikan. " +
+                        "Gambar berasal dari pemeriksaan yang baru kamu kirim."
+                )
+                if (sourceBitmap != null) {
+                    Image(
+                        bitmap = sourceBitmap.asImageBitmap(),
+                        contentDescription = sourceAttachment?.fileName?.let { "Preview $it" },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFE7EEF3)),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                OutlinedTextField(
+                    value = caption,
+                    onValueChange = onCaptionChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Caption") },
+                    placeholder = { Text("Tuliskan konteks kasus ini…") },
+                    supportingText = { Text("Wajib diisi · ${caption.length}/5000") },
+                    isError = caption.isBlank(),
+                    minLines = 3,
+                    maxLines = 6,
                 )
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFF4F8FB)),
                 ) {
                     Text(
-                        preview.redactedText,
+                        "Ringkasan hasil verifikasi:\n${preview.redactedText}",
                         modifier = Modifier.padding(12.dp),
                         color = Color(0xFF153A52),
                     )
@@ -478,7 +532,7 @@ private fun CommunityConsentDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onPublish) {
+            Button(onClick = onPublish, enabled = caption.isNotBlank()) {
                 Text("Publikasikan")
             }
         },

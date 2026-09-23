@@ -560,7 +560,7 @@ async def create_community_preview(
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
             """
-            select c.id, c.revision, c.headline, c.sanitized_text
+            select c.id, c.revision, c.headline, c.sanitized_text, c.risk_level
               from public.verification_cases c
              where c.id = %s and c.user_id = %s and c.deleted_at is null
                and c.community_state = 'PRIVATE'
@@ -570,6 +570,12 @@ async def create_community_preview(
         case = await query.fetchone()
         if case is None:
             raise ProductAPIError(404, "CASE_NOT_FOUND", "History tidak ditemukan.")
+        if str(case["risk_level"]).upper() != "UNKNOWN":
+            raise ProductAPIError(
+                409,
+                "COMMUNITY_REQUIRES_UNKNOWN_RESULT",
+                "Hanya hasil verifikasi yang belum diketahui yang dapat dibagikan ke Koneksi.",
+            )
         assets_query = await connection.execute(
             """
             select asset.id
@@ -681,7 +687,12 @@ async def publish_community_case(
                     409, "PREVIEW_EXPIRED", "Preview komunitas sudah kedaluwarsa."
                 )
 
-            content_hash = preview["content_hash"]
+            caption = request.caption.strip()
+            if not caption:
+                raise ProductAPIError(
+                    422, "COMMUNITY_CAPTION_REQUIRED", "Caption wajib diisi sebelum publikasi."
+                )
+            content_hash = sha256(caption.encode("utf-8")).hexdigest()
             publication = await connection.execute(
                 """
                 insert into private.consent_records
@@ -719,7 +730,7 @@ async def publish_community_case(
                     user_id,
                     request.preview_id,
                     preview["headline"],
-                    preview["redacted_text"],
+                    caption,
                     preview["redacted_asset_id"],
                     publication_row["id"],
                     rag_consent_id,

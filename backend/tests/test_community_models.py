@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.models import CommunityItem, CommunityVoteRequest, ImageVerificationRequest
+from app.models import (
+    CommunityItem,
+    CommunityPublishRequest,
+    CommunityVoteRequest,
+    ImageVerificationRequest,
+)
 
 
 @pytest.mark.parametrize("vote", ["HOAKS", "WASPADA", "VALID"])
@@ -20,6 +25,20 @@ def test_community_vote_rejects_legacy_or_unknown_values(vote: str) -> None:
 def test_community_vote_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError):
         CommunityVoteRequest.model_validate({"vote": "VALID", "case_id": "ignored"})
+
+
+def test_community_publish_requires_caption() -> None:
+    valid = {
+        "preview_id": "73e42666-e1de-4e40-a0fe-5504609700d1",
+        "publication_consent": True,
+    }
+    with pytest.raises(ValidationError):
+        CommunityPublishRequest.model_validate(valid)
+    with pytest.raises(ValidationError):
+        CommunityPublishRequest.model_validate({**valid, "caption": ""})
+    assert CommunityPublishRequest.model_validate(
+        {**valid, "caption": "Mohon bantu cek informasi ini."}
+    ).caption == "Mohon bantu cek informasi ini."
 
 
 def test_image_question_is_trimmed_and_bounded() -> None:

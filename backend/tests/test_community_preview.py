@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 
 import app.community_service as community_service
+from app.errors import ProductAPIError
 
 
 class _Cursor:
@@ -29,8 +30,9 @@ class _Cursor:
 
 
 class _PreviewConnection:
-    def __init__(self, case_id: object) -> None:
+    def __init__(self, case_id: object, risk_level: str = "UNKNOWN") -> None:
         self.case_id = case_id
+        self.risk_level = risk_level
 
     async def execute(self, query: str, parameters: tuple[object, ...]) -> _Cursor:
         assert query.count("%s") == len(parameters), (
@@ -44,6 +46,7 @@ class _PreviewConnection:
                     "revision": 1,
                     "headline": "Judul aman",
                     "sanitized_text": "Konten aman untuk komunitas",
+                    "risk_level": self.risk_level,
                 }
             )
         if "from private.stored_assets" in query:
@@ -77,3 +80,29 @@ def test_create_community_preview_binds_one_case_id_for_asset_query(
 
     assert result.redacted_text == "Konten aman untuk komunitas"
     assert result.media == []
+
+
+def test_create_community_preview_rejects_known_verification_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_id = uuid4()
+    connection = _PreviewConnection(case_id, risk_level="HIGH")
+
+    @asynccontextmanager
+    async def transaction(*_args: object, **_kwargs: object) -> AsyncIterator[_PreviewConnection]:
+        yield connection
+
+    monkeypatch.setattr(community_service, "user_transaction", transaction)
+
+    with pytest.raises(ProductAPIError) as raised:
+        asyncio.run(
+            community_service.create_community_preview(
+                object(),
+                SimpleNamespace(db_statement_timeout_seconds=15, preview_ttl_seconds=900),
+                uuid4(),
+                case_id,
+            )
+        )
+
+    assert raised.value.status_code == 409
+    assert raised.value.code == "COMMUNITY_REQUIRES_UNKNOWN_RESULT"

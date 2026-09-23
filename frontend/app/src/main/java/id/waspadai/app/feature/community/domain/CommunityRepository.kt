@@ -77,6 +77,7 @@ interface CommunityRepository {
         caseId: String,
         previewId: String,
         ragReuseConsent: Boolean,
+        caption: String,
     ): AppResult<CommunityFeedPost>
 }
 

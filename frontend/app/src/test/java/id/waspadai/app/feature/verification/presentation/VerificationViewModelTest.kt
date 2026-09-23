@@ -208,6 +208,7 @@ class VerificationViewModelTest {
 
         assertTrue(viewModel.state.value.communityShare.phase is CommunitySharePhase.PreviewReady)
         viewModel.onAction(VerificationAction.CommunityRagConsentChanged(true))
+        viewModel.onAction(VerificationAction.CommunityCaptionChanged("Caption pengguna"))
         viewModel.onAction(VerificationAction.PublishCommunity)
         dispatcher.scheduler.advanceUntilIdle()
 
@@ -215,6 +216,22 @@ class VerificationViewModelTest {
         assertTrue(phase is CommunitySharePhase.Published)
         assertEquals("community-1", (phase as CommunitySharePhase.Published).post.caseId)
         assertTrue(communityRepository.publishedWithRagConsent)
+        assertEquals("Caption pengguna", communityRepository.publishedCaption)
+    }
+
+    @Test
+    fun `community preview is not requested for a known risk result`() = runTest {
+        val communityRepository = FakeCommunityRepository()
+        val viewModel = viewModel(FakeRepository(RiskLevel.HIGH), communityRepository)
+
+        viewModel.onAction(VerificationAction.InputChanged("Tolong cek pesan OTP ini"))
+        viewModel.onAction(VerificationAction.SubmitText)
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.RequestCommunityPreview)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, communityRepository.previewRequests)
+        assertTrue(viewModel.state.value.communityShare.phase is CommunitySharePhase.Idle)
     }
 
     private fun viewModel(
@@ -233,12 +250,14 @@ class VerificationViewModelTest {
             isRemoteEnabled = true
         )
 
-    private class FakeRepository : VerificationRepository {
+    private class FakeRepository(
+        riskLevel: RiskLevel = RiskLevel.UNKNOWN,
+    ) : VerificationRepository {
         var lastImageQuestion: String? = null
 
         private val result = VerificationResult(
             narrative = "Jangan bagikan kode OTP.",
-            riskLevel = RiskLevel.HIGH,
+            riskLevel = riskLevel,
             reasons = listOf("Meminta kode OTP."),
             recommendedActions = listOf("Jangan kirim OTP."),
             caseId = "case-1",
@@ -285,6 +304,8 @@ class VerificationViewModelTest {
 
     private class FakeCommunityRepository : CommunityRepository {
         var publishedWithRagConsent: Boolean = false
+        var publishedCaption: String? = null
+        var previewRequests: Int = 0
 
         override suspend fun loadCommunity(
             baseUrl: String,
@@ -309,8 +330,9 @@ class VerificationViewModelTest {
             baseUrl: String,
             accessToken: String,
             caseId: String,
-        ): AppResult<CommunityPreview> =
-            AppResult.Success(
+        ): AppResult<CommunityPreview> {
+            previewRequests += 1
+            return AppResult.Success(
                 CommunityPreview(
                     previewId = "preview-1",
                     expiresAt = "2026-09-18T12:00:00Z",
@@ -319,6 +341,7 @@ class VerificationViewModelTest {
                     redactions = emptyList(),
                 )
             )
+        }
 
         override suspend fun publishCase(
             baseUrl: String,
@@ -326,6 +349,7 @@ class VerificationViewModelTest {
             caseId: String,
             previewId: String,
             ragReuseConsent: Boolean,
+            caption: String,
         ): AppResult<CommunityFeedPost> =
             AppResult.Success(
                 CommunityFeedPost(
@@ -341,6 +365,7 @@ class VerificationViewModelTest {
                     userVote = null,
                 ).also {
                     publishedWithRagConsent = ragReuseConsent
+                    publishedCaption = caption
                 }
             )
     }

@@ -59,6 +59,7 @@ sealed interface VerificationConversationItem {
 data class CommunityShareState(
     val phase: CommunitySharePhase = CommunitySharePhase.Idle,
     val ragReuseConsent: Boolean = false,
+    val caption: String = "",
 )
 
 sealed interface CommunitySharePhase {

@@ -66,6 +66,9 @@ class VerificationViewModel(
             is VerificationAction.CommunityRagConsentChanged -> _state.update {
                 it.copy(communityShare = it.communityShare.copy(ragReuseConsent = action.granted))
             }
+            is VerificationAction.CommunityCaptionChanged -> _state.update {
+                it.copy(communityShare = it.communityShare.copy(caption = action.caption.take(5000)))
+            }
             VerificationAction.PublishCommunity -> publishCommunity()
             VerificationAction.DismissCommunityShare -> dismissCommunityShare()
         }
@@ -378,12 +381,17 @@ class VerificationViewModel(
     private fun requestCommunityPreview() {
         val result = currentResult() ?: return
         val caseId = result.caseId ?: return
-        if (!result.communityEligible || result.communityState != "PRIVATE") return
+        if (
+            !result.communityEligible ||
+            result.communityState != "PRIVATE" ||
+            result.riskLevel != id.waspadai.app.core.model.RiskLevel.UNKNOWN
+        ) return
         _state.update {
             it.copy(
                 communityShare = it.communityShare.copy(
                     phase = CommunitySharePhase.RequestingPreview,
                     ragReuseConsent = false,
+                    caption = "",
                 )
             )
         }
@@ -433,6 +441,17 @@ class VerificationViewModel(
         val caseId = result.caseId ?: return
         val preview = (state.value.communityShare.phase as? CommunitySharePhase.PreviewReady)?.preview
             ?: return
+        val caption = state.value.communityShare.caption.trim()
+        if (caption.isEmpty()) {
+            _state.update {
+                it.copy(
+                    communityShare = it.communityShare.copy(
+                        phase = CommunitySharePhase.Failure("Caption wajib diisi sebelum publikasi.")
+                    )
+                )
+            }
+            return
+        }
         _state.update {
             it.copy(communityShare = it.communityShare.copy(phase = CommunitySharePhase.Publishing))
         }
@@ -457,6 +476,7 @@ class VerificationViewModel(
                     caseId = caseId,
                     previewId = preview.previewId,
                     ragReuseConsent = state.value.communityShare.ragReuseConsent,
+                    caption = caption,
                 )
             ) {
                 is AppResult.Success -> _state.update { current ->

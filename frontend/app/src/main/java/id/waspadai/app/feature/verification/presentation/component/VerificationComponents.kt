@@ -488,6 +488,7 @@ fun AnalysisCard(
             RiskLabel(result.riskLevel)
             if (result.communityEligible &&
                 result.communityState == "PRIVATE" &&
+                result.riskLevel == RiskLevel.UNKNOWN &&
                 !result.caseId.isNullOrBlank()
             ) {
                 Spacer(Modifier.height(14.dp))

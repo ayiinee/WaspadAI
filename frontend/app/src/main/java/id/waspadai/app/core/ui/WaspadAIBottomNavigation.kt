@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +34,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,6 +48,13 @@ private val BottomNavigationBarHeight = 66.dp
 private val CenterCtaDiameter = 72.dp
 val WaspadAIBottomNavigationHeight = BottomNavigationBarHeight + CenterCtaDiameter / 2
 
+data class CommunityNotificationState(
+    val showBadge: Boolean = false,
+    val markOpened: () -> Unit = {},
+)
+
+val LocalCommunityNotification = staticCompositionLocalOf { CommunityNotificationState() }
+
 @Composable
 fun WaspadAIBottomNavigation(
     selectedDestination: String,
@@ -52,6 +62,7 @@ fun WaspadAIBottomNavigation(
     modifier: Modifier = Modifier,
 ) {
     val centerNavigationInteraction = remember { MutableInteractionSource() }
+    val communityNotification = LocalCommunityNotification.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -89,8 +100,12 @@ fun WaspadAIBottomNavigation(
                     label = "Koneksi",
                     icon = Icons.Rounded.People,
                     selected = selectedDestination == "Koneksi",
-                    onClick = { onDestinationSelected("Koneksi") },
+                    onClick = {
+                        communityNotification.markOpened()
+                        onDestinationSelected("Koneksi")
+                    },
                     modifier = Modifier.weight(1f),
+                    showBadge = communityNotification.showBadge,
                 )
                 BottomDestination(
                     label = "Progres",
@@ -133,6 +148,7 @@ private fun BottomDestination(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    showBadge: Boolean = false,
 ) {
     val color = if (selected) WaspadAIBlue else WaspadAILightBlue
     val navigationInteraction = remember { MutableInteractionSource() }
@@ -148,13 +164,24 @@ private fun BottomDestination(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color,
-            modifier = Modifier.size(if (selected) 28.dp else 25.dp),
-        )
-        Spacer(Modifier.height(2.dp))
+        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(if (selected) 28.dp else 25.dp),
+            )
+            if (showBadge) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(9.dp)
+                        .background(Color(0xFFE53935), CircleShape)
+                        .border(1.dp, Color.White, CircleShape)
+                        .semantics { contentDescription = "Notifikasi baru Koneksi" },
+                )
+            }
+        }
         Text(
             text = label,
             color = color,

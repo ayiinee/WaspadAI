@@ -56,6 +56,8 @@ sealed interface VerificationAction {
 
     data class CommunityRagConsentChanged(val granted: Boolean) : VerificationAction
 
+    data class CommunityCaptionChanged(val caption: String) : VerificationAction
+
     data object PublishCommunity : VerificationAction
 
     data object DismissCommunityShare : VerificationAction

@@ -2380,13 +2380,20 @@
             "type": "boolean",
             "title": "Rag Reuse Consent",
             "default": false
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Caption"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "preview_id",
-          "publication_consent"
+          "publication_consent",
+          "caption"
         ],
         "title": "CommunityPublishRequest"
       },

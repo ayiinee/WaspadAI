@@ -383,6 +383,8 @@ Community publication dikelola Product Backend. WaspadAI tidak mengakses endpoin
 ini dan tidak menulis ke database community.
 
 Kasus baru selalu privat. Tidak ada publikasi otomatis.
+Tombol publikasi hanya ditampilkan untuk hasil dengan `risk_level=UNKNOWN`
+(`Belum diketahui`). Backend menerapkan aturan yang sama saat membuat preview.
 
 ### 8.1 Membuat Preview Redaksi
 
@@ -419,7 +421,8 @@ Request final:
 {
   "preview_id": "preview_01example",
   "publication_consent": true,
-  "rag_reuse_consent": true
+  "rag_reuse_consent": true,
+  "caption": "Mohon bantu cek informasi yang beredar ini."
 }
 ```
 
@@ -429,6 +432,7 @@ Makna consent:
 | --- | --- |
 | `publication_consent` | Pengguna setuju konten sanitized tampil di komunitas. |
 | `rag_reuse_consent` | Pengguna setuju konten sanitized dipakai ulang sebagai kandidat evidence AI setelah dimoderasi. |
+| `caption` | Caption wajib, 1–5000 karakter, yang ditampilkan sebagai teks postingan. |
 
 Kedua consent harus eksplisit dan terpisah. Publikasi komunitas tidak otomatis
 menjadi izin reuse oleh AI.

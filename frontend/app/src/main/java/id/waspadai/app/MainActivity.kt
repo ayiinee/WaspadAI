@@ -7,8 +7,12 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -31,6 +35,8 @@ import id.waspadai.app.feature.verification.presentation.VerificationRoute
 import id.waspadai.app.feature.verification.presentation.VerificationViewModel
 import id.waspadai.app.ui.theme.WaspadAITheme
 import id.waspadai.app.feature.community.presentation.CommunityAction
+import id.waspadai.app.core.ui.CommunityNotificationState
+import id.waspadai.app.core.ui.LocalCommunityNotification
 
 private const val VerificationRouteName = "verification"
 private const val CommunityRouteName = "community"
@@ -61,6 +67,7 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    var showCommunityBadge by rememberSaveable { mutableStateOf(false) }
     val communityViewModel: CommunityViewModel = viewModel(
         factory = CommunityViewModel.Factory(
             repository = app.communityRepository,
@@ -115,6 +122,12 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
         }
     }
 
+    CompositionLocalProvider(
+        LocalCommunityNotification provides CommunityNotificationState(
+            showBadge = showCommunityBadge,
+            markOpened = { showCommunityBadge = false },
+        )
+    ) {
     NavHost(navController = navController, startDestination = WelcomeRouteName) {
         composable(WelcomeRouteName) {
             AuthLandingScreen(
@@ -153,6 +166,7 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
                 viewModel = viewModel,
                 onDestinationSelected = navigateToTopLevel,
                 onCommunityPublished = { communityId ->
+                    showCommunityBadge = true
                     communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
                     navigateToTopLevel("Koneksi")
                 },
@@ -176,5 +190,6 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
                 onDestinationSelected = navigateToTopLevel,
             )
         }
+    }
     }
 }

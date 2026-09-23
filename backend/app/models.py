@@ -335,6 +335,7 @@ class CommunityPublishRequest(BaseModel):
     preview_id: UUID
     publication_consent: Literal[True]
     rag_reuse_consent: bool = False
+    caption: str = Field(min_length=1, max_length=5000)
 
 
 class CommunityStateResponse(BaseModel):

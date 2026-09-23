@@ -360,6 +360,7 @@ class CommunityRepositoryImpl(
         caseId: String,
         previewId: String,
         ragReuseConsent: Boolean,
+        caption: String,
     ): AppResult<CommunityFeedPost> = runCommunityRequest {
         val response = client.post("${baseUrl.normalized()}/api/v1/history/$caseId/community") {
             authorize(accessToken)
@@ -371,6 +372,7 @@ class CommunityRepositoryImpl(
                     previewId = previewId,
                     publicationConsent = true,
                     ragReuseConsent = ragReuseConsent,
+                    caption = caption.trim(),
                 )
             )
         }

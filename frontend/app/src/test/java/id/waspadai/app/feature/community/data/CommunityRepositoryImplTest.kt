@@ -99,6 +99,7 @@ class CommunityRepositoryImplTest {
             assertEquals("preview-1", requestBody["preview_id"]?.jsonPrimitive?.content)
             assertEquals("true", requestBody["publication_consent"]?.jsonPrimitive?.content)
             assertEquals("true", requestBody["rag_reuse_consent"]?.jsonPrimitive?.content)
+            assertEquals("Caption pengguna", requestBody["caption"]?.jsonPrimitive?.content)
             respond(
                 """
                 {
@@ -120,6 +121,7 @@ class CommunityRepositoryImplTest {
             caseId = "case-1",
             previewId = "preview-1",
             ragReuseConsent = true,
+            caption = "Caption pengguna",
         )
 
         assertTrue(result is AppResult.Success)

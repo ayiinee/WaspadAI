@@ -164,4 +164,5 @@ data class CommunityPublishRequestDto(
     @SerialName("preview_id") val previewId: String,
     @SerialName("publication_consent") val publicationConsent: Boolean,
     @SerialName("rag_reuse_consent") val ragReuseConsent: Boolean = false,
+    val caption: String,
 )
