@@ -54,6 +54,7 @@ from app.learning_service import (
     complete_lesson,
     get_learning_module_detail,
     get_learning_progress,
+    get_learning_media_asset,
     get_module_cases,
     open_learning_module,
     get_module_quiz,
@@ -773,6 +774,23 @@ def create_app() -> FastAPI:
         if pool is None:
             raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
         return await get_module_cases(pool, app.state.settings, user.id, module_id)
+
+    @app.get("/api/v1/learning/media/{object_path:path}", tags=["Learning"])
+    async def get_learning_media_endpoint(
+        object_path: str,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+        content, content_type = await get_learning_media_asset(
+            pool, app.state.settings, user.id, object_path, app.state.http_client
+        )
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
 
     @app.post("/api/v1/learning/modules/{module_id}/open", tags=["Learning"], status_code=status.HTTP_204_NO_CONTENT)
     async def open_learning_module_endpoint(

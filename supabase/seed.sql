@@ -330,11 +330,17 @@ Sebelum meneruskan pesan berantai ke keluarga atau grup:
         (id, module_id, media_type, url, title, alt_text, display_order)
     values
         ('00000000-0000-0000-0000-000000000342', '00000000-0000-0000-0000-000000000301', 'IMAGE',
-         'https://placehold.co/1200x675/png?text=Phishing+OTP+PIN', 'Ilustrasi keamanan OTP dan PIN', 'Ilustrasi keamanan OTP dan PIN', 1),
+         '/api/v1/learning/media/learning/phishing-otp-pin.jpg',
+         'Ilustrasi Keamanan OTP dan Perlindungan Akun Digital',
+         'Ilustrasi keamanan akun digital menggunakan OTP dan perlindungan terhadap serangan phishing', 1),
         ('00000000-0000-0000-0000-000000000442', '00000000-0000-0000-0000-000000000401', 'IMAGE',
-         'https://placehold.co/1200x675/png?text=Impersonation', 'Ilustrasi impersonation instansi resmi', 'Ilustrasi impersonation instansi resmi', 1),
+         '/api/v1/learning/media/learning/impersonation-instansi-resmi.jpg',
+         'Ilustrasi Modus Penipuan Impersonation',
+         'Ilustrasi seseorang menyamar sebagai pihak resmi untuk melakukan penipuan', 1),
         ('00000000-0000-0000-0000-000000000542', '00000000-0000-0000-0000-000000000501', 'IMAGE',
-         'https://placehold.co/1200x675/png?text=Cek+Misinformasi', 'Ilustrasi pemeriksaan misinformasi', 'Ilustrasi pemeriksaan misinformasi', 1)
+         '/api/v1/learning/media/learning/misinformasi-fact-checking.png',
+         'Ilustrasi Verifikasi Informasi dan Fact Checking',
+         'Ilustrasi proses memeriksa kebenaran informasi dan membedakan berita palsu', 1)
     on conflict (id) do update set
         media_type = excluded.media_type,
         url = excluded.url,

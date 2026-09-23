@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+import httpx
 from psycopg.rows import DictRow
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
@@ -290,12 +291,12 @@ async def get_learning_progress(
                    where a.user_id = %s and a.module_id = m.id
               ) best on true
               left join public.learning_module_progress module_progress
-                on module_progress.module_id = m.id and module_progress.user_id = (select auth.uid())
+                on module_progress.module_id = m.id and module_progress.user_id = %s
              group by m.id, m.display_order, latest.score, latest.completed_at, best.best_score,
                       module_progress.first_opened_at, module_progress.last_opened_at
              order by m.display_order, m.id
             """,
-            (user_id, user_id, user_id),
+            (user_id, user_id, user_id, user_id),
         )
         rows = await query.fetchall()
     return LearningProgressResponse(items=[_progress_item(row) for row in rows])
@@ -327,6 +328,44 @@ async def get_module_cases(
         )
         rows = await query.fetchall()
     return [LearningCase(case_id=row["id"], title=row["title"], description=row["description"], reference_url=row.get("reference_url")) for row in rows]
+
+
+async def get_learning_media_asset(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    object_path: str,
+    http_client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
+    if (
+        not object_path.startswith("learning/")
+        or ".." in object_path
+        or object_path.endswith("/")
+    ):
+        raise ProductAPIError(404, "LEARNING_MEDIA_NOT_FOUND", "Media materi tidak ditemukan.")
+    public_url = f"/api/v1/learning/media/{object_path}"
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """select media.url
+                 from public.learning_media media
+                 join public.published_learning_modules module on module.id = media.module_id
+                where media.url = %s and media.media_type = 'IMAGE'""",
+            (public_url,),
+        )
+        media = await query.fetchone()
+    if media is None:
+        raise ProductAPIError(404, "LEARNING_MEDIA_NOT_FOUND", "Media materi tidak ditemukan.")
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(503, "LEARNING_MEDIA_UNAVAILABLE", "Media materi belum tersedia.", True)
+    content_type = "image/png" if object_path.lower().endswith(".png") else "image/jpeg"
+    service_key = settings.supabase_service_role_key.get_secret_value()
+    response = await http_client.get(
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/learning-assets/{object_path}",
+        headers={"Authorization": f"Bearer {service_key}", "apikey": service_key},
+    )
+    if response.is_error:
+        raise ProductAPIError(503, "LEARNING_MEDIA_UNAVAILABLE", "Media materi belum dapat dimuat.", True)
+    return response.content, content_type
 
 
 async def _fetch_module_progress_row(

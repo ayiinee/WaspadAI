@@ -1501,6 +1501,51 @@
         }
       }
     },
+    "/api/v1/learning/media/{object_path}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get Learning Media Endpoint",
+        "operationId": "get_learning_media_endpoint_api_v1_learning_media__object_path__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "object_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/learning/modules/{module_id}/open": {
       "post": {
         "tags": [

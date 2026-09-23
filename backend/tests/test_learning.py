@@ -75,6 +75,13 @@ def test_list_learning_modules_requires_token() -> None:
     assert response.json()["error"]["code"] == "INVALID_ACCESS_TOKEN"
 
 
+def test_learning_media_requires_token() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get("/api/v1/learning/media/learning/phishing-otp-pin.jpg")
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "INVALID_ACCESS_TOKEN"
+
+
 def test_quiz_response_does_not_contain_is_correct(monkeypatch: pytest.MonkeyPatch) -> None:
     """Requirement 2: Quiz response does not contain is_correct in any option."""
     user_id = uuid4()
@@ -450,5 +457,5 @@ def test_user_progress_is_isolated_between_users(monkeypatch: pytest.MonkeyPatch
     assert progress_b.items[0].latest_score is None
 
     # Verifikasi parameter user_id pada SQL query diikat ke user masing-masing
-    assert executed_params[0] == (user_a, user_a, user_a)
-    assert executed_params[1] == (user_b, user_b, user_b)
+    assert executed_params[0] == (user_a, user_a, user_a, user_a)
+    assert executed_params[1] == (user_b, user_b, user_b, user_b)

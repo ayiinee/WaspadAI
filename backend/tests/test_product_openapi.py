@@ -32,6 +32,7 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert "/api/v1/learning/lessons/{lesson_id}/complete" in specification["paths"]
     assert "/api/v1/learning/modules/{module_id}/quiz" in specification["paths"]
     assert "/api/v1/learning/modules/{module_id}/quiz-attempts" in specification["paths"]
+    assert "/api/v1/learning/media/{object_path}" in specification["paths"]
     assert "/api/v1/learning/progress" in specification["paths"]
     complete_parameters = specification["paths"]["/api/v1/learning/lessons/{lesson_id}/complete"][
         "post"

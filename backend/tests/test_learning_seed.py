@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.learning_seed import canonical_learning_seed_sql
+from app.learning_seed import LEARNING_ASSETS, canonical_learning_seed_sql
 
 
 def test_python_learning_seed_uses_canonical_sql_catalog() -> None:
@@ -24,3 +24,11 @@ def test_learning_seed_runs_independently_from_auth_fixture() -> None:
     community_guard_end = sql.index("end if;")
     learning_start = sql.index("-- LEARNING_SEED_BEGIN")
     assert community_guard_end < learning_start
+
+
+def test_learning_seed_uses_internal_curated_media() -> None:
+    extracted = canonical_learning_seed_sql()
+    assert "placehold.co" not in extracted
+    for object_path, (filename, _content_type) in LEARNING_ASSETS.items():
+        assert f"/api/v1/learning/media/{object_path}" in extracted
+        assert (Path(__file__).parents[1] / "assets" / "learning" / filename).is_file()
