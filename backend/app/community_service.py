@@ -18,6 +18,7 @@ from app.supabase_storage import upload_verification_input
 from app.models import (
     AIResult,
     CommunityBootstrap,
+    CommunityCreator,
     CommunityDetail,
     CommunityItem,
     CommunityMediaItem,
@@ -49,7 +50,8 @@ async def list_community(
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
             """
-            select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
+            select p.id as community_id, p.case_id, p.title, p.redacted_text, p.status, p.published_at,
+                   (p.owner_id = %s) as is_owner,
                    (p.redacted_asset_id is not null or coalesce(jsonb_array_length(media.items), 0) > 0) as has_image,
                    coalesce(media.items, '[]'::jsonb) as media,
                    coalesce(counts.hoaks, 0)::int as hoaks,
@@ -112,6 +114,7 @@ async def list_community(
              limit %s
             """,
             (
+                user_id,
                 user_id,
                 user_id,
                 cursor.created_at if cursor else None,
@@ -223,6 +226,11 @@ async def submit_community_response(
     if vote not in {"HOAKS", "WASPADA", "VALID"}:
         raise ProductAPIError(422, "VALIDATION_ERROR", "Kategori penilaian tidak valid.")
     request = CommunityVoteRequest(vote=vote)
+    # Authorize before uploading optional evidence. A rejected self-response
+    # must not leave an orphaned object in Storage.
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        target = await _fetch_vote_target(connection, case_id)
+        _require_response_target(target, user_id)
     digest = sha256(evidence_bytes).hexdigest() if evidence_bytes else None
     object_path = None
     if evidence_bytes is not None and evidence_content_type is not None:
@@ -245,7 +253,7 @@ async def submit_community_response(
 
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         post = await _fetch_vote_target(connection, case_id)
-        _require_vote_target(post, user_id)
+        _require_response_target(post, user_id)
         old = await connection.execute(
             "select evidence_asset_id from public.community_votes where post_id = %s and user_id = %s",
             (post["post_id"], user_id),
@@ -297,7 +305,8 @@ async def submit_community_response(
     if row is None or response_row is None:
         raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
     return CommunityResponseResult(
-        case_id=case_id,
+        community_id=post["post_id"],
+        case_id=post["case_id"],
         user_vote=request.vote,
         counts=_counts(row),
         response=_response_item(response_row),
@@ -325,7 +334,7 @@ async def get_community_image(
               from public.community_posts p
               join public.verification_results result on result.case_id = p.case_id
               join private.stored_assets asset on asset.id = p.redacted_asset_id
-             where p.case_id = %s
+             where (p.id = %s or p.case_id = %s)
                and p.withdrawn_at is null
                and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
                and p.publication_consent_id is not null
@@ -421,13 +430,13 @@ async def get_community_media(
               from public.community_posts post
               join public.community_media media on media.community_id = post.id
               join private.stored_assets asset on asset.id = media.asset_id
-             where post.case_id = %s and media.id = %s
+             where (post.id = %s or post.case_id = %s) and media.id = %s
                and post.withdrawn_at is null
                and post.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
                and post.publication_consent_id is not null
                and asset.deleted_at is null
             """,
-            (case_id, media_id),
+            (case_id, case_id, media_id),
         )
         asset = await query.fetchone()
     if asset is None:
@@ -473,12 +482,12 @@ async def get_community_response_image(
               from public.community_votes v
               join public.community_posts p on p.id = v.post_id
               join private.stored_assets asset on asset.id = v.evidence_asset_id
-             where p.case_id = %s and v.user_id = %s
+             where (p.id = %s or p.case_id = %s) and v.user_id = %s
                and p.withdrawn_at is null
                and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
                and asset.deleted_at is null
             """,
-            (case_id, response_user_id),
+            (case_id, case_id, response_user_id),
         )
         asset = await query.fetchone()
     if asset is None:
@@ -571,7 +580,7 @@ async def create_community_preview(
              order by asset.created_at, asset.id
              limit 4
             """,
-            (case_id,),
+            (case_id, case_id),
         )
         assets = await assets_query.fetchall()
 
@@ -642,7 +651,7 @@ async def publish_community_case(
     user_id: UUID,
     case_id: UUID,
     request: CommunityPublishRequest,
-) -> CommunityStateResponse:
+) -> CommunityItem:
     content_hash: str
     try:
         async with user_transaction(
@@ -751,7 +760,7 @@ async def publish_community_case(
                 """,
                 (case_id,),
             )
-            updated_row = await updated.fetchone()
+            await updated.fetchone()
             await connection.execute(
                 """
                 update public.community_previews
@@ -760,16 +769,19 @@ async def publish_community_case(
                 """,
                 (request.preview_id,),
             )
+            created_row = await _fetch_detail_row(connection, user_id, post_row["id"])
+            if created_row is None:
+                raise ProductAPIError(
+                    500,
+                    "COMMUNITY_PUBLISH_INCONSISTENT",
+                    "Postingan berhasil dibuat tetapi belum dapat dibaca kembali.",
+                )
     except UniqueViolation as error:
         raise ProductAPIError(
             409, "COMMUNITY_ALREADY_PUBLISHED", "Kasus sudah dipublikasikan ke komunitas."
         ) from error
 
-    return CommunityStateResponse(
-        case_id=case_id,
-        community_state="PUBLISHED_UNVERIFIED",
-        revision=updated_row["revision"],
-    )
+    return _community_item(created_row)
 
 
 async def withdraw_community_case(
@@ -852,10 +864,11 @@ async def withdraw_community_case(
     )
 
 
-async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) -> DictRow | None:
+async def _fetch_detail_row(connection: object, user_id: UUID, community_id: UUID) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
-        select p.case_id, p.title, p.redacted_text, p.status, p.published_at,
+        select p.id as community_id, p.case_id, p.title, p.redacted_text, p.status, p.published_at,
+               (p.owner_id = %s) as is_owner,
                (p.redacted_asset_id is not null or coalesce(jsonb_array_length(media.items), 0) > 0) as has_image,
                coalesce(media.items, '[]'::jsonb) as media,
                r.result_json, r.execution_mode,
@@ -904,7 +917,7 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
                     exists (select 1 from public.community_likes mine
                             where mine.post_id = p.id and mine.user_id = %s) as user_liked
          ) social on true
-         where p.case_id = %s
+         where (p.id = %s or p.case_id = %s)
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
            and p.publication_consent_id is not null
@@ -916,12 +929,12 @@ async def _fetch_detail_row(connection: object, user_id: UUID, case_id: UUID) ->
                   and (consent.expires_at is null or consent.expires_at > now())
            )
         """,
-        (user_id, user_id, case_id),
+        (user_id, user_id, user_id, community_id, community_id),
     )
     return await query.fetchone()
 
 
-async def _fetch_response_rows(connection: object, case_id: UUID) -> list[DictRow]:
+async def _fetch_response_rows(connection: object, community_id: UUID) -> list[DictRow]:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
         select v.user_id as response_id,
@@ -931,12 +944,12 @@ async def _fetch_response_rows(connection: object, case_id: UUID) -> list[DictRo
           from public.community_votes v
           join public.community_posts p on p.id = v.post_id
           left join public.profiles profile on profile.id = v.user_id
-         where p.case_id = %s
+         where (p.id = %s or p.case_id = %s)
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
          order by v.created_at desc
         """,
-        (case_id,),
+        (community_id, community_id),
     )
     return await query.fetchall()
 
@@ -962,10 +975,10 @@ async def _fetch_response_row(
 async def _fetch_vote_target(connection: object, case_id: UUID) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
-        select p.id as post_id, p.owner_id
+        select p.id as post_id, p.case_id, p.owner_id
           from public.community_posts p
           join public.verification_results result on result.case_id = p.case_id
-         where p.case_id = %s
+         where (p.id = %s or p.case_id = %s)
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
            and p.publication_consent_id is not null
@@ -977,7 +990,7 @@ async def _fetch_vote_target(connection: object, case_id: UUID) -> DictRow | Non
                   and (consent.expires_at is null or consent.expires_at > now())
            )
         """,
-        (case_id,),
+        (case_id, case_id),
     )
     return await query.fetchone()
 
@@ -987,7 +1000,7 @@ async def _fetch_vote_result_row(
 ) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
-        select p.case_id, own.vote as user_vote,
+        select p.id as community_id, p.case_id, own.vote as user_vote,
                count(*) filter (where v.vote = 'HOAKS')::int as hoaks,
                count(*) filter (where v.vote = 'WASPADA')::int as waspada,
                count(*) filter (where v.vote = 'VALID')::int as valid
@@ -996,13 +1009,13 @@ async def _fetch_vote_result_row(
           left join public.community_votes v on v.post_id = p.id
           left join public.community_votes own
             on own.post_id = p.id and own.user_id = %s
-         where p.case_id = %s
+         where (p.id = %s or p.case_id = %s)
            and p.withdrawn_at is null
            and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
            and p.publication_consent_id is not null
-         group by p.case_id, own.vote
+         group by p.id, p.case_id, own.vote
         """,
-        (user_id, case_id),
+        (user_id, case_id, case_id),
     )
     return await query.fetchone()
 
@@ -1019,9 +1032,14 @@ def _require_vote_target(row: DictRow | None, user_id: UUID) -> None:
 
 
 def _community_item(row: DictRow) -> CommunityItem:
-    media = _community_media(row["case_id"], row)
+    media = _community_media(row["community_id"], row)
     return CommunityItem(
+        id=row["community_id"],
         case_id=row["case_id"],
+        creator=CommunityCreator(
+            display_name="Anda" if row["is_owner"] else "Pengguna WaspadAI",
+            is_current_user=bool(row["is_owner"]),
+        ),
         title=row["title"],
         redacted_text=row["redacted_text"],
         status=row["status"],
@@ -1040,9 +1058,14 @@ def _community_item(row: DictRow) -> CommunityItem:
 
 
 def _community_detail(row: DictRow, response_rows: list[DictRow]) -> CommunityDetail:
-    media = _community_media(row["case_id"], row)
+    media = _community_media(row["community_id"], row)
     return CommunityDetail(
+        id=row["community_id"],
         case_id=row["case_id"],
+        creator=CommunityCreator(
+            display_name="Anda" if row["is_owner"] else "Pengguna WaspadAI",
+            is_current_user=bool(row["is_owner"]),
+        ),
         title=row["title"],
         redacted_text=row["redacted_text"],
         status=row["status"],
@@ -1074,13 +1097,13 @@ def _response_item(row: DictRow) -> CommunityResponseItem:
     )
 
 
-def _community_media(case_id: UUID, row: DictRow) -> list[CommunityMediaItem]:
+def _community_media(community_id: UUID, row: DictRow) -> list[CommunityMediaItem]:
     raw_media = row.get("media") or []
     items = [
         CommunityMediaItem(
             id=item["id"],
             media_type=item.get("media_type", "IMAGE"),
-            url=f"/api/v1/community/{case_id}/media/{item['id']}",
+            url=f"/api/v1/community/{community_id}/media/{item['id']}",
             thumbnail_url=None,
             width=item.get("width"),
             height=item.get("height"),
@@ -1089,6 +1112,17 @@ def _community_media(case_id: UUID, row: DictRow) -> list[CommunityMediaItem]:
         for index, item in enumerate(raw_media[:4])
     ]
     return sorted(items, key=lambda item: item.position)
+
+
+def _require_response_target(row: DictRow | None, user_id: UUID) -> None:
+    if row is None:
+        raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+    if row["owner_id"] == user_id:
+        raise ProductAPIError(
+            403,
+            "CANNOT_RESPOND_OWN_POST",
+            "User cannot respond to their own community case",
+        )
 
 
 async def like_community(
@@ -1149,16 +1183,16 @@ async def record_community_share(
             (post["post_id"], user_id),
         )
         row = await _fetch_social_row(connection, user_id, case_id)
-    share_url = f"{settings.public_base_url.rstrip('/')}/community/{case_id}"
+    share_url = f"{settings.public_base_url.rstrip('/')}/community/{row['community_id']}"
     return _social_result(row, case_id, share_url=share_url)
 
 
 async def _fetch_social_target(connection: object, case_id: UUID) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
-        """select p.id as post_id
+        """select p.id as post_id, p.case_id
              from public.community_posts p
              join public.verification_results result on result.case_id = p.case_id
-            where p.case_id = %s
+            where (p.id = %s or p.case_id = %s)
               and p.withdrawn_at is null
               and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
               and p.publication_consent_id is not null
@@ -1169,7 +1203,7 @@ async def _fetch_social_target(connection: object, case_id: UUID) -> DictRow | N
                      and c.revoked_at is null
                      and (c.expires_at is null or c.expires_at > now())
               )""",
-        (case_id,),
+        (case_id, case_id),
     )
     return await query.fetchone()
 
@@ -1178,7 +1212,7 @@ async def _fetch_social_row(
     connection: object, user_id: UUID, case_id: UUID
 ) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
-        """select p.case_id,
+        """select p.id as community_id, p.case_id,
                     exists (select 1 from public.community_likes l
                             where l.post_id = p.id and l.user_id = %s) as liked,
                     (select count(*) from public.community_likes l where l.post_id = p.id)::int as like_count,
@@ -1187,11 +1221,11 @@ async def _fetch_social_row(
                     (select count(*) from public.community_shares s where s.post_id = p.id)::int as share_count
                from public.community_posts p
               join public.verification_results result on result.case_id = p.case_id
-              where p.case_id = %s
+              where (p.id = %s or p.case_id = %s)
                 and p.withdrawn_at is null
                 and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
                 and p.publication_consent_id is not null""",
-        (user_id, case_id),
+        (user_id, case_id, case_id),
     )
     return await query.fetchone()
 
@@ -1205,7 +1239,8 @@ def _social_result(
     if row is None:
         raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
     return CommunitySocialResult(
-        case_id=case_id,
+        community_id=row["community_id"],
+        case_id=row["case_id"],
         liked=bool(row["liked"] if liked is None else liked),
         like_count=row["like_count"],
         view_count=row["view_count"],
@@ -1217,6 +1252,7 @@ def _social_result(
 
 def _vote_result(row: DictRow) -> CommunityVoteResult:
     return CommunityVoteResult(
+        community_id=row["community_id"],
         case_id=row["case_id"],
         user_vote=row["user_vote"],
         counts=_counts(row),

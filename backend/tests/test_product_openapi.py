@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.auth import AuthenticatedUser, get_current_user
+from app.errors import ProductAPIError
 from app.main import create_app
 from app.models import CommunityStateResponse
 
@@ -48,6 +49,14 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     )
     vote_schema = specification["components"]["schemas"]["CommunityVoteRequest"]
     assert vote_schema["properties"]["vote"]["enum"] == ["HOAKS", "WASPADA", "VALID"]
+    publication = specification["paths"]["/api/v1/history/{case_id}/community"]["post"]
+    assert publication["responses"]["200"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/CommunityItem")
+    community_item = specification["components"]["schemas"]["CommunityItem"]
+    assert {"id", "case_id", "creator", "media"} <= set(community_item["properties"])
+    social_result = specification["components"]["schemas"]["CommunitySocialResult"]
+    assert {"community_id", "case_id"} <= set(social_result["properties"])
 
 
 def test_community_feed_requires_supabase_bearer() -> None:
@@ -87,3 +96,33 @@ def test_community_withdrawal_endpoint_returns_withdrawn(monkeypatch) -> None:
         "community_state": "WITHDRAWN",
         "revision": 3,
     }
+
+
+def test_self_response_error_contract(monkeypatch) -> None:
+    user_id = uuid4()
+    community_id = uuid4()
+
+    async def reject(*_args: object) -> None:
+        raise ProductAPIError(
+            403,
+            "CANNOT_RESPOND_OWN_POST",
+            "User cannot respond to their own community case",
+        )
+
+    monkeypatch.setattr("app.main.create_pool", lambda _settings: None)
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id, None)
+    monkeypatch.setattr("app.main.submit_community_response", reject)
+    with TestClient(app) as client:
+        app.state.db_pool = object()
+        response = client.post(
+            f"/api/v1/community/{community_id}/response",
+            data={"vote": "VALID", "reasoning": "Alasan yang cukup panjang."},
+        )
+        app.state.db_pool = None
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "CANNOT_RESPOND_OWN_POST"
+    assert response.json()["error"]["message"] == (
+        "User cannot respond to their own community case"
+    )

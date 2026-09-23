@@ -31,7 +31,9 @@ def test_image_question_is_trimmed_and_bounded() -> None:
 
 def test_community_media_supports_one_to_four_items() -> None:
     payload = {
+        "id": "73e42666-e1de-4e40-a0fe-5504609700d1",
         "case_id": "73e42666-e1de-4e40-a0fe-5504609700d2",
+        "creator": {"display_name": "Anda", "is_current_user": True},
         "title": "Kasus",
         "redacted_text": "Konten aman",
         "status": "PUBLISHED_UNVERIFIED",

@@ -63,6 +63,7 @@ from app.learning_service import (
 from app.models import (
     CommunityBootstrap,
     CommunityDetail,
+    CommunityItem,
     CommunityPage,
     CommunityPreviewResponse,
     CommunityPublishRequest,
@@ -199,7 +200,7 @@ def create_app() -> FastAPI:
     @app.websocket("/api/v1/community/ws")
     async def community_websocket(websocket: WebSocket, access_token: str = Query(...)) -> None:
         try:
-            await authenticate_access_token(
+            user = await authenticate_access_token(
                 app.state.settings,
                 app.state.auth_client,
                 access_token,
@@ -207,7 +208,7 @@ def create_app() -> FastAPI:
         except HTTPException:
             await websocket.close(code=4401)
             return
-        await community_connections.connect(websocket)
+        await community_connections.connect(websocket, user.id)
         try:
             while True:
                 await websocket.receive_text()
@@ -545,21 +546,33 @@ def create_app() -> FastAPI:
     @app.post(
         "/api/v1/history/{case_id}/community",
         tags=["Community"],
-        response_model=CommunityStateResponse,
+        response_model=CommunityItem,
     )
     async def publish_community_case_endpoint(
         case_id: UUID,
         payload: CommunityPublishRequest,
         user: AuthenticatedUser = Depends(get_current_user),
-    ) -> CommunityStateResponse:
+    ) -> CommunityItem:
         pool = app.state.db_pool
         if pool is None:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         result = await publish_community_case(pool, app.state.settings, user.id, case_id, payload)
+        realtime_post = result.model_copy(
+            update={
+                "creator": result.creator.model_copy(
+                    update={"display_name": "Pengguna WaspadAI", "is_current_user": False}
+                )
+            }
+        )
         await community_connections.broadcast(
-            {"type": "community.created", "community_id": str(case_id), "payload": {}}
+            {
+                "type": "community.created",
+                "community_id": str(result.id),
+                "payload": {"post": realtime_post.model_dump(mode="json")},
+            },
+            exclude_user_id=user.id,
         )
         return result
 
@@ -594,7 +607,9 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await cast_community_vote(pool, app.state.settings, user.id, case_id, payload)
+        result = await cast_community_vote(pool, app.state.settings, user.id, case_id, payload)
+        await community_connections.broadcast(_poll_event(result))
+        return result
 
     @app.delete(
         "/api/v1/community/{case_id}/vote",
@@ -610,7 +625,9 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        return await remove_community_vote(pool, app.state.settings, user.id, case_id)
+        result = await remove_community_vote(pool, app.state.settings, user.id, case_id)
+        await community_connections.broadcast(_poll_event(result))
+        return result
 
     @app.post(
         "/api/v1/community/{case_id}/response",
@@ -660,7 +677,7 @@ def create_app() -> FastAPI:
         )
         event = {
             "type": "community.response.created",
-            "community_id": str(case_id),
+            "community_id": str(result.community_id),
             "payload": {
                 "hoaks_count": result.counts.HOAKS,
                 "waspada_count": result.counts.WASPADA,
@@ -669,8 +686,17 @@ def create_app() -> FastAPI:
             },
         }
         await community_connections.broadcast(event)
+        await community_connections.broadcast({**event, "type": "community.comment.created"})
         await community_connections.broadcast(
-            {**event, "type": "community.poll.updated", "payload": {k: v for k, v in event["payload"].items() if k != "response"}}
+            {
+                **event,
+                "type": "community.poll.updated",
+                "payload": {
+                    key: value
+                    for key, value in event["payload"].items()
+                    if key != "response"
+                },
+            }
         )
         return result
 
@@ -807,12 +833,24 @@ def _request_id(request: Request) -> str:
 def _social_event(event_type: str, result: CommunitySocialResult) -> dict[str, object]:
     return {
         "type": event_type,
-        "community_id": str(result.case_id),
+        "community_id": str(result.community_id),
         "payload": {
             "like_count": result.like_count,
             "view_count": result.view_count,
             "comment_count": result.comment_count,
             "share_count": result.share_count,
+        },
+    }
+
+
+def _poll_event(result: CommunityVoteResult) -> dict[str, object]:
+    return {
+        "type": "community.poll.updated",
+        "community_id": str(result.community_id),
+        "payload": {
+            "hoaks_count": result.counts.HOAKS,
+            "waspada_count": result.counts.WASPADA,
+            "valid_count": result.counts.VALID,
         },
     }
 

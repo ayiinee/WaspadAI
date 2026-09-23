@@ -438,6 +438,25 @@ Jika `publication_consent=false`, backend menolak request publikasi. Jika
 di community setelah validasi product, tetapi tidak pernah boleh dikirim ke
 WaspadAI sebagai community evidence.
 
+Response sukses mengembalikan entity community final, bukan `history_id`,
+`case_id`, atau `preview_id` sebagai ID navigasi:
+
+```json
+{
+  "id": "<community_id>",
+  "case_id": "<legacy_history_case_id>",
+  "creator": {"display_name": "Anda", "is_current_user": true},
+  "media": [],
+  "published_at": "2026-09-23T01:00:00Z",
+  "like_count": 0,
+  "comment_count": 0
+}
+```
+
+Android wajib memasukkan object ini ke shared feed state, menavigasi dengan
+`id`, lalu membuka detail tanpa menunggu GET feed berikutnya. `case_id` hanya
+dipertahankan untuk kompatibilitas history lama.
+
 ### 8.3 Menarik Kasus
 
 ```http
@@ -455,9 +474,13 @@ Endpoint Product Backend:
 
 ```http
 GET    /api/v1/community?limit=20&cursor=<opaque_cursor>
-GET    /api/v1/community/{case_id}
-POST   /api/v1/community/{case_id}/vote
-DELETE /api/v1/community/{case_id}/vote
+GET    /api/v1/community/{community_id}
+POST   /api/v1/community/{community_id}/vote
+DELETE /api/v1/community/{community_id}/vote
+POST   /api/v1/community/{community_id}/like
+DELETE /api/v1/community/{community_id}/like
+POST   /api/v1/community/{community_id}/response
+WS     /api/v1/community/ws?access_token=<access_token>
 ```
 
 Feed dan detail memakai `media` sebagai struktur gambar kanonik (maksimal empat,
@@ -467,12 +490,12 @@ sementara untuk kompatibilitas client single-image lama.
 ```json
 {
   "has_image": true,
-  "image_url": "/api/v1/community/<case_id>/media/<media_id>",
+  "image_url": "/api/v1/community/<community_id>/media/<media_id>",
   "media": [
     {
       "id": "<media_id>",
       "media_type": "IMAGE",
-      "url": "/api/v1/community/<case_id>/media/<media_id>",
+      "url": "/api/v1/community/<community_id>/media/<media_id>",
       "thumbnail_url": null,
       "width": 1080,
       "height": 1350,
@@ -513,6 +536,21 @@ Aturan vote:
 - jumlah vote tidak boleh otomatis membuat kasus menjadi evidence terverifikasi.
 
 Hanya moderator/admin yang boleh menetapkan `VERIFIED_EVIDENCE`.
+
+Aturan interaksi sosial:
+
+- pemilik boleh like dan unlike postingannya sendiri;
+- primary key `(post_id, user_id)` menjamin satu like aktif per user/post;
+- pemilik tidak boleh mengirim response terhadap postingannya sendiri;
+- backend mengembalikan `403 CANNOT_RESPOND_OWN_POST` untuk self-response;
+- validasi ownership wajib dilakukan sebelum optional evidence di-upload.
+
+WebSocket adalah sinkronisasi realtime single-process tanpa Redis. Event yang
+didukung: `community.created`, `community.like.updated`,
+`community.comment.created`, `community.response.created`, dan
+`community.poll.updated`. Event `community.created` membawa object post lengkap
+agar client lain dapat prepend tanpa GET feed ulang. Deployment multi-worker
+memerlukan message broker eksternal dan berada di luar kontrak MVP ini.
 
 ## 10. Error Envelope
 

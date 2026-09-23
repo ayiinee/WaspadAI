@@ -1039,7 +1039,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommunityStateResponse"
+                  "$ref": "#/components/schemas/CommunityItem"
                 }
               }
             }
@@ -1879,12 +1879,39 @@
         ],
         "title": "CommunityBootstrap"
       },
+      "CommunityCreator": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "is_current_user": {
+            "type": "boolean",
+            "title": "Is Current User",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "title": "CommunityCreator"
+      },
       "CommunityDetail": {
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
           "case_id": {
             "type": "string",
             "format": "uuid",
             "title": "Case Id"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/CommunityCreator"
           },
           "title": {
             "type": "string",
@@ -2000,7 +2027,9 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "id",
           "case_id",
+          "creator",
           "title",
           "redacted_text",
           "status",
@@ -2014,10 +2043,18 @@
       },
       "CommunityItem": {
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
           "case_id": {
             "type": "string",
             "format": "uuid",
             "title": "Case Id"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/CommunityCreator"
           },
           "title": {
             "type": "string",
@@ -2115,7 +2152,9 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "id",
           "case_id",
+          "creator",
           "title",
           "redacted_text",
           "status",
@@ -2353,6 +2392,11 @@
       },
       "CommunityResponseResult": {
         "properties": {
+          "community_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Community Id"
+          },
           "case_id": {
             "type": "string",
             "format": "uuid",
@@ -2377,6 +2421,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "community_id",
           "case_id",
           "user_vote",
           "counts",
@@ -2386,6 +2431,11 @@
       },
       "CommunitySocialResult": {
         "properties": {
+          "community_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Community Id"
+          },
           "case_id": {
             "type": "string",
             "format": "uuid",
@@ -2430,6 +2480,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "community_id",
           "case_id",
           "liked",
           "like_count",
@@ -2544,6 +2595,11 @@
       },
       "CommunityVoteResult": {
         "properties": {
+          "community_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Community Id"
+          },
           "case_id": {
             "type": "string",
             "format": "uuid",
@@ -2572,6 +2628,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "community_id",
           "case_id",
           "user_vote",
           "counts"

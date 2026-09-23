@@ -198,10 +198,19 @@ class CommunityMediaItem(BaseModel):
     position: int = Field(ge=0, le=3)
 
 
+class CommunityCreator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str
+    is_current_user: bool = False
+
+
 class CommunityItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    id: UUID
     case_id: UUID
+    creator: CommunityCreator
     title: str
     redacted_text: str
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
@@ -243,7 +252,9 @@ class CommunityBootstrap(BaseModel):
 class CommunityDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    id: UUID
     case_id: UUID
+    creator: CommunityCreator
     title: str
     redacted_text: str
     status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
@@ -277,6 +288,7 @@ class CommunityResponseItem(BaseModel):
 class CommunityVoteResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    community_id: UUID
     case_id: UUID
     user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
     counts: CommunityVoteCounts
@@ -285,6 +297,7 @@ class CommunityVoteResult(BaseModel):
 class CommunityResponseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    community_id: UUID
     case_id: UUID
     user_vote: Literal["HOAKS", "WASPADA", "VALID"]
     counts: CommunityVoteCounts
@@ -294,6 +307,7 @@ class CommunityResponseResult(BaseModel):
 class CommunitySocialResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    community_id: UUID
     case_id: UUID
     liked: bool
     like_count: int = Field(ge=0)
