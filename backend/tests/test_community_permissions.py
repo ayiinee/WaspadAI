@@ -58,6 +58,29 @@ def test_owner_response_is_forbidden_with_stable_error() -> None:
     assert raised.value.message == "User cannot respond to their own community case"
 
 
+@pytest.mark.parametrize(
+    "guard",
+    [
+        community_service._require_vote_target,
+        community_service._require_response_target,
+    ],
+)
+def test_verified_case_rejects_new_assessments(guard: object) -> None:
+    with pytest.raises(ProductAPIError) as raised:
+        guard(  # type: ignore[operator]
+            {
+                "post_id": uuid4(),
+                "case_id": uuid4(),
+                "owner_id": uuid4(),
+                "status": "VERIFIED_EVIDENCE",
+            },
+            uuid4(),
+        )
+    assert raised.value.status_code == 409
+    assert raised.value.code == "COMMUNITY_ASSESSMENT_CLOSED"
+    assert raised.value.message == "Kasus sudah terverifikasi dan tidak menerima penilaian baru."
+
+
 def test_owner_like_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
     async def check() -> None:
         user_id = uuid4()

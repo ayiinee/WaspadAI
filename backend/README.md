@@ -12,6 +12,16 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --loop app.uvico
 uv run pytest
 ```
 
+Untuk mengisi data demo Koneksi dan Beranda pada database development yang
+terkonfigurasi di `.env`:
+
+```powershell
+uv run python -m scripts.seed_development
+```
+
+Runner ini idempotent, memakai `MIGRATION_DATABASE_URL`, dan akan menolak
+berjalan ketika `APP_ENV=production`.
+
 Untuk testing di HP fisik, pakai IP LAN komputer sebagai `WASPADAI_API_BASE_URL`, misalnya `http://10.30.172.167:8001`, lalu rebuild dan reinstall APK debug.
 
 Konfigurasi dibaca dari `.env` root. Untuk runtime saat ini, siapkan `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, dan `HISTORY_CURSOR_SIGNING_KEY`. Gunakan role `product_app` pada `DATABASE_URL`; jangan memakai password migrator atau service-role sebagai credential umum runtime.

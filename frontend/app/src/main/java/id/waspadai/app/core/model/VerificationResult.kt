@@ -2,10 +2,10 @@ package id.waspadai.app.core.model
 
 data class VerificationResult(
     val narrative: String,
+    val headline: String = "",
     val riskLevel: RiskLevel,
     val reasons: List<String>,
     val recommendedActions: List<String>,
-    val headline: String = "",
     val verdict: Verdict = Verdict.UNKNOWN,
     val factualStatus: FactualStatus = FactualStatus.UNKNOWN,
     val evidence: List<VerificationEvidence> = emptyList(),
@@ -14,6 +14,7 @@ data class VerificationResult(
     val requiresHumanReview: Boolean = false,
     val disclaimer: String = "",
     val caseId: String? = null,
+    val conversationId: String? = null,
     val communityEligible: Boolean = false,
     val communityState: String = "",
 )

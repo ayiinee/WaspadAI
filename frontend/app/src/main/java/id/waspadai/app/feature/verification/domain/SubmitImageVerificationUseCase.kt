@@ -13,6 +13,7 @@ class SubmitImageVerificationUseCase(
         fileName: String,
         question: String?,
         source: TriggerSource = TriggerSource.IN_APP,
+        conversationId: String? = null,
     ): AppResult<VerificationResult> = repository.submitImage(
         ImageVerificationInput(
             imageBytes = imageBytes,
@@ -20,6 +21,7 @@ class SubmitImageVerificationUseCase(
             fileName = fileName,
             question = question,
             source = source,
+            conversationId = conversationId,
         )
     )
 }

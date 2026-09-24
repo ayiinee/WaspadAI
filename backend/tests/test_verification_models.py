@@ -59,6 +59,17 @@ def test_payload_hash_is_stable_for_equivalent_trimmed_input() -> None:
     assert payload_hash(left) == payload_hash(right)
 
 
+def test_conversation_id_is_part_of_idempotent_payload() -> None:
+    first_room = TextVerificationRequest.model_validate(
+        request_payload(conversation_id=str(uuid4()))
+    )
+    second_room = TextVerificationRequest.model_validate(
+        request_payload(conversation_id=str(uuid4()))
+    )
+
+    assert payload_hash(first_room) != payload_hash(second_room)
+
+
 def test_mock_result_is_explicitly_mock_and_requires_history() -> None:
     request = TextVerificationRequest.model_validate(request_payload())
     digest = payload_hash(request)
@@ -74,11 +85,28 @@ def test_mock_result_is_explicitly_mock_and_requires_history() -> None:
 def test_not_required_fixture_obeys_review_required_policy() -> None:
     request = TextVerificationRequest.model_validate(request_payload())
     result = build_not_required_result(request, payload_hash(request))
-    settings = Settings(_env_file=None, history_cursor_signing_key="test-secret")
+    settings = Settings(
+        _env_file=None,
+        history_cursor_signing_key="test-secret",
+        history_policy="REVIEW_REQUIRED",
+    )
 
     assert not requires_history(result, settings)
     with pytest.raises(ValueError):
         save_reason(result, settings)
+
+
+def test_all_history_policy_saves_completed_results() -> None:
+    request = TextVerificationRequest.model_validate(request_payload())
+    result = build_not_required_result(request, payload_hash(request))
+    settings = Settings(
+        _env_file=None,
+        history_cursor_signing_key="test-secret",
+        history_policy="ALL",
+    )
+
+    assert requires_history(result, settings)
+    assert save_reason(result, settings) == "ALL_POLICY"
 
 
 def test_history_cursor_is_signed_and_user_scoped() -> None:
@@ -129,7 +157,8 @@ def test_persist_terminal_result_stores_trimmed_text(monkeypatch: pytest.MonkeyP
             settings=settings,
             user_id=uuid4(),
             operation_id=uuid4(),
-            request=request,
+            input_text=request.text,
+            conversation_id=None,
             digest=payload_hash(request),
             result=result,
             execution_mode="MOCK",
@@ -141,6 +170,72 @@ def test_persist_terminal_result_stores_trimmed_text(monkeypatch: pytest.MonkeyP
             for sql, params in connection.calls
             if "insert into public.verification_cases" in sql
         )
-        assert case_insert[5] == "Pesan mengaku bank dan meminta kode OTP segera."
+        assert case_insert[7] == "Pesan mengaku bank dan meminta kode OTP segera."
+
+    anyio.run(check)
+
+
+def test_persist_follow_up_appends_to_existing_conversation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeTransaction:
+        def __init__(self, connection: object) -> None:
+            self.connection = connection
+
+        async def __aenter__(self) -> object:
+            return self.connection
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    class FakeCursor:
+        async def fetchone(self) -> dict[str, int]:
+            return {"next_turn_index": 2}
+
+    class FakeConnection:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, tuple[object, ...]]] = []
+
+        async def execute(self, sql: str, params: tuple[object, ...]) -> FakeCursor:
+            self.calls.append((sql, params))
+            return FakeCursor()
+
+    async def check() -> None:
+        conversation_id = uuid4()
+        request = TextVerificationRequest.model_validate(
+            request_payload(conversation_id=str(conversation_id))
+        )
+        result = build_review_required_result(request, payload_hash(request))
+        connection = FakeConnection()
+        monkeypatch.setattr(
+            "app.verification_service.user_transaction",
+            lambda *_args: FakeTransaction(connection),
+        )
+
+        envelope = await _persist_terminal_result(
+            pool=object(),
+            settings=Settings(_env_file=None, history_cursor_signing_key="test-secret"),
+            user_id=uuid4(),
+            operation_id=uuid4(),
+            input_text=request.text,
+            conversation_id=conversation_id,
+            digest=payload_hash(request),
+            result=result,
+            execution_mode="MOCK",
+            input_type="TEXT",
+        )
+
+        case_insert = next(
+            params
+            for sql, params in connection.calls
+            if "insert into public.verification_cases" in sql
+        )
+        assert case_insert[4] == conversation_id
+        assert case_insert[5] == 2
+        assert envelope.history.conversation_id == conversation_id
+        assert not any(
+            "insert into public.verification_conversations" in sql
+            for sql, _ in connection.calls
+        )
 
     anyio.run(check)

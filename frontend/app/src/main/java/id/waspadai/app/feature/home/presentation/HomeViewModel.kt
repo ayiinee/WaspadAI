@@ -14,6 +14,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class HomeViewModel(
     private val loadHome: LoadHomeUseCase,
@@ -32,8 +36,14 @@ class HomeViewModel(
         when (action) {
             HomeAction.Refresh -> refresh()
             is HomeAction.SearchChanged -> _uiState.update { it.copy(searchQuery = action.query) }
-            HomeAction.ToggleCautionFilter ->
-                _uiState.update { it.copy(cautionOnly = !it.cautionOnly) }
+            HomeAction.FilterClicked ->
+                _uiState.update { it.copy(isFilterMenuVisible = !it.isFilterMenuVisible) }
+            HomeAction.FilterDismissed ->
+                _uiState.update { it.copy(isFilterMenuVisible = false) }
+            is HomeAction.FilterSelected ->
+                _uiState.update {
+                    it.copy(selectedFilter = action.filter, isFilterMenuVisible = false)
+                }
         }
     }
 
@@ -75,10 +85,13 @@ private fun HomeUiState.withDashboard(dashboard: HomeDashboard) = copy(
     cases = dashboard.recentCases.map { item ->
         HomeCaseUiModel(
             communityId = item.communityId,
+            creatorName = item.creatorName,
+            timestamp = formatPublishedAt(item.createdAt),
             title = item.title,
             description = item.summary,
             status = item.displayStatus(),
             tone = item.toTone(),
+            imageUrl = item.imageUrl,
         )
     },
     learningRecommendations = dashboard.learningRecommendations.map { item ->
@@ -92,16 +105,21 @@ private fun HomeUiState.withDashboard(dashboard: HomeDashboard) = copy(
     },
 )
 
-private fun HomeCase.toTone(): HomeCaseTone = when {
-    requiresHumanReview -> HomeCaseTone.Caution
-    verdict.uppercase() in setOf("HOAX", "PALSU", "MISLEADING") -> HomeCaseTone.Hoax
-    riskLevel.uppercase() in setOf("HIGH", "CRITICAL") -> HomeCaseTone.Hoax
-    riskLevel.uppercase() in setOf("MEDIUM", "UNKNOWN") -> HomeCaseTone.Caution
-    else -> HomeCaseTone.Valid
-}
+private fun HomeCase.toTone(): HomeCaseTone =
+    if (verdict.uppercase() in setOf("HOAX", "HOAKS", "PALSU", "FALSE", "MISLEADING")) {
+        HomeCaseTone.Hoax
+    } else {
+        HomeCaseTone.Valid
+    }
 
 private fun HomeCase.displayStatus(): String = when (toTone()) {
     HomeCaseTone.Hoax -> "Hoaks"
-    HomeCaseTone.Caution -> "Waspada"
-    HomeCaseTone.Valid -> "Valid"
+    HomeCaseTone.Valid -> "Fakta"
 }
+
+private val homeTimestampFormatter = DateTimeFormatter
+    .ofPattern("d MMM yyyy · HH.mm 'WIB'", Locale.forLanguageTag("id-ID"))
+
+private fun formatPublishedAt(raw: String): String = runCatching {
+    homeTimestampFormatter.format(Instant.parse(raw).atZone(ZoneId.of("Asia/Jakarta")))
+}.getOrDefault(raw)

@@ -106,3 +106,21 @@ def test_create_community_preview_rejects_known_verification_result(
 
     assert raised.value.status_code == 409
     assert raised.value.code == "COMMUNITY_REQUIRES_UNKNOWN_RESULT"
+
+
+def test_seed_community_asset_is_served_without_supabase_storage() -> None:
+    content, content_type = asyncio.run(
+        community_service._download_asset(
+            SimpleNamespace(supabase_url=None, supabase_service_role_key=None),
+            {
+                "bucket": "seed-assets",
+                "object_path": "phishing-account.png",
+                "mime_type": "image/png",
+            },
+            object(),
+            "gambar komunitas",
+        )
+    )
+
+    assert content.startswith(b"\x89PNG")
+    assert content_type == "image/png"

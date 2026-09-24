@@ -58,6 +58,7 @@ class VerificationMapper {
             requiresHumanReview = response.requiresHumanReview,
             disclaimer = response.disclaimer.trim(),
             caseId = history.caseId,
+            conversationId = history.conversationId,
             communityEligible = history.communityEligible,
             communityState = history.communityState,
         )

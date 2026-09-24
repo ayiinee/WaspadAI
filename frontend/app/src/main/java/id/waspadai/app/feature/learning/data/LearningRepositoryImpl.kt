@@ -114,12 +114,16 @@ class LearningRepositoryImpl(
         idempotencyKey: String,
         answers: Map<String, String>,
         moduleVersion: Int,
+        readingDurationSeconds: Long,
+        quizDurationSeconds: Long,
     ): AppResult<QuizAttemptResult> = runLearningRequest {
         val payload = QuizAttemptRequestDto(
             moduleVersion = moduleVersion,
             answers = answers.map { (qId, optId) ->
                 QuizAttemptAnswerDto(questionId = qId, selectedOptionId = optId)
             },
+            readingDurationSeconds = readingDurationSeconds.coerceIn(0, MAX_SESSION_SECONDS),
+            quizDurationSeconds = quizDurationSeconds.coerceIn(0, MAX_SESSION_SECONDS),
         )
         val response = client.post("${baseUrl.normalized()}/api/v1/learning/modules/$moduleId/quiz-attempts") {
             authorize(accessToken)
@@ -278,6 +282,8 @@ private fun QuizAttemptResultDto.toDomain(): QuizAttemptResult = QuizAttemptResu
     score = score,
     correctAnswers = correctAnswers,
     totalQuestions = totalQuestions,
+    readingDurationSeconds = readingDurationSeconds,
+    quizDurationSeconds = quizDurationSeconds,
     feedback = feedback.map(QuizQuestionFeedbackDto::toDomain),
 )
 
@@ -291,6 +297,8 @@ private fun LearningProgressItemDto.toDomain(): LearningProgressItem = LearningP
     updatedAt = updatedAt,
     latestCorrectAnswers = latestCorrectAnswers,
     latestTotalQuestions = latestTotalQuestions,
+    readingDurationSeconds = readingDurationSeconds,
+    quizDurationSeconds = quizDurationSeconds,
     firstOpenedAt = firstOpenedAt,
     lastOpenedAt = lastOpenedAt,
 )
@@ -306,4 +314,6 @@ private fun HttpStatusCode.toSafeMessage(): String = when (value) {
 }
 
 private class LearningApiException(val status: HttpStatusCode) : RuntimeException()
+
+private const val MAX_SESSION_SECONDS = 86_400L
 

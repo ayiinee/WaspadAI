@@ -30,6 +30,7 @@ data class CommunityPost(
     val title: String,
     val body: String,
     val statusLabel: String = "Belum diverifikasi",
+    val canReceiveAssessment: Boolean = true,
     @DrawableRes val avatarRes: Int,
     @DrawableRes val evidenceRes: Int? = null,
     val imageUrl: String? = null,

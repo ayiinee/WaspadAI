@@ -17,14 +17,17 @@ import id.waspadai.app.feature.community.domain.CommunityVoteUpdate
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
-import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
-import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.ImageVerificationInput
+import id.waspadai.app.feature.verification.domain.LoadVerificationConversationDetailUseCase
+import id.waspadai.app.feature.verification.domain.LoadVerificationConversationsUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import id.waspadai.app.feature.verification.domain.TextVerificationInput
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.domain.VerificationConversationDetail
+import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
+import id.waspadai.app.feature.verification.domain.VerificationConversationTurn
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -256,6 +259,39 @@ class VerificationViewModelTest {
     }
 
     @Test
+    fun `new conversation clears active chat and keeps saved rooms`() = runTest {
+        val viewModel = viewModel(FakeRepository())
+
+        viewModel.onAction(VerificationAction.InputChanged("Tolong cek pesan OTP ini"))
+        viewModel.onAction(VerificationAction.SubmitText)
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.NewConversation)
+
+        assertTrue(viewModel.state.value.conversation.isEmpty())
+        assertTrue(viewModel.state.value.draft.isEmpty())
+        assertEquals(1, viewModel.state.value.history.size)
+        assertTrue(viewModel.state.value.isHistoryVisible)
+    }
+
+    @Test
+    fun `follow up is submitted to the active conversation`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(repository)
+
+        viewModel.onAction(VerificationAction.PrepareNewConversation)
+        viewModel.onAction(VerificationAction.InputChanged("Tolong cek pesan OTP pertama"))
+        viewModel.onAction(VerificationAction.SubmitText)
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.InputChanged("Apa sumber untuk kesimpulan itu?"))
+        viewModel.onAction(VerificationAction.SubmitText)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(null, "conversation-1"), repository.submittedConversationIds)
+        assertEquals("conversation-1", viewModel.state.value.activeConversationId)
+        assertEquals(4, viewModel.state.value.conversation.size)
+    }
+
+    @Test
     fun `community sharing requests preview and publishes after consent`() = runTest {
         val communityRepository = FakeCommunityRepository()
         val viewModel = viewModel(FakeRepository(), communityRepository)
@@ -301,8 +337,8 @@ class VerificationViewModelTest {
         VerificationViewModel(
             submitTextVerification = SubmitTextVerificationUseCase(repository),
             submitImageVerification = SubmitImageVerificationUseCase(repository),
-            loadHistory = LoadVerificationHistoryUseCase(repository),
-            loadHistoryDetail = LoadVerificationHistoryDetailUseCase(repository),
+            loadHistory = LoadVerificationConversationsUseCase(repository),
+            loadHistoryDetail = LoadVerificationConversationDetailUseCase(repository),
             requestCommunityPreview = RequestCommunityPreviewUseCase(communityRepository),
             publishCommunityCase = PublishCommunityCaseUseCase(communityRepository),
             communityBaseUrl = "https://api.example.test",
@@ -314,23 +350,32 @@ class VerificationViewModelTest {
         riskLevel: RiskLevel = RiskLevel.UNKNOWN,
     ) : VerificationRepository {
         var lastImageQuestion: String? = null
+        val submittedConversationIds = mutableListOf<String?>()
 
         private val result = VerificationResult(
             narrative = "Jangan bagikan kode OTP.",
+            headline = "Pesan OTP",
             riskLevel = riskLevel,
             reasons = listOf("Meminta kode OTP."),
             recommendedActions = listOf("Jangan kirim OTP."),
             caseId = "case-1",
+            conversationId = "conversation-1",
             communityEligible = true,
             communityState = "PRIVATE",
         )
 
-        override suspend fun submitText(input: TextVerificationInput): AppResult<VerificationResult> =
-            AppResult.Success(result)
+        override suspend fun submitText(input: TextVerificationInput): AppResult<VerificationResult> {
+            submittedConversationIds += input.conversationId
+            return AppResult.Success(
+                result.copy(conversationId = input.conversationId ?: result.conversationId)
+            )
+        }
 
         override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> {
             lastImageQuestion = input.question
-            return AppResult.Success(result)
+            return AppResult.Success(
+                result.copy(conversationId = input.conversationId ?: result.conversationId)
+            )
         }
 
         override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> =
@@ -353,6 +398,41 @@ class VerificationViewModelTest {
                     result = result
                 )
             )
+
+        override suspend fun listConversations(): AppResult<List<VerificationConversationSummary>> =
+            AppResult.Success(
+                listOf(
+                    VerificationConversationSummary(
+                        conversationId = "conversation-1",
+                        title = "Pesan OTP",
+                        latestMessagePreview = "Jangan bagikan kode OTP.",
+                        latestMessageRole = "ASSISTANT",
+                        lastVerdict = "UNVERIFIED",
+                        createdAt = "2026-09-17T10:00:00Z",
+                        updatedAt = "2026-09-17T10:00:00Z",
+                    )
+                )
+            )
+
+        override suspend fun getConversationDetail(
+            conversationId: String,
+        ): AppResult<VerificationConversationDetail> = AppResult.Success(
+            VerificationConversationDetail(
+                conversationId = conversationId,
+                title = "Pesan OTP",
+                createdAt = "2026-09-17T10:00:00Z",
+                updatedAt = "2026-09-17T10:00:00Z",
+                turns = listOf(
+                    VerificationConversationTurn(
+                        caseId = "case-1",
+                        inputType = "TEXT",
+                        inputText = "Pesan meminta OTP",
+                        createdAt = "2026-09-17T10:00:00Z",
+                        result = result,
+                    )
+                ),
+            )
+        )
 
     }
 

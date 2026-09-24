@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 5
     db_statement_timeout_seconds: int = 15
-    history_policy: Literal["REVIEW_REQUIRED", "ALL"] = "REVIEW_REQUIRED"
+    history_policy: Literal["REVIEW_REQUIRED", "ALL"] = "ALL"
     history_retention_days: int = 90
     idempotency_cache_ttl_seconds: int = 600
     preview_ttl_seconds: int = 900

@@ -50,12 +50,14 @@ private fun HomeResponseDto.toDomain(baseUrl: String) = HomeDashboard(
         HomeCase(
             communityId = item.communityId,
             caseId = item.caseId,
+            creatorName = item.creatorName,
             title = item.title,
             summary = item.summary,
             verdict = item.verdict,
             riskLevel = item.riskLevel,
             requiresHumanReview = item.requiresHumanReview,
             createdAt = item.createdAt,
+            imageUrl = item.imageUrl?.let { if (it.startsWith('/')) "$baseUrl$it" else it },
         )
     },
     learningRecommendations = learningRecommendations.map { item ->

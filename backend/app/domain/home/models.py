@@ -14,12 +14,14 @@ class HomeProfile:
 class HomeCase:
     community_id: UUID
     case_id: UUID
+    creator_name: str
     title: str
     summary: str
     verdict: str
     risk_level: str
     requires_human_review: bool
     created_at: datetime
+    image_url: str | None
 
 
 @dataclass(frozen=True)

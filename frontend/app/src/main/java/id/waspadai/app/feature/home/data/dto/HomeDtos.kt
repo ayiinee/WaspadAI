@@ -20,12 +20,14 @@ data class HomeProfileDto(
 data class HomeCaseDto(
     @SerialName("community_id") val communityId: String,
     @SerialName("case_id") val caseId: String,
+    @SerialName("creator_name") val creatorName: String,
     val title: String,
     val summary: String,
     val verdict: String,
     @SerialName("risk_level") val riskLevel: String,
     @SerialName("requires_human_review") val requiresHumanReview: Boolean,
     @SerialName("created_at") val createdAt: String,
+    @SerialName("image_url") val imageUrl: String? = null,
 )
 
 @Serializable

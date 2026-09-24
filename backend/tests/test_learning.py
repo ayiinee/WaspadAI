@@ -284,6 +284,8 @@ def test_submit_quiz_valid_answers_computes_server_score(monkeypatch: pytest.Mon
 
     payload = QuizAttemptRequest(
         module_version=1,
+        reading_duration_seconds=125,
+        quiz_duration_seconds=48,
         answers=[
             QuizAttemptAnswer(question_id=q1, selected_option_id=q1_opt_correct),
             QuizAttemptAnswer(question_id=q2, selected_option_id=q2_opt_correct),
@@ -305,6 +307,12 @@ def test_submit_quiz_valid_answers_computes_server_score(monkeypatch: pytest.Mon
     assert result.score == 100.0
     assert result.correct_answers == 2
     assert result.total_questions == 2
+    insert_params = next(
+        parameters
+        for query, parameters in connection.executed
+        if "insert into public.quiz_attempts" in query
+    )
+    assert insert_params[-2:] == (125, 48)
     assert len(result.feedback) == 2
     assert all(item.correct for item in result.feedback)
 
@@ -410,6 +418,8 @@ def test_user_progress_is_isolated_between_users(monkeypatch: pytest.MonkeyPatch
                         "last_lesson_completed_at": datetime.now(UTC),
                         "latest_score": 90.0,
                         "best_score": 90.0,
+                        "reading_duration_seconds": 125,
+                        "quiz_duration_seconds": 48,
                         "latest_quiz_completed_at": datetime.now(UTC),
                     }
                 ]
@@ -423,6 +433,8 @@ def test_user_progress_is_isolated_between_users(monkeypatch: pytest.MonkeyPatch
                         "last_lesson_completed_at": None,
                         "latest_score": None,
                         "best_score": None,
+                        "reading_duration_seconds": None,
+                        "quiz_duration_seconds": None,
                         "latest_quiz_completed_at": None,
                     }
                 ]
@@ -449,12 +461,16 @@ def test_user_progress_is_isolated_between_users(monkeypatch: pytest.MonkeyPatch
     assert progress_a.items[0].completed_lessons == 2
     assert progress_a.items[0].progress_percent == 100.0
     assert progress_a.items[0].latest_score == 90.0
+    assert progress_a.items[0].reading_duration_seconds == 125
+    assert progress_a.items[0].quiz_duration_seconds == 48
 
     # Verifikasi User B tidak melihat progress User A (tetap 0)
     assert len(progress_b.items) == 1
     assert progress_b.items[0].completed_lessons == 0
     assert progress_b.items[0].progress_percent == 0.0
     assert progress_b.items[0].latest_score is None
+    assert progress_b.items[0].reading_duration_seconds is None
+    assert progress_b.items[0].quiz_duration_seconds is None
 
     # Verifikasi parameter user_id pada SQL query diikat ke user masing-masing
     assert executed_params[0] == (user_a, user_a, user_a, user_a)

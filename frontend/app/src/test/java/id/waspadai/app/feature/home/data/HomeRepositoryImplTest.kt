@@ -39,6 +39,10 @@ class HomeRepositoryImplTest {
         assertEquals("Bearer token", authorization)
         assertEquals("Putu Alvin", dashboard.displayName)
         assertEquals(
+            "https://api.test/api/v1/community/post/media/image",
+            dashboard.recentCases.single().imageUrl,
+        )
+        assertEquals(
             "https://api.test/api/v1/learning/media/cover.png",
             dashboard.learningRecommendations.single().imageUrl,
         )
@@ -52,12 +56,14 @@ private const val HOME_RESPONSE = """
   "recent_cases": [{
     "case_id": "3a2fd727-87c0-4bb6-9ac6-1ab50fd02430",
     "community_id": "0eb7025d-4627-4cc3-862c-6c0ed709b4e8",
+    "creator_name": "Alya Prameswari",
     "title": "Kasus",
     "summary": "Ringkasan",
     "verdict": "HOAX",
     "risk_level": "HIGH",
     "requires_human_review": false,
-    "created_at": "2026-09-24T00:00:00Z"
+    "created_at": "2026-09-24T00:00:00Z",
+    "image_url": "/api/v1/community/post/media/image"
   }],
   "learning_recommendations": [{
     "module_id": "9b919771-ae25-4d35-a7ce-b253eec3239d",

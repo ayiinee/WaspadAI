@@ -14,6 +14,7 @@ class SubmitTextVerificationUseCase(
         senderContext: String = "UNKNOWN",
         pageContext: id.waspadai.app.core.trigger.VerificationPageContext? = null,
         source: TriggerSource = TriggerSource.IN_APP,
+        conversationId: String? = null,
     ): AppResult<VerificationResult> = repository.submitText(
         TextVerificationInput(
             text = text,
@@ -22,6 +23,7 @@ class SubmitTextVerificationUseCase(
             senderContext = senderContext,
             pageContext = pageContext,
             source = source,
+            conversationId = conversationId,
         )
     )
 }

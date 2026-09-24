@@ -5,6 +5,8 @@ import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.verification.domain.ImageVerificationInput
 import id.waspadai.app.feature.verification.domain.TextVerificationInput
+import id.waspadai.app.feature.verification.domain.VerificationConversationDetail
+import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationRepository
@@ -109,5 +111,12 @@ class AssistantVerificationControllerTest {
 
         override suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail> =
             AppResult.Failure("Tidak digunakan")
+
+        override suspend fun listConversations(): AppResult<List<VerificationConversationSummary>> =
+            AppResult.Success(emptyList())
+
+        override suspend fun getConversationDetail(
+            conversationId: String,
+        ): AppResult<VerificationConversationDetail> = AppResult.Failure("Tidak digunakan")
     }
 }

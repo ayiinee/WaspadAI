@@ -1789,6 +1789,121 @@
         }
       }
     },
+    "/api/v1/conversations": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "List Conversations Endpoint",
+        "operationId": "list_conversations_endpoint_api_v1_conversations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Get Conversation Detail Endpoint",
+        "operationId": "get_conversation_detail_endpoint_api_v1_conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/learning/modules": {
       "get": {
         "tags": [
@@ -2437,6 +2552,18 @@
               }
             ],
             "title": "Question"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           }
         },
         "type": "object",
@@ -3267,6 +3394,169 @@
         ],
         "title": "CommunityVoteResult"
       },
+      "ConversationDetail": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationTurn"
+            },
+            "type": "array",
+            "title": "Turns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "title",
+          "created_at",
+          "updated_at",
+          "turns"
+        ],
+        "title": "ConversationDetail"
+      },
+      "ConversationItem": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "latest_message_preview": {
+            "type": "string",
+            "title": "Latest Message Preview"
+          },
+          "latest_message_role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ASSISTANT"
+            ],
+            "title": "Latest Message Role"
+          },
+          "last_verdict": {
+            "type": "string",
+            "title": "Last Verdict"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "title",
+          "latest_message_preview",
+          "latest_message_role",
+          "last_verdict",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationItem"
+      },
+      "ConversationPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ConversationPage"
+      },
+      "ConversationTurn": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "input_type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE"
+            ],
+            "title": "Input Type"
+          },
+          "input_text": {
+            "type": "string",
+            "title": "Input Text"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "MOCK",
+              "REMOTE"
+            ],
+            "title": "Execution Mode"
+          },
+          "history": {
+            "$ref": "#/components/schemas/HistoryMeta"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AIResult"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "input_type",
+          "input_text",
+          "created_at",
+          "execution_mode",
+          "history",
+          "result"
+        ],
+        "title": "ConversationTurn"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3346,6 +3636,18 @@
             ],
             "title": "Case Id"
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "save_reason": {
             "type": "string",
             "title": "Save Reason"
@@ -3409,6 +3711,12 @@
             "format": "uuid",
             "title": "Case Id"
           },
+          "creator_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Creator Name"
+          },
           "title": {
             "type": "string",
             "maxLength": 1000,
@@ -3441,6 +3749,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
           }
         },
         "additionalProperties": false,
@@ -3448,6 +3767,7 @@
         "required": [
           "community_id",
           "case_id",
+          "creator_name",
           "title",
           "summary",
           "verdict",
@@ -3995,6 +4315,32 @@
               }
             ],
             "title": "Latest Total Questions"
+          },
+          "reading_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Duration Seconds"
+          },
+          "quiz_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiz Duration Seconds"
           },
           "updated_at": {
             "type": "string",
@@ -4625,6 +4971,20 @@
             "type": "array",
             "minItems": 1,
             "title": "Answers"
+          },
+          "reading_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Reading Duration Seconds",
+            "default": 0
+          },
+          "quiz_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Quiz Duration Seconds",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -4657,6 +5017,20 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "Total Questions"
+          },
+          "reading_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Reading Duration Seconds",
+            "default": 0
+          },
+          "quiz_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Quiz Duration Seconds",
+            "default": 0
           },
           "feedback": {
             "items": {
@@ -4825,6 +5199,18 @@
                 "type": "null"
               }
             ]
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           }
         },
         "additionalProperties": false,

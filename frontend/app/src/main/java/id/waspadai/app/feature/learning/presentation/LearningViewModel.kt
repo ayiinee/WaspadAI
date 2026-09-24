@@ -38,7 +38,10 @@ sealed interface LearningAction {
     data object CloseModule : LearningAction
     data class CompleteLesson(val lessonId: String) : LearningAction
     data class SelectAnswer(val questionId: String, val optionId: String) : LearningAction
-    data object SubmitQuiz : LearningAction
+    data class SubmitQuiz(
+        val readingDurationSeconds: Long,
+        val quizDurationSeconds: Long,
+    ) : LearningAction
     data object DismissQuizResult : LearningAction
 }
 
@@ -64,7 +67,10 @@ class LearningViewModel(
             is LearningAction.SelectAnswer -> _uiState.update {
                 it.copy(answers = it.answers + (action.questionId to action.optionId))
             }
-            LearningAction.SubmitQuiz -> submitQuiz()
+            is LearningAction.SubmitQuiz -> submitQuiz(
+                action.readingDurationSeconds,
+                action.quizDurationSeconds,
+            )
             LearningAction.DismissQuizResult -> _uiState.update { it.copy(quizResult = null) }
         }
     }
@@ -93,6 +99,8 @@ class LearningViewModel(
                                     progressUpdatedAt = it.updatedAt,
                                     latestCorrectAnswers = it.latestCorrectAnswers,
                                     latestTotalQuestions = it.latestTotalQuestions,
+                                    readingDurationSeconds = it.readingDurationSeconds,
+                                    quizDurationSeconds = it.quizDurationSeconds,
                                 )
                             } ?: module
                         },
@@ -151,14 +159,21 @@ class LearningViewModel(
         }
     }
 
-    private fun submitQuiz() = viewModelScope.launch {
+    private fun submitQuiz(readingDurationSeconds: Long, quizDurationSeconds: Long) = viewModelScope.launch {
         val token = accessTokenProvider.currentAccessToken() ?: return@launch
         val module = _uiState.value.selectedModule ?: return@launch
         val quiz = _uiState.value.quiz ?: return@launch
         if (_uiState.value.answers.size != quiz.questions.size) return@launch
         _uiState.update { it.copy(submitting = true, error = null) }
         when (val result = repository.submitQuiz(
-            baseUrl, token, module.moduleId, UUID.randomUUID().toString(), _uiState.value.answers, module.version,
+            baseUrl,
+            token,
+            module.moduleId,
+            UUID.randomUUID().toString(),
+            _uiState.value.answers,
+            module.version,
+            readingDurationSeconds,
+            quizDurationSeconds,
         )) {
             is AppResult.Success -> {
                 _uiState.update { it.copy(submitting = false, quizResult = result.value) }

@@ -12,6 +12,7 @@ data class TextVerificationInput(
     val senderContext: String = "UNKNOWN",
     val pageContext: VerificationPageContext? = null,
     val source: TriggerSource = TriggerSource.IN_APP,
+    val conversationId: String? = null,
 )
 
 data class ImageVerificationInput(
@@ -20,6 +21,7 @@ data class ImageVerificationInput(
     val fileName: String,
     val question: String? = null,
     val source: TriggerSource = TriggerSource.IN_APP,
+    val conversationId: String? = null,
 )
 
 interface VerificationRepository {
@@ -30,4 +32,10 @@ interface VerificationRepository {
     suspend fun listHistory(): AppResult<List<VerificationHistoryItem>>
 
     suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail>
+
+    suspend fun listConversations(): AppResult<List<VerificationConversationSummary>>
+
+    suspend fun getConversationDetail(
+        conversationId: String,
+    ): AppResult<VerificationConversationDetail>
 }

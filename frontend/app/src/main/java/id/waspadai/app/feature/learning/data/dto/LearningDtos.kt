@@ -100,6 +100,8 @@ data class QuizAttemptAnswerDto(
 data class QuizAttemptRequestDto(
     @SerialName("module_version") val moduleVersion: Int,
     val answers: List<QuizAttemptAnswerDto>,
+    @SerialName("reading_duration_seconds") val readingDurationSeconds: Long,
+    @SerialName("quiz_duration_seconds") val quizDurationSeconds: Long,
 )
 
 @Serializable
@@ -117,6 +119,8 @@ data class QuizAttemptResultDto(
     val score: Double = 0.0,
     @SerialName("correct_answers") val correctAnswers: Int = 0,
     @SerialName("total_questions") val totalQuestions: Int = 0,
+    @SerialName("reading_duration_seconds") val readingDurationSeconds: Long = 0,
+    @SerialName("quiz_duration_seconds") val quizDurationSeconds: Long = 0,
     val feedback: List<QuizQuestionFeedbackDto> = emptyList(),
 )
 
@@ -130,6 +134,8 @@ data class LearningProgressItemDto(
     @SerialName("best_score") val bestScore: Double? = null,
     @SerialName("latest_correct_answers") val latestCorrectAnswers: Int? = null,
     @SerialName("latest_total_questions") val latestTotalQuestions: Int? = null,
+    @SerialName("reading_duration_seconds") val readingDurationSeconds: Long? = null,
+    @SerialName("quiz_duration_seconds") val quizDurationSeconds: Long? = null,
     @SerialName("updated_at") val updatedAt: String = "",
     @SerialName("first_opened_at") val firstOpenedAt: String? = null,
     @SerialName("last_opened_at") val lastOpenedAt: String? = null,

@@ -124,6 +124,8 @@ private data class LearningMaterial(
     val progressUpdatedAt: String? = null,
     val latestCorrectAnswers: Int? = null,
     val latestTotalQuestions: Int? = null,
+    val readingDurationSeconds: Long? = null,
+    val quizDurationSeconds: Long? = null,
 )
 
 private data class LearningSessionStats(
@@ -238,6 +240,8 @@ fun LearningScreen(
             progressUpdatedAt = module.progressUpdatedAt,
             latestCorrectAnswers = module.latestCorrectAnswers,
             latestTotalQuestions = module.latestTotalQuestions,
+            readingDurationSeconds = module.readingDurationSeconds,
+            quizDurationSeconds = module.quizDurationSeconds,
         )
     }
     val selectedMaterial = uiState.selectedModule?.let { detail ->
@@ -264,6 +268,8 @@ fun LearningScreen(
             progressUpdatedAt = materials.firstOrNull { it.moduleId == detail.moduleId }?.progressUpdatedAt,
             latestCorrectAnswers = materials.firstOrNull { it.moduleId == detail.moduleId }?.latestCorrectAnswers,
             latestTotalQuestions = materials.firstOrNull { it.moduleId == detail.moduleId }?.latestTotalQuestions,
+            readingDurationSeconds = materials.firstOrNull { it.moduleId == detail.moduleId }?.readingDurationSeconds,
+            quizDurationSeconds = materials.firstOrNull { it.moduleId == detail.moduleId }?.quizDurationSeconds,
         )
     }
     fun statusFor(material: LearningMaterial): LearningStatus? = uiState.modules
@@ -292,7 +298,14 @@ fun LearningScreen(
             submitting = uiState.submitting,
             onAnswerSelected = { questionId, optionId -> onAction(LearningAction.SelectAnswer(questionId, optionId)) },
             selectedAnswers = uiState.answers,
-            onSubmitQuiz = { onAction(LearningAction.SubmitQuiz) },
+            onSubmitQuiz = { readingSeconds, quizSeconds ->
+                onAction(
+                    LearningAction.SubmitQuiz(
+                        readingDurationSeconds = readingSeconds,
+                        quizDurationSeconds = quizSeconds,
+                    )
+                )
+            },
             onLessonCompleted = { onAction(LearningAction.CompleteLesson(it)) },
             accessToken = uiState.accessToken,
             onStatusChanged = {},
@@ -340,7 +353,7 @@ private fun LearningListScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item {
                     materials.firstOrNull()?.let { first ->
@@ -360,7 +373,7 @@ private fun LearningListScreen(
                             Text("Materi untukmu", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                             Text("$completedCount dari ${materials.size}", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(7.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -406,7 +419,7 @@ private fun LearningDailyMissions(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = learningContentGutter(), top = 16.dp, end = learningContentGutter(), bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Text("Misi harian", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
         LearningMissionCard(
@@ -463,7 +476,7 @@ private fun LearningMissionCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = WaspadAIDarkBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(1.dp))
                 Text(description, color = if (isComplete) Color(0xFF554714) else WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
             }
             if (isComplete) {
@@ -508,7 +521,6 @@ private fun LearningMaterialCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = cardBackground,
-        // Hanya materi aktif yang memiliki elevasi lembut sebagai penanda fokus.
         shadowElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, strokeColor),
     ) {
@@ -535,7 +547,7 @@ private fun LearningMaterialCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         material.description,
                         color = supportingColor,
@@ -583,15 +595,6 @@ private fun LearningMaterialCard(
                             Text("Selesai $it", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    sessionStats?.let {
-                        Spacer(Modifier.height(5.dp))
-                        Text(
-                            "Materi ${formatElapsed(it.readingSeconds)}  •  Latihan ${formatElapsed(it.quizSeconds)}",
-                            color = WaspadAIMuted,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp,
-                        )
-                    }
                 }
             }
         }
@@ -606,7 +609,7 @@ private fun LearningDetailScreen(
     submitting: Boolean,
     onAnswerSelected: (String, String) -> Unit,
     selectedAnswers: Map<String, String>,
-    onSubmitQuiz: () -> Unit,
+    onSubmitQuiz: (Long, Long) -> Unit,
     onLessonCompleted: (String) -> Unit,
     accessToken: String,
     onStatusChanged: (LearningStatus) -> Unit,
@@ -616,13 +619,14 @@ private fun LearningDetailScreen(
 ) {
     var stageIndex by remember(material.title) { mutableIntStateOf(0) }
     var completedStages by remember(material.title) { mutableIntStateOf(0) }
+    var showOverview by rememberSaveable(material.moduleId) { mutableStateOf(true) }
     var showQuizChoice by remember(material.title) { mutableStateOf(false) }
     var showQuiz by remember(material.title) { mutableStateOf(false) }
     var readingSeconds by rememberSaveable(material.moduleId) { mutableLongStateOf(0L) }
     var readingFinished by rememberSaveable(material.moduleId) { mutableStateOf(false) }
 
-    LaunchedEffect(material.moduleId, readingFinished) {
-        while (!readingFinished) {
+    LaunchedEffect(material.moduleId, readingFinished, showOverview, showQuiz) {
+        while (!readingFinished && !showOverview && !showQuiz) {
             delay(1_000)
             readingSeconds += 1
         }
@@ -641,58 +645,69 @@ private fun LearningDetailScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             LearningPageHeader(title = material.title, onBack = onBack)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = learningContentGutter(), vertical = 20.dp),
-            ) {
-                LearningStageStepper(
-                    stages = material.stages,
-                    completedStages = completedStages,
-                    elapsedSeconds = readingSeconds,
-                )
-                Spacer(Modifier.height(14.dp))
-                LearningStageCard(
-                    stage = material.stages[stageIndex],
+            if (showOverview) {
+                LearningMaterialOverview(
                     material = material,
-                    accessToken = accessToken,
+                    onStart = { showOverview = false },
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.height(15.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+            } else {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = learningContentGutter(), vertical = 20.dp),
                 ) {
-                    if (stageIndex > 0) {
-                        OutlinedButton(
-                            onClick = { stageIndex -= 1 },
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(0.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WaspadAIBlue),
-                        ) {
-                            Icon(Icons.Rounded.ArrowBack, contentDescription = "Materi sebelumnya", modifier = Modifier.size(20.dp))
-                        }
+                    LearningStageStepper(
+                        stages = material.stages,
+                        completedStages = completedStages,
+                        elapsedSeconds = readingSeconds,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    material.stages.getOrNull(stageIndex)?.let { stage ->
+                        LearningStageCard(
+                            stage = stage,
+                            material = material,
+                            accessToken = accessToken,
+                        )
                     }
-                    Button(
-                        onClick = {
-                            material.stages.getOrNull(stageIndex)?.lessonId?.takeIf { it.isNotBlank() }?.let(onLessonCompleted)
-                            if (stageIndex < material.stages.lastIndex) {
-                                completedStages = maxOf(completedStages, stageIndex + 1)
-                                stageIndex += 1
-                            } else {
-                                completedStages = material.stages.size
-                                readingFinished = true
-                                showQuizChoice = true
-                            }
-                        },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
+                    Spacer(Modifier.height(15.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text(if (stageIndex == material.stages.lastIndex) "Selesai membaca" else "Lanjut", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, modifier = Modifier.size(19.dp))
+                        if (stageIndex > 0) {
+                            OutlinedButton(
+                                onClick = { stageIndex -= 1 },
+                                modifier = Modifier.size(48.dp),
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = WaspadAIBlue),
+                            ) {
+                                Icon(Icons.Rounded.ArrowBack, contentDescription = "Materi sebelumnya", modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                material.stages.getOrNull(stageIndex)?.lessonId?.takeIf { it.isNotBlank() }?.let(onLessonCompleted)
+                                if (stageIndex < material.stages.lastIndex) {
+                                    completedStages = maxOf(completedStages, stageIndex + 1)
+                                    stageIndex += 1
+                                } else {
+                                    completedStages = material.stages.size
+                                    readingFinished = true
+                                    showQuizChoice = true
+                                }
+                            },
+                            enabled = material.stages.isNotEmpty(),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
+                        ) {
+                            Text(if (stageIndex == material.stages.lastIndex) "Selesai membaca" else "Lanjut", fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, modifier = Modifier.size(19.dp))
+                        }
                     }
                 }
             }
@@ -745,7 +760,7 @@ private fun LearningDetailScreen(
             submitting = submitting,
             onAnswerSelected = onAnswerSelected,
             selectedAnswers = selectedAnswers,
-            onSubmitQuiz = onSubmitQuiz,
+            onSubmitQuiz = { quizSeconds -> onSubmitQuiz(readingSeconds, quizSeconds) },
             onProgress = { index -> onStatusChanged(LearningStatus("in_progress", index)) },
             onComplete = { result, quizSeconds ->
                 onStatusChanged(LearningStatus("completed", material.questions.size))
@@ -757,6 +772,151 @@ private fun LearningDetailScreen(
                 onBack()
             },
         )
+    }
+}
+
+@Composable
+private fun LearningMaterialOverview(
+    material: LearningMaterial,
+    onStart: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = learningContentGutter(), vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(86.dp)
+                .background(material.iconColor.copy(alpha = .13f), RoundedCornerShape(26.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = material.icon,
+                contentDescription = null,
+                tint = material.iconColor,
+                modifier = Modifier.size(44.dp),
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            text = material.title,
+            color = WaspadAIDarkBlue,
+            fontSize = 20.sp,
+            lineHeight = 25.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = material.description,
+            color = WaspadAIMuted,
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(20.dp))
+        Text(
+            text = "Tahapan belajar",
+            modifier = Modifier.fillMaxWidth(),
+            color = WaspadAIDarkBlue,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = "Ikuti setiap tahap secara berurutan, lalu selesaikan latihan soal.",
+            modifier = Modifier.fillMaxWidth(),
+            color = WaspadAIMuted,
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+        )
+        Spacer(Modifier.height(9.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            material.stages.forEachIndexed { index, stage ->
+                LearningOverviewStep(
+                    number = index + 1,
+                    title = stage.title,
+                    supportingText = "Materi",
+                    color = WaspadAIBlue,
+                )
+            }
+            LearningOverviewStep(
+                number = material.stages.size + 1,
+                title = "Latihan soal",
+                supportingText = "${material.questions.size} soal untuk cek pemahaman",
+                color = Color(0xFFC76500),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Button(
+            onClick = onStart,
+            enabled = material.stages.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
+        ) {
+            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(7.dp))
+            Text("Mulai materi", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun LearningOverviewStep(
+    number: Int,
+    title: String,
+    supportingText: String,
+    color: Color,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Surface(
+            modifier = Modifier.size(width = 46.dp, height = 56.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = color,
+            shadowElevation = 2.dp,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("TAHAP", color = Color.White.copy(alpha = .8f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                Text(number.toString().padStart(2, '0'), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+        Surface(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(13.dp),
+            color = Color.White,
+            shadowElevation = 1.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8E4EC)),
+        ) {
+            Column {
+                Text(
+                    text = title,
+                    modifier = Modifier.padding(start = 13.dp, top = 10.dp, end = 13.dp),
+                    color = WaspadAIDarkBlue,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = supportingText,
+                    modifier = Modifier.padding(start = 13.dp, top = 2.dp, end = 13.dp, bottom = 10.dp),
+                    color = color,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 
@@ -774,8 +934,6 @@ private fun LearningStageCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8E4EC)),
     ) {
         Column(modifier = Modifier.padding(17.dp)) {
-            Text(stage.title, color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(7.dp))
             material.imageUrl?.let {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -783,8 +941,16 @@ private fun LearningStageCard(
                 ) {
                     LearningMediaImage(material, accessToken, Modifier.widthIn(max = 230.dp))
                 }
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
             }
+            Text(
+                text = stage.title,
+                color = WaspadAIDarkBlue,
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(7.dp))
             Markdown(
                 content = stage.body,
                 modifier = Modifier.fillMaxWidth(),
@@ -857,7 +1023,7 @@ private fun LearningQuizScreen(
     submitting: Boolean,
     onAnswerSelected: (String, String) -> Unit,
     selectedAnswers: Map<String, String>,
-    onSubmitQuiz: () -> Unit,
+    onSubmitQuiz: (Long) -> Unit,
     onProgress: (Int) -> Unit,
     onComplete: (id.waspadai.app.feature.learning.domain.QuizAttemptResult, Long) -> Unit,
     onDismiss: () -> Unit,
@@ -1100,7 +1266,7 @@ private fun LearningQuizScreen(
                                 Button(
                                     onClick = {
                                         if (questionIndex == material.questions.lastIndex) {
-                                            onSubmitQuiz()
+                                            onSubmitQuiz(quizSeconds)
                                         } else {
                                             questionIndex += 1
                                             onProgress(questionIndex)

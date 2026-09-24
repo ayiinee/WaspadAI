@@ -28,12 +28,14 @@ async def get_home_dashboard(
             HomeCaseResponse(
                 community_id=item.community_id,
                 case_id=item.case_id,
+                creator_name=item.creator_name,
                 title=item.title,
                 summary=item.summary,
                 verdict=item.verdict,
                 risk_level=item.risk_level,
                 requires_human_review=item.requires_human_review,
                 created_at=item.created_at,
+                image_url=item.image_url,
             )
             for item in snapshot.recent_cases
         ],

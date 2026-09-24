@@ -2,6 +2,8 @@ package id.waspadai.app.feature.verification.data
 
 import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.verification.data.dto.ErrorEnvelopeDto
+import id.waspadai.app.feature.verification.data.dto.ConversationDetailDto
+import id.waspadai.app.feature.verification.data.dto.ConversationPageDto
 import id.waspadai.app.feature.verification.data.dto.HistoryPageDto
 import id.waspadai.app.feature.verification.data.dto.PageContextDto
 import id.waspadai.app.feature.verification.data.dto.TextVerificationRequestDto
@@ -36,6 +38,7 @@ class VerificationRemoteDataSource(
         sourceUrl: String? = null,
         senderContext: String = "UNKNOWN",
         pageContext: id.waspadai.app.core.trigger.VerificationPageContext? = null,
+        conversationId: String? = null,
     ): VerificationEnvelopeDto {
         val idempotencyKey = UUID.randomUUID().toString()
         val accessToken = requireAccessToken()
@@ -47,6 +50,7 @@ class VerificationRemoteDataSource(
             pageContext = pageContext?.let {
                 PageContextDto(title = it.title, before = it.before, after = it.after)
             },
+            conversationId = conversationId,
         )
         var response = postText(payload, accessToken, idempotencyKey)
         if (response.status == HttpStatusCode.Unauthorized) {
@@ -66,10 +70,19 @@ class VerificationRemoteDataSource(
         contentType: String,
         fileName: String,
         question: String?,
+        conversationId: String? = null,
     ): VerificationEnvelopeDto {
         val idempotencyKey = UUID.randomUUID().toString()
         val accessToken = requireAccessToken()
-        var response = postImage(imageBytes, contentType, fileName, question, accessToken, idempotencyKey)
+        var response = postImage(
+            imageBytes,
+            contentType,
+            fileName,
+            question,
+            conversationId,
+            accessToken,
+            idempotencyKey,
+        )
         if (response.status == HttpStatusCode.Unauthorized) {
             val refreshedToken = tokenProvider.refreshAccessToken()
             if (!refreshedToken.isNullOrBlank()) {
@@ -78,6 +91,7 @@ class VerificationRemoteDataSource(
                     contentType,
                     fileName,
                     question,
+                    conversationId,
                     refreshedToken,
                     idempotencyKey,
                 )
@@ -108,6 +122,7 @@ class VerificationRemoteDataSource(
         contentType: String,
         fileName: String,
         question: String?,
+        conversationId: String?,
         accessToken: String,
         idempotencyKey: String,
     ): HttpResponse = client.post(config.imageVerificationUrl) {
@@ -132,6 +147,9 @@ class VerificationRemoteDataSource(
                     )
                     question?.takeIf(String::isNotBlank)?.let { value ->
                         append("question", value)
+                    }
+                    conversationId?.takeIf(String::isNotBlank)?.let { value ->
+                        append("conversation_id", value)
                     }
                 }
             )
@@ -179,6 +197,30 @@ class VerificationRemoteDataSource(
             headers {
                 append(HttpHeaders.Authorization, "Bearer $accessToken")
             }
+            accept(ContentType.Application.Json)
+        }
+        if (!response.status.isSuccess()) {
+            throw VerificationApiException(response.status, response.safeError())
+        }
+        return response.body()
+    }
+
+    suspend fun listConversations(): ConversationPageDto {
+        val accessToken = requireAccessToken()
+        val response = client.get(config.conversationsUrl) {
+            headers { append(HttpHeaders.Authorization, "Bearer $accessToken") }
+            accept(ContentType.Application.Json)
+        }
+        if (!response.status.isSuccess()) {
+            throw VerificationApiException(response.status, response.safeError())
+        }
+        return response.body()
+    }
+
+    suspend fun getConversationDetail(conversationId: String): ConversationDetailDto {
+        val accessToken = requireAccessToken()
+        val response = client.get(config.conversationDetailUrl(conversationId)) {
+            headers { append(HttpHeaders.Authorization, "Bearer $accessToken") }
             accept(ContentType.Application.Json)
         }
         if (!response.status.isSuccess()) {

@@ -45,16 +45,25 @@ class LearningViewModelTest {
         assertTrue(viewModel.uiState.value.selectedModule!!.lessons.single().completed)
 
         viewModel.onAction(LearningAction.SelectAnswer("question-1", "option-1"))
-        viewModel.onAction(LearningAction.SubmitQuiz)
+        viewModel.onAction(
+            LearningAction.SubmitQuiz(
+                readingDurationSeconds = 125,
+                quizDurationSeconds = 48,
+            )
+        )
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(100.0, viewModel.uiState.value.quizResult?.score ?: 0.0, 0.0)
         assertEquals(mapOf("question-1" to "option-1"), repository.submittedAnswers)
+        assertEquals(125L, repository.submittedReadingSeconds)
+        assertEquals(48L, repository.submittedQuizSeconds)
     }
 }
 
 private class FakeLearningRepository : LearningRepository {
     var openedModule: String? = null
     var submittedAnswers: Map<String, String> = emptyMap()
+    var submittedReadingSeconds: Long = 0
+    var submittedQuizSeconds: Long = 0
     private val module = LearningModuleItem("module-1", "backend", "Backend module", "Summary", 1, 1, 1, 0, 0.0)
     private val detail = LearningModuleDetail(
         "module-1", "backend", "Backend module", "Summary", 1, 1, 1, 0, 0.0,
@@ -68,8 +77,19 @@ private class FakeLearningRepository : LearningRepository {
     override suspend fun loadQuiz(baseUrl: String, accessToken: String, moduleId: String) = AppResult.Success(
         LearningQuiz(moduleId, 1, listOf(QuizQuestion("question-1", "Question", listOf(QuizOption("option-1", "Answer")))))
     )
-    override suspend fun submitQuiz(baseUrl: String, accessToken: String, moduleId: String, idempotencyKey: String, answers: Map<String, String>, moduleVersion: Int): AppResult<QuizAttemptResult> {
+    override suspend fun submitQuiz(
+        baseUrl: String,
+        accessToken: String,
+        moduleId: String,
+        idempotencyKey: String,
+        answers: Map<String, String>,
+        moduleVersion: Int,
+        readingDurationSeconds: Long,
+        quizDurationSeconds: Long,
+    ): AppResult<QuizAttemptResult> {
         submittedAnswers = answers
+        submittedReadingSeconds = readingDurationSeconds
+        submittedQuizSeconds = quizDurationSeconds
         return AppResult.Success(QuizAttemptResult("attempt-1", 100.0, 1, 1, emptyList()))
     }
     override suspend fun loadProgress(baseUrl: String, accessToken: String) = AppResult.Success(emptyList<LearningProgressItem>())

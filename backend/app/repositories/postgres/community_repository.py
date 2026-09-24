@@ -526,7 +526,7 @@ SELECT_COMMUNITY_RESPONSE = """
 
 SELECT_VOTE_TARGET = """
 
-        select p.id as post_id, p.case_id, p.owner_id
+        select p.id as post_id, p.case_id, p.owner_id, p.status
           from public.community_posts p
           join public.verification_results result on result.case_id = p.case_id
          where (p.id = %s or p.case_id = %s)
