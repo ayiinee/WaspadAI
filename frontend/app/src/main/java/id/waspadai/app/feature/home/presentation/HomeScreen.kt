@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -28,12 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -111,7 +108,7 @@ fun HomeScreen(
                     .padding(innerPadding),
                 contentPadding = PaddingValues(bottom = bottomNavigationPadding + 20.dp),
             ) {
-                item { HomeHero(displayName = uiState.displayName) }
+                item { HomeHero() }
                 item {
                     HomeBody(
                         uiState = uiState,
@@ -133,7 +130,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHero(displayName: String) {
+private fun HomeHero() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -146,57 +143,27 @@ private fun HomeHero(displayName: String) {
             contentScale = ContentScale.Crop,
             alpha = .68f,
         )
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .height(64.dp)
                 .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Image(
-                painter = painterResource(R.drawable.community_avatar_putu),
-                contentDescription = "Foto profil $displayName",
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .border(1.dp, Color.White.copy(alpha = .8f), CircleShape),
-                contentScale = ContentScale.Crop,
-            )
             Image(
                 painter = painterResource(R.drawable.waspadai_logo),
                 contentDescription = "Logo WaspadAI",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(42.dp),
+                modifier = Modifier.size(42.dp),
                 contentScale = ContentScale.Fit,
             )
-            HomeHeaderAction(
-                contentDescription = "Pengaturan",
-                icon = { Icon(Icons.Outlined.Settings, null, tint = Color.White) },
-                modifier = Modifier.align(Alignment.CenterEnd),
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = "WaspadAI",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
             )
-        }
-    }
-}
-
-@Composable
-private fun HomeHeaderAction(
-    contentDescription: String,
-    icon: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .size(40.dp)
-            .semantics { this.contentDescription = contentDescription },
-        color = Color.Black.copy(alpha = .48f),
-        shape = CircleShape,
-    ) {
-        IconButton(onClick = {}, modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                icon()
-            }
         }
     }
 }
@@ -213,7 +180,6 @@ private fun HomeBody(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .offset(y = (-10).dp)
             .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
             .background(Color.White)
             .padding(top = 14.dp, bottom = 20.dp),

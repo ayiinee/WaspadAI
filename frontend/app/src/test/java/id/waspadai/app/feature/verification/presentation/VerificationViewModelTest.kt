@@ -26,6 +26,7 @@ import id.waspadai.app.feature.verification.domain.TextVerificationInput
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationConversationDetail
+import id.waspadai.app.feature.verification.domain.VerificationConversationPage
 import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.feature.verification.domain.VerificationConversationTurn
 import id.waspadai.app.feature.verification.domain.VerificationRepository
@@ -37,6 +38,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -271,6 +273,133 @@ class VerificationViewModelTest {
         assertTrue(viewModel.state.value.draft.isEmpty())
         assertEquals(1, viewModel.state.value.history.size)
         assertTrue(viewModel.state.value.isHistoryVisible)
+        assertEquals(1, viewModel.state.value.composerFocusRequest)
+    }
+
+    @Test
+    fun `noneligible result stays in session without creating an active conversation`() = runTest {
+        val viewModel = viewModel(FakeRepository(resultConversationId = null))
+
+        viewModel.onAction(VerificationAction.InputChanged("Tolong cek pesan ini sekarang"))
+        viewModel.onAction(VerificationAction.SubmitText)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(2, viewModel.state.value.conversation.size)
+        assertNull(viewModel.state.value.activeConversationId)
+    }
+
+    @Test
+    fun `history pagination appends the next page`() = runTest {
+        val viewModel = viewModel(FakeRepository(hasSecondPage = true))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(VerificationAction.LoadMoreHistory)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("conversation-1", "conversation-2"), viewModel.state.value.history.map { it.conversationId })
+        assertNull(viewModel.state.value.historyNextCursor)
+    }
+
+    @Test
+    fun `rename updates drawer and active header`() = runTest {
+        val viewModel = viewModel(FakeRepository())
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.OpenConversation("conversation-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(VerificationAction.StartRenameConversation("conversation-1"))
+        viewModel.onAction(VerificationAction.RenameDraftChanged("  Judul   baru  "))
+        viewModel.onAction(VerificationAction.ConfirmRenameConversation)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Judul baru", viewModel.state.value.history.single().title)
+        assertEquals("Judul baru", viewModel.state.value.activeConversationTitle)
+    }
+
+    @Test
+    fun `failed rename keeps previous title and inline edit for retry`() = runTest {
+        val viewModel = viewModel(FakeRepository(mutationFails = true))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(VerificationAction.StartRenameConversation("conversation-1"))
+        viewModel.onAction(VerificationAction.RenameDraftChanged("Judul gagal"))
+        viewModel.onAction(VerificationAction.ConfirmRenameConversation)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Pesan OTP", viewModel.state.value.history.single().title)
+        assertEquals("conversation-1", viewModel.state.value.editingConversationId)
+        assertEquals(VerificationAction.ConfirmRenameConversation, viewModel.state.value.uiMessageRetryAction)
+    }
+
+    @Test
+    fun `delete active conversation returns to focused empty chat`() = runTest {
+        val viewModel = viewModel(FakeRepository())
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.OpenConversation("conversation-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(VerificationAction.RequestDeleteConversation("conversation-1"))
+        viewModel.onAction(VerificationAction.ConfirmDeleteConversation)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.history.isEmpty())
+        assertTrue(viewModel.state.value.conversation.isEmpty())
+        assertNull(viewModel.state.value.activeConversationId)
+        assertEquals(1, viewModel.state.value.composerFocusRequest)
+    }
+
+    @Test
+    fun `delete inactive conversation leaves current chat unchanged`() = runTest {
+        val viewModel = viewModel(FakeRepository(hasSecondPage = true))
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.LoadMoreHistory)
+        viewModel.onAction(VerificationAction.OpenConversation("conversation-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(VerificationAction.RequestDeleteConversation("conversation-2"))
+        viewModel.onAction(VerificationAction.ConfirmDeleteConversation)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("conversation-1", viewModel.state.value.activeConversationId)
+        assertEquals(2, viewModel.state.value.conversation.size)
+        assertEquals(listOf("conversation-1"), viewModel.state.value.history.map { it.conversationId })
+    }
+
+    @Test
+    fun `failed delete rolls back without clearing active chat`() = runTest {
+        val viewModel = viewModel(FakeRepository(mutationFails = true))
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(VerificationAction.OpenConversation("conversation-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(VerificationAction.RequestDeleteConversation("conversation-1"))
+        viewModel.onAction(VerificationAction.ConfirmDeleteConversation)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("conversation-1", viewModel.state.value.activeConversationId)
+        assertEquals(2, viewModel.state.value.conversation.size)
+        assertEquals(1, viewModel.state.value.history.size)
+        assertEquals(VerificationAction.ConfirmDeleteConversation, viewModel.state.value.uiMessageRetryAction)
+    }
+
+    @Test
+    fun `failed room load keeps the currently visible conversation`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(repository)
+        viewModel.onAction(VerificationAction.InputChanged("Tolong cek pesan OTP ini"))
+        viewModel.onAction(VerificationAction.SubmitText)
+        dispatcher.scheduler.advanceUntilIdle()
+        repository.detailFails = true
+
+        viewModel.onAction(VerificationAction.OpenConversation("conversation-missing"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(2, viewModel.state.value.conversation.size)
+        assertEquals("conversation-1", viewModel.state.value.activeConversationId)
+        assertEquals(
+            VerificationAction.OpenConversation("conversation-missing"),
+            viewModel.state.value.uiMessageRetryAction,
+        )
     }
 
     @Test
@@ -348,9 +477,13 @@ class VerificationViewModelTest {
 
     private class FakeRepository(
         riskLevel: RiskLevel = RiskLevel.UNKNOWN,
+        private val resultConversationId: String? = "conversation-1",
+        private val hasSecondPage: Boolean = false,
+        private val mutationFails: Boolean = false,
     ) : VerificationRepository {
         var lastImageQuestion: String? = null
         val submittedConversationIds = mutableListOf<String?>()
+        var detailFails: Boolean = false
 
         private val result = VerificationResult(
             narrative = "Jangan bagikan kode OTP.",
@@ -359,7 +492,7 @@ class VerificationViewModelTest {
             reasons = listOf("Meminta kode OTP."),
             recommendedActions = listOf("Jangan kirim OTP."),
             caseId = "case-1",
-            conversationId = "conversation-1",
+            conversationId = resultConversationId,
             communityEligible = true,
             communityState = "PRIVATE",
         )
@@ -400,23 +533,39 @@ class VerificationViewModelTest {
             )
 
         override suspend fun listConversations(): AppResult<List<VerificationConversationSummary>> =
-            AppResult.Success(
-                listOf(
-                    VerificationConversationSummary(
-                        conversationId = "conversation-1",
-                        title = "Pesan OTP",
-                        latestMessagePreview = "Jangan bagikan kode OTP.",
-                        latestMessageRole = "ASSISTANT",
-                        lastVerdict = "UNVERIFIED",
-                        createdAt = "2026-09-17T10:00:00Z",
-                        updatedAt = "2026-09-17T10:00:00Z",
-                    )
+            AppResult.Success(listOf(summary("conversation-1", "Pesan OTP")))
+
+        override suspend fun listConversationPage(
+            cursor: String?,
+        ): AppResult<VerificationConversationPage> = when {
+            cursor == "next" -> AppResult.Success(
+                VerificationConversationPage(listOf(summary("conversation-2", "Pesan kedua")), null)
+            )
+            else -> AppResult.Success(
+                VerificationConversationPage(
+                    listOf(summary("conversation-1", "Pesan OTP")),
+                    if (hasSecondPage) "next" else null,
                 )
             )
+        }
+
+        override suspend fun renameConversation(
+            conversationId: String,
+            title: String,
+        ): AppResult<VerificationConversationSummary> = if (mutationFails) {
+            AppResult.Failure("Rename gagal")
+        } else {
+            AppResult.Success(summary(conversationId, title))
+        }
+
+        override suspend fun deleteConversation(conversationId: String): AppResult<Unit> =
+            if (mutationFails) AppResult.Failure("Delete gagal") else AppResult.Success(Unit)
 
         override suspend fun getConversationDetail(
             conversationId: String,
-        ): AppResult<VerificationConversationDetail> = AppResult.Success(
+        ): AppResult<VerificationConversationDetail> = if (detailFails) {
+            AppResult.Failure("Percakapan tidak ditemukan")
+        } else AppResult.Success(
             VerificationConversationDetail(
                 conversationId = conversationId,
                 title = "Pesan OTP",
@@ -432,6 +581,16 @@ class VerificationViewModelTest {
                     )
                 ),
             )
+        )
+
+        private fun summary(id: String, title: String) = VerificationConversationSummary(
+            conversationId = id,
+            title = title,
+            latestMessagePreview = "Jangan bagikan kode OTP.",
+            latestMessageRole = "ASSISTANT",
+            lastVerdict = "UNVERIFIED",
+            createdAt = "2026-09-17T10:00:00Z",
+            updatedAt = "2026-09-17T10:00:00Z",
         )
 
     }

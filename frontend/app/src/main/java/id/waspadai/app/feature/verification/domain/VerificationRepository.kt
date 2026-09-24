@@ -35,6 +35,21 @@ interface VerificationRepository {
 
     suspend fun listConversations(): AppResult<List<VerificationConversationSummary>>
 
+    suspend fun listConversationPage(cursor: String? = null): AppResult<VerificationConversationPage> =
+        when (val result = listConversations()) {
+            is AppResult.Success -> AppResult.Success(VerificationConversationPage(result.value, null))
+            is AppResult.Failure -> result
+        }
+
+    suspend fun renameConversation(conversationId: String, title: String): AppResult<VerificationConversationSummary> =
+        AppResult.Failure("Rename percakapan belum tersedia.")
+
+    suspend fun deleteConversation(conversationId: String): AppResult<Unit> =
+        AppResult.Failure("Hapus percakapan belum tersedia.")
+
+    suspend fun loadConversationAttachment(conversationId: String, caseId: String): AppResult<ByteArray> =
+        AppResult.Failure("Lampiran belum tersedia.")
+
     suspend fun getConversationDetail(
         conversationId: String,
     ): AppResult<VerificationConversationDetail>

@@ -349,14 +349,6 @@ private fun WaspadAiApp(
             VerificationRoute(
                 viewModel = verificationViewModel,
                 onDestinationSelected = navigateToTopLevel,
-                onStartConversation = {
-                    navController.navigate(VerificationChatNewRouteName) {
-                        launchSingleTop = true
-                    }
-                },
-                onOpenConversation = { conversationId ->
-                    navController.navigate("verification/chat/$conversationId")
-                },
                 onCommunityPublished = { communityId ->
                     showCommunityBadge = true
                     communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
@@ -366,6 +358,9 @@ private fun WaspadAiApp(
         }
         composable(VerificationChatNewRouteName) {
             val verificationState by verificationViewModel.state.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) {
+                verificationViewModel.onAction(VerificationAction.NewConversation)
+            }
             LaunchedEffect(
                 verificationState.activeConversationId,
                 verificationState.phase,

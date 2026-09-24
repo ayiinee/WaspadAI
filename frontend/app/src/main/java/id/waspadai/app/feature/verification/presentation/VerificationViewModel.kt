@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class VerificationViewModel(
@@ -33,6 +34,8 @@ class VerificationViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(VerificationUiState.initial(isRemoteEnabled))
     val state: StateFlow<VerificationUiState> = _state.asStateFlow()
+    private var conversationLoadJob: Job? = null
+    private var verificationJob: Job? = null
 
     init {
         refreshHistory()
@@ -76,10 +79,29 @@ class VerificationViewModel(
             VerificationAction.DismissFailure -> dismissFailure()
             VerificationAction.ToggleHistory -> toggleHistory()
             VerificationAction.RefreshHistory -> refreshHistory()
+            VerificationAction.LoadMoreHistory -> loadMoreHistory()
+            VerificationAction.OpenDrawer -> _state.update { it.copy(isDrawerOpen = true) }
+            VerificationAction.CloseDrawer -> _state.update { it.copy(isDrawerOpen = false) }
             VerificationAction.NewConversation -> newConversation()
             VerificationAction.PrepareNewConversation -> prepareNewConversation()
             is VerificationAction.OpenHistory -> openConversation(action.caseId)
             is VerificationAction.OpenConversation -> openConversation(action.conversationId)
+            is VerificationAction.StartRenameConversation -> startRename(action.conversationId)
+            is VerificationAction.RenameDraftChanged -> _state.update { it.copy(renameDraft = action.value.take(80)) }
+            VerificationAction.ConfirmRenameConversation -> confirmRename()
+            VerificationAction.CancelRenameConversation -> _state.update {
+                it.copy(editingConversationId = null, renameDraft = "")
+            }
+            is VerificationAction.RequestDeleteConversation -> _state.update {
+                it.copy(pendingDeleteConversationId = action.conversationId)
+            }
+            VerificationAction.ConfirmDeleteConversation -> confirmDelete()
+            VerificationAction.CancelDeleteConversation -> _state.update {
+                it.copy(pendingDeleteConversationId = null)
+            }
+            VerificationAction.DismissUiMessage -> _state.update {
+                it.copy(uiMessage = null, uiMessageRetryAction = null)
+            }
             VerificationAction.RequestCommunityPreview -> requestCommunityPreview()
             is VerificationAction.CommunityRagConsentChanged -> _state.update {
                 it.copy(communityShare = it.communityShare.copy(ragReuseConsent = action.granted))
@@ -181,7 +203,7 @@ class VerificationViewModel(
             return
         }
         _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
-        viewModelScope.launch {
+        verificationJob = viewModelScope.launch {
             _state.update { current ->
                 current.copy(
                     conversation = current.conversation + VerificationConversationItem.UserMessage(text),
@@ -207,9 +229,13 @@ class VerificationViewModel(
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
                         phase = VerificationPhase.Success(result.value),
                         activeConversationId = result.value.conversationId ?: current.activeConversationId,
-                        activeConversationTitle = current.activeConversationTitle
-                            .takeUnless { it == "Percakapan baru" }
-                            ?: result.value.headline.ifBlank { "Percakapan baru" },
+                        activeConversationTitle = if (
+                            conversationId == null && result.value.conversationId != null
+                        ) {
+                            conversationTitle(text)
+                        } else {
+                            current.activeConversationTitle
+                        },
                     )
                 }.also { refreshHistory() }
                 is AppResult.Failure -> _state.update { current ->
@@ -228,7 +254,7 @@ class VerificationViewModel(
         val conversationId = state.value.activeConversationId
         val userMessage = question ?: "Gambar dikirim untuk diperiksa."
         _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
-        viewModelScope.launch {
+        verificationJob = viewModelScope.launch {
             _state.update { current ->
                 current.copy(
                     conversation = current.conversation + VerificationConversationItem.UserMessage(
@@ -269,9 +295,13 @@ class VerificationViewModel(
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
                         phase = VerificationPhase.Success(result.value),
                         activeConversationId = result.value.conversationId ?: current.activeConversationId,
-                        activeConversationTitle = current.activeConversationTitle
-                            .takeUnless { it == "Percakapan baru" }
-                            ?: result.value.headline.ifBlank { "Percakapan baru" },
+                        activeConversationTitle = if (
+                            conversationId == null && result.value.conversationId != null
+                        ) {
+                            conversationTitle(userMessage)
+                        } else {
+                            current.activeConversationTitle
+                        },
                     )
                 }.also { refreshHistory() }
                 is AppResult.Failure -> _state.update { current ->
@@ -385,7 +415,7 @@ class VerificationViewModel(
         _state.update { current ->
             current.copy(pendingAttachments = emptyList(), phase = VerificationPhase.Validating)
         }
-        viewModelScope.launch {
+        verificationJob = viewModelScope.launch {
             val userMessage = question ?: "Lampiran dikirim untuk diperiksa."
             _state.update { current ->
                 current.copy(
@@ -477,12 +507,45 @@ class VerificationViewModel(
         viewModelScope.launch {
             when (val result = loadHistory()) {
                 is AppResult.Success -> _state.update { current ->
-                    current.copy(history = result.value, isHistoryLoading = false)
+                    val activeTitle = result.value.items
+                        .firstOrNull { it.conversationId == current.activeConversationId }
+                        ?.title
+                    current.copy(
+                        history = result.value.items,
+                        historyNextCursor = result.value.nextCursor,
+                        isHistoryLoading = false,
+                        activeConversationTitle = activeTitle ?: current.activeConversationTitle,
+                    )
                 }
                 is AppResult.Failure -> _state.update { current ->
                     current.copy(
                         isHistoryLoading = false,
-                        phase = VerificationPhase.Failure(result.message)
+                        uiMessage = result.message,
+                        uiMessageRetryAction = VerificationAction.RefreshHistory,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun loadMoreHistory() {
+        val cursor = state.value.historyNextCursor ?: return
+        if (state.value.isHistoryLoadingMore) return
+        _state.update { it.copy(isHistoryLoadingMore = true) }
+        viewModelScope.launch {
+            when (val result = loadHistory(cursor)) {
+                is AppResult.Success -> _state.update { current ->
+                    current.copy(
+                        history = (current.history + result.value.items).distinctBy { it.conversationId },
+                        historyNextCursor = result.value.nextCursor,
+                        isHistoryLoadingMore = false,
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        isHistoryLoadingMore = false,
+                        uiMessage = result.message,
+                        uiMessageRetryAction = VerificationAction.LoadMoreHistory,
                     )
                 }
             }
@@ -490,22 +553,36 @@ class VerificationViewModel(
     }
 
     private fun newConversation() {
+        conversationLoadJob?.cancel()
+        verificationJob?.cancel()
         _state.update { current ->
             current.copy(
                 draft = "",
+                draftSource = TriggerSource.IN_APP,
+                draftPageContext = null,
+                draftSourceUrl = null,
                 conversation = emptyList(),
                 pendingAttachments = emptyList(),
                 phase = VerificationPhase.Idle,
                 communityShare = CommunityShareState(),
                 isHistoryVisible = true,
+                isDrawerOpen = false,
                 activeConversationId = null,
                 activeConversationTitle = "Percakapan baru",
                 isConversationLoading = false,
+                editingConversationId = null,
+                renameDraft = "",
+                pendingDeleteConversationId = null,
+                uiMessage = null,
+                uiMessageRetryAction = null,
+                composerFocusRequest = current.composerFocusRequest + 1,
             )
         }
     }
 
     private fun prepareNewConversation() {
+        conversationLoadJob?.cancel()
+        verificationJob?.cancel()
         _state.update { current ->
             current.copy(
                 conversation = emptyList(),
@@ -519,25 +596,32 @@ class VerificationViewModel(
     }
 
     private fun openConversation(conversationId: String) {
+        conversationLoadJob?.cancel()
+        verificationJob?.cancel()
         _state.update { current ->
             current.copy(
-                conversation = emptyList(),
-                draft = "",
-                pendingAttachments = emptyList(),
-                activeConversationId = conversationId,
-                activeConversationTitle = current.history
-                    .firstOrNull { it.conversationId == conversationId }
-                    ?.title
-                    ?: "Percakapan",
                 isConversationLoading = true,
                 phase = VerificationPhase.Idle,
+                isDrawerOpen = false,
+                uiMessage = null,
+                uiMessageRetryAction = null,
             )
         }
-        viewModelScope.launch {
+        conversationLoadJob = viewModelScope.launch {
             when (val result = loadHistoryDetail(conversationId)) {
-                is AppResult.Success -> _state.update { current ->
+                is AppResult.Success -> {
+                    var attachmentFailed = false
                     val restored = buildList<VerificationConversationItem> {
                         result.value.turns.forEach { turn ->
+                            val attachmentBytes = if (turn.attachment?.available == true) {
+                                when (val attachment = loadHistory.attachment(conversationId, turn.caseId)) {
+                                    is AppResult.Success -> attachment.value
+                                    is AppResult.Failure -> {
+                                        attachmentFailed = true
+                                        null
+                                    }
+                                }
+                            } else null
                             add(
                                 VerificationConversationItem.UserMessage(
                                     text = turn.inputText,
@@ -547,24 +631,114 @@ class VerificationViewModel(
                                     } else {
                                         null
                                     },
+                                    attachmentBytes = attachmentBytes,
+                                    attachmentContentType = turn.attachment?.contentType,
                                 )
                             )
                             add(VerificationConversationItem.Analysis(turn.result))
                         }
                     }
-                    current.copy(
-                        conversation = restored,
-                        draft = "",
-                        activeConversationId = result.value.conversationId,
-                        activeConversationTitle = result.value.title,
-                        isConversationLoading = false,
-                        phase = VerificationPhase.Idle,
-                    )
+                    _state.update { current ->
+                        current.copy(
+                            conversation = restored,
+                            draft = "",
+                            pendingAttachments = emptyList(),
+                            activeConversationId = result.value.conversationId,
+                            activeConversationTitle = result.value.title,
+                            isConversationLoading = false,
+                            phase = VerificationPhase.Idle,
+                            uiMessage = if (attachmentFailed) {
+                                "Sebagian preview lampiran belum dapat dimuat."
+                            } else {
+                                null
+                            },
+                            uiMessageRetryAction = if (attachmentFailed) {
+                                VerificationAction.OpenConversation(conversationId)
+                            } else {
+                                null
+                            },
+                        )
+                    }
                 }
                 is AppResult.Failure -> _state.update { current ->
                     current.copy(
                         isConversationLoading = false,
-                        phase = VerificationPhase.Failure(result.message),
+                        uiMessage = result.message,
+                        uiMessageRetryAction = VerificationAction.OpenConversation(conversationId),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun startRename(conversationId: String) {
+        val title = state.value.history.firstOrNull { it.conversationId == conversationId }?.title ?: return
+        _state.update { it.copy(editingConversationId = conversationId, renameDraft = title) }
+    }
+
+    private fun confirmRename() {
+        val id = state.value.editingConversationId ?: return
+        val title = state.value.renameDraft.trim().replace(Regex("\\s+"), " ")
+        if (title.isBlank()) {
+            _state.update { it.copy(uiMessage = "Judul percakapan tidak boleh kosong.") }
+            return
+        }
+        _state.update { it.copy(isConversationMutationRunning = true) }
+        viewModelScope.launch {
+            when (val result = loadHistory.rename(id, title)) {
+                is AppResult.Success -> _state.update { current ->
+                    current.copy(
+                        history = current.history.map { if (it.conversationId == id) result.value else it },
+                        activeConversationTitle = if (current.activeConversationId == id) result.value.title else current.activeConversationTitle,
+                        editingConversationId = null,
+                        renameDraft = "",
+                        isConversationMutationRunning = false,
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        isConversationMutationRunning = false,
+                        uiMessage = result.message,
+                        uiMessageRetryAction = VerificationAction.ConfirmRenameConversation,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun confirmDelete() {
+        val id = state.value.pendingDeleteConversationId ?: return
+        if (state.value.activeConversationId == id) {
+            verificationJob?.cancel()
+            conversationLoadJob?.cancel()
+        }
+        _state.update { it.copy(isConversationMutationRunning = true) }
+        viewModelScope.launch {
+            when (val result = loadHistory.delete(id)) {
+                is AppResult.Success -> _state.update { current ->
+                    val deletingActive = current.activeConversationId == id
+                    current.copy(
+                        history = current.history.filterNot { it.conversationId == id },
+                        pendingDeleteConversationId = null,
+                        isConversationMutationRunning = false,
+                        activeConversationId = if (deletingActive) null else current.activeConversationId,
+                        activeConversationTitle = if (deletingActive) "Percakapan baru" else current.activeConversationTitle,
+                        conversation = if (deletingActive) emptyList() else current.conversation,
+                        draft = if (deletingActive) "" else current.draft,
+                        draftSource = if (deletingActive) TriggerSource.IN_APP else current.draftSource,
+                        draftPageContext = if (deletingActive) null else current.draftPageContext,
+                        draftSourceUrl = if (deletingActive) null else current.draftSourceUrl,
+                        pendingAttachments = if (deletingActive) emptyList() else current.pendingAttachments,
+                        phase = if (deletingActive) VerificationPhase.Idle else current.phase,
+                        communityShare = if (deletingActive) CommunityShareState() else current.communityShare,
+                        composerFocusRequest = if (deletingActive) current.composerFocusRequest + 1 else current.composerFocusRequest,
+                    )
+                }
+                is AppResult.Failure -> _state.update {
+                    it.copy(
+                        isConversationMutationRunning = false,
+                        uiMessage = result.message,
+                        uiMessageRetryAction = VerificationAction.ConfirmDeleteConversation,
                     )
                 }
             }
@@ -746,5 +920,14 @@ class VerificationViewModel(
     private companion object {
         const val MINIMUM_TEXT_LENGTH = 10
         const val MAXIMUM_PENDING_ATTACHMENTS = 5
+
+        fun conversationTitle(input: String): String = input
+            .trim()
+            .split(Regex("\\s+"))
+            .filter(String::isNotBlank)
+            .take(7)
+            .joinToString(" ")
+            .take(80)
+            .ifBlank { "Pemeriksaan gambar" }
     }
 }

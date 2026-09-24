@@ -4,6 +4,8 @@ import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.verification.data.dto.ErrorEnvelopeDto
 import id.waspadai.app.feature.verification.data.dto.ConversationDetailDto
 import id.waspadai.app.feature.verification.data.dto.ConversationPageDto
+import id.waspadai.app.feature.verification.data.dto.ConversationItemDto
+import id.waspadai.app.feature.verification.data.dto.ConversationUpdateRequestDto
 import id.waspadai.app.feature.verification.data.dto.HistoryPageDto
 import id.waspadai.app.feature.verification.data.dto.PageContextDto
 import id.waspadai.app.feature.verification.data.dto.TextVerificationRequestDto
@@ -14,8 +16,11 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.accept
 import io.ktor.client.request.get
+import io.ktor.client.request.delete
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
+import io.ktor.client.request.patch
+import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -205,11 +210,12 @@ class VerificationRemoteDataSource(
         return response.body()
     }
 
-    suspend fun listConversations(): ConversationPageDto {
+    suspend fun listConversations(cursor: String? = null): ConversationPageDto {
         val accessToken = requireAccessToken()
         val response = client.get(config.conversationsUrl) {
             headers { append(HttpHeaders.Authorization, "Bearer $accessToken") }
             accept(ContentType.Application.Json)
+            cursor?.let { parameter("cursor", it) }
         }
         if (!response.status.isSuccess()) {
             throw VerificationApiException(response.status, response.safeError())
@@ -226,6 +232,38 @@ class VerificationRemoteDataSource(
         if (!response.status.isSuccess()) {
             throw VerificationApiException(response.status, response.safeError())
         }
+        return response.body()
+    }
+
+    suspend fun renameConversation(conversationId: String, title: String): ConversationItemDto {
+        val accessToken = requireAccessToken()
+        val response = client.patch(config.conversationDetailUrl(conversationId)) {
+            headers {
+                append(HttpHeaders.Authorization, "Bearer $accessToken")
+                append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            }
+            accept(ContentType.Application.Json)
+            setBody(ConversationUpdateRequestDto(title))
+        }
+        if (!response.status.isSuccess()) throw VerificationApiException(response.status, response.safeError())
+        return response.body()
+    }
+
+    suspend fun deleteConversation(conversationId: String) {
+        val accessToken = requireAccessToken()
+        val response = client.delete(config.conversationDetailUrl(conversationId)) {
+            headers { append(HttpHeaders.Authorization, "Bearer $accessToken") }
+        }
+        if (!response.status.isSuccess()) throw VerificationApiException(response.status, response.safeError())
+    }
+
+    suspend fun loadConversationAttachment(conversationId: String, caseId: String): ByteArray {
+        val accessToken = requireAccessToken()
+        val response = client.get(config.conversationAttachmentUrl(conversationId, caseId)) {
+            headers { append(HttpHeaders.Authorization, "Bearer $accessToken") }
+            accept(ContentType.Image.Any)
+        }
+        if (!response.status.isSuccess()) throw VerificationApiException(response.status, response.safeError())
         return response.body()
     }
 

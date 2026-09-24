@@ -130,6 +130,16 @@ data class ConversationPageDto(
 )
 
 @Serializable
+data class ConversationUpdateRequestDto(val title: String)
+
+@Serializable
+data class ConversationAttachmentDto(
+    val available: Boolean = false,
+    @SerialName("content_type") val contentType: String? = null,
+    @SerialName("size_bytes") val sizeBytes: Long? = null,
+)
+
+@Serializable
 data class ConversationTurnDto(
     @SerialName("case_id") val caseId: String,
     @SerialName("input_type") val inputType: String,
@@ -138,6 +148,7 @@ data class ConversationTurnDto(
     @SerialName("execution_mode") val executionMode: String,
     val history: HistoryMetaDto,
     val result: VerificationResponseDto,
+    val attachment: ConversationAttachmentDto? = null,
 )
 
 @Serializable

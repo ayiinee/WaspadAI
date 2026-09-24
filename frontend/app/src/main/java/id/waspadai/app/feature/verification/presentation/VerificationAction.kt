@@ -79,6 +79,12 @@ sealed interface VerificationAction {
 
     data object RefreshHistory : VerificationAction
 
+    data object LoadMoreHistory : VerificationAction
+
+    data object OpenDrawer : VerificationAction
+
+    data object CloseDrawer : VerificationAction
+
     data object NewConversation : VerificationAction
 
     data object PrepareNewConversation : VerificationAction
@@ -86,6 +92,22 @@ sealed interface VerificationAction {
     data class OpenHistory(val caseId: String) : VerificationAction
 
     data class OpenConversation(val conversationId: String) : VerificationAction
+
+    data class StartRenameConversation(val conversationId: String) : VerificationAction
+
+    data class RenameDraftChanged(val value: String) : VerificationAction
+
+    data object ConfirmRenameConversation : VerificationAction
+
+    data object CancelRenameConversation : VerificationAction
+
+    data class RequestDeleteConversation(val conversationId: String) : VerificationAction
+
+    data object ConfirmDeleteConversation : VerificationAction
+
+    data object CancelDeleteConversation : VerificationAction
+
+    data object DismissUiMessage : VerificationAction
 
     data object RequestCommunityPreview : VerificationAction
 

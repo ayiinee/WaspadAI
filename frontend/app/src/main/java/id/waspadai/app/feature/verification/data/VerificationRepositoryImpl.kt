@@ -9,6 +9,8 @@ import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationConversationDetail
 import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.feature.verification.domain.VerificationConversationTurn
+import id.waspadai.app.feature.verification.domain.VerificationConversationAttachment
+import id.waspadai.app.feature.verification.domain.VerificationConversationPage
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import id.waspadai.app.feature.verification.domain.TextVerificationInput
 import id.waspadai.app.feature.verification.domain.ImageVerificationInput
@@ -150,6 +152,51 @@ class VerificationRepositoryImpl(
         AppResult.Failure("Percakapan belum dapat dimuat. Coba lagi nanti.")
     }
 
+    override suspend fun listConversationPage(cursor: String?): AppResult<VerificationConversationPage> = try {
+        val page = remoteDataSource.listConversations(cursor)
+        AppResult.Success(
+            VerificationConversationPage(
+                items = page.items.map { it.toDomain() },
+                nextCursor = page.nextCursor,
+            )
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        AppResult.Failure(error.conversationMessage("Percakapan belum dapat dimuat."))
+    }
+
+    override suspend fun renameConversation(
+        conversationId: String,
+        title: String,
+    ): AppResult<VerificationConversationSummary> = try {
+        AppResult.Success(remoteDataSource.renameConversation(conversationId, title).toDomain())
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        AppResult.Failure(error.conversationMessage("Judul belum dapat diubah."))
+    }
+
+    override suspend fun deleteConversation(conversationId: String): AppResult<Unit> = try {
+        remoteDataSource.deleteConversation(conversationId)
+        AppResult.Success(Unit)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        AppResult.Failure(error.conversationMessage("Percakapan belum dapat dihapus."))
+    }
+
+    override suspend fun loadConversationAttachment(
+        conversationId: String,
+        caseId: String,
+    ): AppResult<ByteArray> = try {
+        AppResult.Success(remoteDataSource.loadConversationAttachment(conversationId, caseId))
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        AppResult.Failure(error.conversationMessage("Lampiran belum dapat dimuat."))
+    }
+
     override suspend fun getConversationDetail(
         conversationId: String,
     ): AppResult<VerificationConversationDetail> = try {
@@ -167,6 +214,9 @@ class VerificationRepositoryImpl(
                         inputText = turn.inputText,
                         createdAt = turn.createdAt,
                         result = mapper.map(turn.result, turn.history),
+                        attachment = turn.attachment?.let {
+                            VerificationConversationAttachment(it.available, it.contentType, it.sizeBytes)
+                        },
                     )
                 },
             )
@@ -186,6 +236,25 @@ class VerificationRepositoryImpl(
     } catch (error: Exception) {
         AppResult.Failure("Detail percakapan belum dapat dimuat. Coba lagi nanti.")
     }
+}
+
+private fun id.waspadai.app.feature.verification.data.dto.ConversationItemDto.toDomain() =
+    VerificationConversationSummary(
+        conversationId = conversationId,
+        title = title,
+        latestMessagePreview = latestMessagePreview,
+        latestMessageRole = latestMessageRole,
+        lastVerdict = lastVerdict,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
+private fun Throwable.conversationMessage(fallback: String): String = when (this) {
+    is MissingAccessTokenException -> "Sesi Supabase belum tersedia. Login terlebih dahulu."
+    is VerificationApiException -> toSafeMessage()
+    is HttpRequestTimeoutException -> "Permintaan memerlukan waktu terlalu lama. Coba lagi nanti."
+    is IOException -> "Koneksi belum tersedia. Periksa internet lalu coba lagi."
+    else -> fallback
 }
 
 private fun buildImageQuestion(

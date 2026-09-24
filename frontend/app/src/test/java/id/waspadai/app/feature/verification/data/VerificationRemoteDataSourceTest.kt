@@ -13,6 +13,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Test
@@ -98,6 +99,85 @@ class VerificationRemoteDataSourceTest {
 
         assertFalse(result.isSuccess)
         assertEquals(MissingAccessTokenException::class, result.exceptionOrNull()!!::class)
+    }
+
+    @Test
+    fun `conversation pagination sends cursor query`() = runTest {
+        val engine = MockEngine { request ->
+            assertEquals("next-page", request.url.parameters["cursor"])
+            respond(
+                content = """{"items":[],"next_cursor":null}""",
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+        val dataSource = VerificationRemoteDataSource(
+            httpClient(engine),
+            WaspadAiApiConfig("https://product.example"),
+            StaticAccessTokenProvider("user-token"),
+        )
+
+        dataSource.listConversations("next-page")
+    }
+
+    @Test
+    fun `rename and delete use conversation resource`() = runTest {
+        var requestIndex = 0
+        val engine = MockEngine { request ->
+            requestIndex += 1
+            assertEquals(
+                "https://product.example/api/v1/conversations/conversation-1",
+                request.url.toString(),
+            )
+            if (requestIndex == 1) {
+                assertEquals("PATCH", request.method.value)
+                respond(
+                    content = """{
+                        "conversation_id":"conversation-1",
+                        "title":"Judul baru",
+                        "latest_message_preview":"Preview",
+                        "latest_message_role":"ASSISTANT",
+                        "last_verdict":"UNVERIFIED",
+                        "created_at":"2026-09-17T10:00:00Z",
+                        "updated_at":"2026-09-17T10:05:00Z"
+                    }""".trimIndent(),
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                )
+            } else {
+                assertEquals("DELETE", request.method.value)
+                respond(content = "", status = HttpStatusCode.NoContent)
+            }
+        }
+        val dataSource = VerificationRemoteDataSource(
+            httpClient(engine),
+            WaspadAiApiConfig("https://product.example"),
+            StaticAccessTokenProvider("user-token"),
+        )
+
+        assertEquals("Judul baru", dataSource.renameConversation("conversation-1", "Judul baru").title)
+        dataSource.deleteConversation("conversation-1")
+        assertEquals(2, requestIndex)
+    }
+
+    @Test
+    fun `attachment download returns in-memory bytes`() = runTest {
+        val expected = byteArrayOf(1, 2, 3, 4)
+        val engine = MockEngine { request ->
+            assertEquals(
+                "https://product.example/api/v1/conversations/conversation-1/attachments/case-1",
+                request.url.toString(),
+            )
+            respond(
+                content = expected,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Image.PNG.toString()),
+            )
+        }
+        val dataSource = VerificationRemoteDataSource(
+            httpClient(engine),
+            WaspadAiApiConfig("https://product.example"),
+            StaticAccessTokenProvider("user-token"),
+        )
+
+        assertArrayEquals(expected, dataSource.loadConversationAttachment("conversation-1", "case-1"))
     }
 
     private fun httpClient(engine: MockEngine): HttpClient = HttpClient(engine) {

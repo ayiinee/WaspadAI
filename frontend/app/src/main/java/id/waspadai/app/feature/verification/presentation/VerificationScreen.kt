@@ -21,12 +21,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -34,20 +28,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -72,6 +60,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
@@ -93,13 +82,10 @@ import id.waspadai.app.core.trigger.WaspadAIQuickTileService
 import id.waspadai.app.R
 import id.waspadai.app.feature.verification.presentation.component.AnalysisCard
 import id.waspadai.app.feature.verification.presentation.component.FailureNotice
-import id.waspadai.app.feature.verification.presentation.component.HistoryPanel
 import id.waspadai.app.feature.verification.presentation.component.ThinkingBubble
 import id.waspadai.app.feature.verification.presentation.component.UserMessage
 import id.waspadai.app.feature.verification.presentation.component.VerificationComposer
-import id.waspadai.app.feature.verification.presentation.component.VerificationChatHeader
-import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeader
-import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.feature.verification.presentation.component.VerificationChatShell
 import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.ui.theme.WaspadAITheme
 import java.io.ByteArrayOutputStream
@@ -112,8 +98,6 @@ import kotlinx.coroutines.withContext
 fun VerificationRoute(
     viewModel: VerificationViewModel,
     isChatScreen: Boolean = false,
-    onStartConversation: () -> Unit = {},
-    onOpenConversation: (String) -> Unit = {},
     onBackToConversations: () -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
     onCommunityPublished: (String) -> Unit = {},
@@ -128,8 +112,6 @@ fun VerificationRoute(
         state = state,
         onAction = viewModel::onAction,
         isChatScreen = isChatScreen,
-        onStartConversation = onStartConversation,
-        onOpenConversation = onOpenConversation,
         onBackToConversations = onBackToConversations,
         onDestinationSelected = onDestinationSelected,
     )
@@ -140,12 +122,11 @@ fun VerificationScreen(
     state: VerificationUiState,
     onAction: (VerificationAction) -> Unit,
     isChatScreen: Boolean = false,
-    onStartConversation: () -> Unit = {},
-    onOpenConversation: (String) -> Unit = {},
     onBackToConversations: () -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
+    val composerFocusRequester = remember { FocusRequester() }
     var isBottomNavigationVisible by rememberSaveable { mutableStateOf(true) }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -493,9 +474,14 @@ fun VerificationScreen(
         }
     }
 
-    LaunchedEffect(state.conversation.size, state.phase, isChatScreen) {
-        if (isChatScreen && state.conversation.isNotEmpty()) {
+    LaunchedEffect(state.conversation.size, state.phase) {
+        if (state.conversation.isNotEmpty()) {
             listState.animateScrollToItem(state.conversation.lastIndex)
+        }
+    }
+    LaunchedEffect(state.composerFocusRequest) {
+        if (state.composerFocusRequest > 0) {
+            composerFocusRequester.requestFocus()
         }
     }
 
@@ -512,10 +498,6 @@ fun VerificationScreen(
             modifier = composerModifier,
             onValueChange = { onAction(VerificationAction.InputChanged(it)) },
             onSubmit = {
-                if (!isChatScreen) {
-                    onAction(VerificationAction.PrepareNewConversation)
-                    onStartConversation()
-                }
                 onAction(
                     if (state.pendingAttachments.isNotEmpty()) {
                         VerificationAction.SubmitPendingImage
@@ -536,175 +518,20 @@ fun VerificationScreen(
                 onAction(VerificationAction.RequestImageCapture)
                 filePicker.launch(arrayOf("application/pdf"))
             },
+            focusRequester = composerFocusRequester,
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        if (isChatScreen) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                VerificationChatHeader(
-                    title = state.activeConversationTitle,
-                    onBack = onBackToConversations,
-                )
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(
-                        start = contentGutter,
-                        end = contentGutter,
-                        top = 16.dp,
-                        bottom = 16.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    if (state.isConversationLoading) {
-                        item { ThinkingBubble("Memuat percakapan…") }
-                    }
-                    items(state.conversation) { item ->
-                        when (item) {
-                            is VerificationConversationItem.UserMessage -> UserMessage(
-                                text = item.text,
-                                hasAttachment = item.hasAttachment,
-                                attachmentName = item.attachmentName,
-                                attachmentBytes = item.attachmentBytes,
-                                attachmentContentType = item.attachmentContentType,
-                                attachmentGroup = item.attachmentGroup,
-                            )
-                            is VerificationConversationItem.Analysis -> AnalysisCard(
-                                result = item.result,
-                                isSample = item.isSample,
-                                onShareToCommunity = {
-                                    onAction(VerificationAction.RequestCommunityPreview)
-                                },
-                            )
-                        }
-                    }
-                    when (val phase = state.phase) {
-                        VerificationPhase.Validating -> item {
-                            ThinkingBubble("Menyiapkan pemeriksaan…")
-                        }
-                        VerificationPhase.Submitting -> item {
-                            ThinkingBubble("WaspadAI sedang memeriksa…")
-                        }
-                        is VerificationPhase.Failure -> item {
-                            FailureNotice(phase.message) {
-                                onAction(VerificationAction.DismissFailure)
-                            }
-                        }
-                        else -> Unit
-                    }
-                }
-                verificationComposer(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(horizontal = contentGutter, vertical = 10.dp)
-                        .navigationBarsPadding()
-                        .imePadding(),
-                )
-            }
-        } else {
-        Column(modifier = Modifier.fillMaxSize()) {
-            WaspadAiHeader(
-                enabled = !isSubmitting,
-                onOpenQuickAccess = {
-                    assistantRoleHeld = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                        roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
-                    showQuickAccess = true
-                },
-            )
-            verificationComposer(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = contentGutter,
-                        end = contentGutter,
-                        top = 12.dp,
-                        bottom = 10.dp,
-                    ),
-            )
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(
-                    start = contentGutter,
-                    end = contentGutter,
-                    top = 6.dp,
-                    bottom = bottomNavigationPadding + 24.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-            if (state.isHistoryVisible) {
-                item {
-                    HistoryPanel(
-                        items = state.history,
-                        isLoading = state.isHistoryLoading,
-                        onRefresh = { onAction(VerificationAction.RefreshHistory) },
-                        onNewChat = {
-                            onAction(VerificationAction.NewConversation)
-                            onStartConversation()
-                        },
-                        onOpen = onOpenConversation,
-                    )
-                }
-            }
-            if (isChatScreen) {
-            items(state.conversation) { item ->
-                when (item) {
-                    is VerificationConversationItem.UserMessage -> {
-                        UserMessage(
-                            text = item.text,
-                            hasAttachment = item.hasAttachment,
-                            attachmentName = item.attachmentName,
-                            attachmentBytes = item.attachmentBytes,
-                            attachmentContentType = item.attachmentContentType,
-                            attachmentGroup = item.attachmentGroup,
-                        )
-                    }
-                    is VerificationConversationItem.Analysis -> AnalysisCard(
-                        result = item.result,
-                        isSample = item.isSample,
-                        onShareToCommunity = {
-                            onAction(VerificationAction.RequestCommunityPreview)
-                        },
-                    )
-                }
-            }
-            when (val phase = state.phase) {
-                VerificationPhase.Validating -> item { ThinkingBubble("Menyiapkan pemeriksaan…") }
-                VerificationPhase.Submitting -> item { ThinkingBubble("WaspadAI sedang memeriksa…") }
-                is VerificationPhase.Failure -> item {
-                    FailureNotice(phase.message) { onAction(VerificationAction.DismissFailure) }
-                }
-                else -> Unit
-            }
-            item { Spacer(Modifier.padding(bottom = 1.dp)) }
-            }
-            }
-        }
-            AnimatedVisibility(
-                visible = shouldShowBottomNavigation,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(
-                    initialOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = tween(220),
-                ) + fadeIn(animationSpec = tween(160)),
-                exit = slideOutVertically(
-                    targetOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = tween(220),
-                ) + fadeOut(animationSpec = tween(140)),
-            ) {
-                WaspadAIBottomNavigation(
-                    selectedDestination = "Periksa",
-                    onDestinationSelected = onDestinationSelected,
-                )
-            }
-        }
-    }
+    VerificationChatShell(
+        state = state,
+        listState = listState,
+        contentGutter = contentGutter,
+        bottomNavigationPadding = bottomNavigationPadding,
+        showBottomNavigation = shouldShowBottomNavigation,
+        onAction = onAction,
+        onDestinationSelected = onDestinationSelected,
+        composer = verificationComposer,
+    )
 }
 
 @Composable

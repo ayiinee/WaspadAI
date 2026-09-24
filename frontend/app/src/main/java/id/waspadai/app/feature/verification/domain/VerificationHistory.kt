@@ -25,12 +25,24 @@ data class VerificationConversationSummary(
     val updatedAt: String,
 )
 
+data class VerificationConversationPage(
+    val items: List<VerificationConversationSummary>,
+    val nextCursor: String?,
+)
+
+data class VerificationConversationAttachment(
+    val available: Boolean,
+    val contentType: String?,
+    val sizeBytes: Long?,
+)
+
 data class VerificationConversationTurn(
     val caseId: String,
     val inputType: String,
     val inputText: String,
     val createdAt: String,
     val result: VerificationResult,
+    val attachment: VerificationConversationAttachment? = null,
 )
 
 data class VerificationConversationDetail(

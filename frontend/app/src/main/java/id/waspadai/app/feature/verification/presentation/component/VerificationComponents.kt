@@ -57,6 +57,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -421,6 +423,22 @@ private fun SingleAttachmentPreview(
                 .clickable(onClick = onClick),
             contentScale = ContentScale.Fit,
         )
+    } else {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 350.dp)
+                .height(112.dp)
+                .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(SoftBlue),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Preview lampiran tidak tersedia",
+                color = Color(0xFF557383),
+                fontSize = 13.sp,
+            )
+        }
     }
 }
 
@@ -761,6 +779,7 @@ fun VerificationComposer(
     onRemovePendingAttachment: (Int) -> Unit,
     onRequestImageCapture: () -> Unit,
     onRequestFileCapture: () -> Unit,
+    focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     var isAttachmentMenuVisible by remember { mutableStateOf(false) }
@@ -859,7 +878,9 @@ fun VerificationComposer(
             value = value,
             onValueChange = onValueChange,
             enabled = enabled,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier),
             textStyle = TextStyle(color = Ink, fontSize = 15.sp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

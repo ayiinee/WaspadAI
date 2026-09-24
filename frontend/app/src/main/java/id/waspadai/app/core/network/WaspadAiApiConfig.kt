@@ -12,6 +12,9 @@ data class WaspadAiApiConfig(private val baseUrl: String) {
 
     fun conversationDetailUrl(conversationId: String): String = "$conversationsUrl/$conversationId"
 
+    fun conversationAttachmentUrl(conversationId: String, caseId: String): String =
+        "$conversationsUrl/$conversationId/attachments/$caseId"
+
     fun communityPreviewUrl(caseId: String): String = "$historyUrl/$caseId/community-preview"
 
     fun communityPublishUrl(caseId: String): String = "$historyUrl/$caseId/community"
