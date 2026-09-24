@@ -1086,6 +1086,428 @@
         ]
       }
     },
+    "/api/v1/me/profile": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Endpoint",
+        "operationId": "get_profile_endpoint_api_v1_me_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Update Profile Endpoint",
+        "operationId": "update_profile_endpoint_api_v1_me_profile_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/profile/overview": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Overview Endpoint",
+        "operationId": "get_profile_overview_endpoint_api_v1_me_profile_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/profile/verifications": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Verifications Endpoint",
+        "operationId": "get_profile_verifications_endpoint_api_v1_me_profile_verifications_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileVerificationPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/profile/publications": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Publications Endpoint",
+        "operationId": "get_profile_publications_endpoint_api_v1_me_profile_publications_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilePublicationPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/profile/community-activity": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Community Activity Endpoint",
+        "operationId": "get_profile_community_activity_endpoint_api_v1_me_profile_community_activity_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCommunityActivityPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/profile/learning": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Learning Endpoint",
+        "operationId": "get_profile_learning_endpoint_api_v1_me_profile_learning_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileLearningResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/profile/avatar": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get Profile Avatar Endpoint",
+        "operationId": "get_profile_avatar_endpoint_api_v1_me_profile_avatar_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Put Profile Avatar Endpoint",
+        "operationId": "put_profile_avatar_endpoint_api_v1_me_profile_avatar_put",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_put_profile_avatar_endpoint_api_v1_me_profile_avatar_put"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Delete Profile Avatar Endpoint",
+        "operationId": "delete_profile_avatar_endpoint_api_v1_me_profile_avatar_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -1951,6 +2373,20 @@
         "title": "AIResult",
         "description": "Complete validated result returned by the upstream verification service."
       },
+      "Body_put_profile_avatar_endpoint_api_v1_me_profile_avatar_put": {
+        "properties": {
+          "avatar": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Avatar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "avatar"
+        ],
+        "title": "Body_put_profile_avatar_endpoint_api_v1_me_profile_avatar_put"
+      },
       "Body_submit_community_response_endpoint_api_v1_community__case_id__response_post": {
         "properties": {
           "vote": {
@@ -2008,6 +2444,32 @@
           "image"
         ],
         "title": "Body_verify_image_endpoint_api_v1_verifications_image_post"
+      },
+      "CommunityActivityOverview": {
+        "properties": {
+          "assessments": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Assessments"
+          },
+          "evidence_added": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Evidence Added"
+          },
+          "resolved_cases": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Resolved Cases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assessments",
+          "evidence_added",
+          "resolved_cases"
+        ],
+        "title": "CommunityActivityOverview"
       },
       "CommunityBootstrap": {
         "properties": {
@@ -3396,6 +3858,71 @@
         ],
         "title": "LearningModuleItem"
       },
+      "LearningOverview": {
+        "properties": {
+          "total_modules": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Modules"
+          },
+          "completed_modules": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completed Modules"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          },
+          "latest_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Score"
+          },
+          "best_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Score"
+          },
+          "last_activity_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_modules",
+          "completed_modules",
+          "progress_percent"
+        ],
+        "title": "LearningOverview"
+      },
       "LearningProgressItem": {
         "properties": {
           "module_id": {
@@ -3634,6 +4161,434 @@
         "additionalProperties": false,
         "type": "object",
         "title": "PageContext"
+      },
+      "ProfileCommunityActivityItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ASSESSMENT",
+              "CONTRIBUTION"
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "created_at"
+        ],
+        "title": "ProfileCommunityActivityItem"
+      },
+      "ProfileCommunityActivityPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileCommunityActivityItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "title": "ProfileCommunityActivityPage"
+      },
+      "ProfileLearningItem": {
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Module Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "completed_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completed Lessons"
+          },
+          "total_lessons": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Lessons"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          },
+          "latest_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Score"
+          },
+          "best_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Score"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "module_id",
+          "title",
+          "completed_lessons",
+          "total_lessons",
+          "progress_percent"
+        ],
+        "title": "ProfileLearningItem"
+      },
+      "ProfileLearningResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileLearningItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ProfileLearningResponse"
+      },
+      "ProfileOverviewResponse": {
+        "properties": {
+          "verification": {
+            "$ref": "#/components/schemas/VerificationOverview"
+          },
+          "publications": {
+            "$ref": "#/components/schemas/PublicationOverview"
+          },
+          "community_activity": {
+            "$ref": "#/components/schemas/CommunityActivityOverview"
+          },
+          "learning": {
+            "$ref": "#/components/schemas/LearningOverview"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verification",
+          "publications",
+          "community_activity",
+          "learning"
+        ],
+        "title": "ProfileOverviewResponse"
+      },
+      "ProfilePublicationItem": {
+        "properties": {
+          "community_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Community Id"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "community_id",
+          "case_id",
+          "title",
+          "status",
+          "published_at"
+        ],
+        "title": "ProfilePublicationItem"
+      },
+      "ProfilePublicationPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProfilePublicationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "title": "ProfilePublicationPage"
+      },
+      "ProfileResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_id",
+          "display_name",
+          "created_at"
+        ],
+        "title": "ProfileResponse"
+      },
+      "ProfileUpdateRequest": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ProfileUpdateRequest"
+      },
+      "ProfileVerificationItem": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "community_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Community Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "community_state": {
+            "type": "string",
+            "title": "Community State"
+          },
+          "requires_human_review": {
+            "type": "boolean",
+            "title": "Requires Human Review"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "headline",
+          "verdict",
+          "community_state",
+          "requires_human_review",
+          "created_at"
+        ],
+        "title": "ProfileVerificationItem"
+      },
+      "ProfileVerificationPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileVerificationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "title": "ProfileVerificationPage"
+      },
+      "PublicationOverview": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "published_unverified": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Published Unverified"
+          },
+          "verified_evidence": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Verified Evidence"
+          },
+          "withdrawn": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Withdrawn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "published_unverified",
+          "verified_evidence",
+          "withdrawn"
+        ],
+        "title": "PublicationOverview"
       },
       "QuizAttemptAnswer": {
         "properties": {
@@ -3967,6 +4922,44 @@
           "execution_mode"
         ],
         "title": "VerificationEnvelope"
+      },
+      "VerificationOverview": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "private": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Private"
+          },
+          "published_unverified": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Published Unverified"
+          },
+          "verified_evidence": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Verified Evidence"
+          },
+          "withdrawn": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Withdrawn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "private",
+          "published_unverified",
+          "verified_evidence",
+          "withdrawn"
+        ],
+        "title": "VerificationOverview"
       }
     },
     "securitySchemes": {
