@@ -608,12 +608,13 @@ class FloatingVerifyService : Service() {
         selectedImageBytes?.let { bytes ->
             CaptureResultBus.publish(
                 CaptureEvent.Conversation(
-                    imageBytes = bytes,
+                    imageBytes = bytes.copyOf(),
                     contentType = "image/png",
                     fileName = selectedFileName ?: "tanya-area.png",
                     turns = conversation.map { entry ->
                         OverlayChatTurn(entry.isUser, entry.text, entry.result)
                     },
+                    source = TriggerSource.FLOATING_OVERLAY,
                 )
             )
         }

@@ -60,6 +60,7 @@ class VerificationViewModel(
                 )
             )
             is VerificationAction.OverlayConversationReady -> importOverlayConversation(action)
+            is VerificationAction.TextConversationReady -> importTextConversation(action)
             is VerificationAction.OverlayPermissionExpired -> _state.update { current ->
                 current.copy(
                     isOverlayModeEnabled = false,
@@ -94,6 +95,7 @@ class VerificationViewModel(
                 draft = action.text.take(25_000),
                 draftSource = action.source,
                 draftPageContext = action.pageContext,
+                draftSourceUrl = action.sourceUrl,
                 phase = VerificationPhase.Idle,
             )
         }
@@ -104,7 +106,7 @@ class VerificationViewModel(
             imageBytes = action.imageBytes,
             contentType = action.contentType,
             fileName = action.fileName,
-            source = TriggerSource.FLOATING_OVERLAY,
+            source = action.source,
         )
         val imported = buildList<VerificationConversationItem> {
             add(
@@ -136,6 +138,31 @@ class VerificationViewModel(
         }
     }
 
+    private fun importTextConversation(action: VerificationAction.TextConversationReady) {
+        val imported = buildList<VerificationConversationItem> {
+            add(VerificationConversationItem.UserMessage(action.text))
+            action.turns.forEach { turn ->
+                if (turn.isUser) {
+                    add(VerificationConversationItem.UserMessage(turn.text))
+                } else {
+                    turn.result?.let { add(VerificationConversationItem.Analysis(it)) }
+                }
+            }
+        }
+        val latestResult = action.turns.lastOrNull { !it.isUser }?.result
+        _state.update { current ->
+            current.copy(
+                conversation = current.conversation + imported,
+                pendingAttachments = emptyList(),
+                draft = "",
+                draftSource = action.source,
+                draftPageContext = action.pageContext,
+                draftSourceUrl = action.sourceUrl,
+                phase = latestResult?.let(VerificationPhase::Success) ?: VerificationPhase.Idle,
+            )
+        }
+    }
+
     private fun submitText() {
         val text = state.value.draft.trim()
         if (text.length < MINIMUM_TEXT_LENGTH) {
@@ -155,6 +182,7 @@ class VerificationViewModel(
             when (
                 val result = submitTextVerification(
                     text = text,
+                    sourceUrl = state.value.draftSourceUrl,
                     pageContext = state.value.draftPageContext,
                     source = state.value.draftSource,
                 )
@@ -165,6 +193,7 @@ class VerificationViewModel(
                         draft = "",
                         draftSource = TriggerSource.IN_APP,
                         draftPageContext = null,
+                        draftSourceUrl = null,
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
                         phase = VerificationPhase.Success(result.value)
                     )
@@ -220,6 +249,7 @@ class VerificationViewModel(
                         draft = "",
                         draftSource = TriggerSource.IN_APP,
                         draftPageContext = null,
+                        draftSourceUrl = null,
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
                         phase = VerificationPhase.Success(result.value)
                     )
@@ -375,6 +405,7 @@ class VerificationViewModel(
                     draft = "",
                     draftSource = TriggerSource.IN_APP,
                     draftPageContext = null,
+                    draftSourceUrl = null,
                 )
             }
         }

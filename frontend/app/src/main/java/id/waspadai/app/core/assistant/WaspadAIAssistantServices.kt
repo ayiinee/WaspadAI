@@ -17,6 +17,9 @@ import android.view.View
 import android.view.WindowManager
 import androidx.annotation.RequiresApi
 import id.waspadai.app.WaspadAIApplication
+import id.waspadai.app.core.capture.CaptureEvent
+import id.waspadai.app.core.capture.CaptureResultBus
+import id.waspadai.app.core.trigger.TriggerSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -102,6 +105,27 @@ class WaspadAIVoiceSession(context: android.content.Context) : VoiceInteractionS
     }
 
     private fun openFullApp() {
+        when (val handoff = controller.snapshotForApp()) {
+            is AssistantSessionHandoff.Image -> CaptureResultBus.publish(
+                CaptureEvent.Conversation(
+                    imageBytes = handoff.imageBytes,
+                    contentType = "image/png",
+                    fileName = "waspadai-assistant.png",
+                    turns = handoff.turns,
+                    source = TriggerSource.ASSISTANT,
+                )
+            )
+            is AssistantSessionHandoff.Text -> CaptureResultBus.publish(
+                CaptureEvent.TextConversation(
+                    text = handoff.text,
+                    sourceUrl = handoff.sourceUrl,
+                    pageContext = handoff.pageContext,
+                    turns = handoff.turns,
+                    source = TriggerSource.ASSISTANT,
+                )
+            )
+            null -> Unit
+        }
         context.startActivity(
             Intent(context, id.waspadai.app.MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

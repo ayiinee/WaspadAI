@@ -11,6 +11,7 @@ data class VerificationUiState(
     val draft: String = "",
     val draftSource: TriggerSource = TriggerSource.IN_APP,
     val draftPageContext: VerificationPageContext? = null,
+    val draftSourceUrl: String? = null,
     val conversation: List<VerificationConversationItem> = emptyList(),
     val history: List<VerificationHistoryItem> = emptyList(),
     val isHistoryVisible: Boolean = false,

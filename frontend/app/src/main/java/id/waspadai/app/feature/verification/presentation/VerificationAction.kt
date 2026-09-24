@@ -11,6 +11,7 @@ sealed interface VerificationAction {
         val text: String,
         val source: TriggerSource,
         val pageContext: VerificationPageContext? = null,
+        val sourceUrl: String? = null,
     ) : VerificationAction
 
     data object SubmitText : VerificationAction
@@ -57,6 +58,15 @@ sealed interface VerificationAction {
         val contentType: String,
         val fileName: String,
         val turns: List<OverlayChatTurn>,
+        val source: TriggerSource = TriggerSource.FLOATING_OVERLAY,
+    ) : VerificationAction
+
+    data class TextConversationReady(
+        val text: String,
+        val sourceUrl: String?,
+        val pageContext: VerificationPageContext?,
+        val turns: List<OverlayChatTurn>,
+        val source: TriggerSource,
     ) : VerificationAction
 
     data class OverlayPermissionExpired(val message: String) : VerificationAction

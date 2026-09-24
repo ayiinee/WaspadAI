@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -64,6 +65,23 @@ class AssistantVerificationControllerTest {
 
         assertTrue(controller.state.value.phase is AssistantSessionPhase.Closed)
         assertTrue(controller.state.value.conversation.isEmpty())
+    }
+
+    @Test
+    fun `image handoff keeps a safe copy after assistant session is cleared`() = runTest {
+        val controller = AssistantVerificationController(FakeRepository(), this)
+        val selected = byteArrayOf(9, 8, 7, 6)
+        controller.selectImageArea(selected)
+        controller.confirmImage()
+        advanceUntilIdle()
+
+        val handoff = controller.snapshotForApp() as AssistantSessionHandoff.Image
+        controller.clear()
+
+        assertArrayEquals(byteArrayOf(9, 8, 7, 6), handoff.imageBytes)
+        assertEquals(1, handoff.turns.size)
+        assertTrue(handoff.turns.single().result != null)
+        assertArrayEquals(byteArrayOf(0, 0, 0, 0), selected)
     }
 
     private class FakeRepository : VerificationRepository {

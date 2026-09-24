@@ -2,6 +2,7 @@ package id.waspadai.app.core.assistant
 
 import android.graphics.Bitmap
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.core.capture.OverlayChatTurn
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.core.trigger.TriggerSource
 import id.waspadai.app.core.trigger.VerificationPageContext
@@ -35,6 +36,22 @@ data class AssistantSessionState(
     val conversation: List<AssistantConversationTurn> = emptyList(),
     val selectedImagePreview: ByteArray? = null,
 )
+
+sealed interface AssistantSessionHandoff {
+    val turns: List<OverlayChatTurn>
+
+    data class Image(
+        val imageBytes: ByteArray,
+        override val turns: List<OverlayChatTurn>,
+    ) : AssistantSessionHandoff
+
+    data class Text(
+        val text: String,
+        val sourceUrl: String?,
+        val pageContext: VerificationPageContext?,
+        override val turns: List<OverlayChatTurn>,
+    ) : AssistantSessionHandoff
+}
 
 class AssistantVerificationController(
     repository: id.waspadai.app.feature.verification.domain.VerificationRepository,
@@ -122,6 +139,33 @@ class AssistantVerificationController(
     }
 
     fun retryLastSubmission() = submit(lastSubmittedQuestion)
+
+    fun snapshotForApp(): AssistantSessionHandoff? {
+        val turns = mutableState.value.conversation.flatMap { turn ->
+            buildList {
+                turn.question?.let { add(OverlayChatTurn(isUser = true, text = it)) }
+                add(
+                    OverlayChatTurn(
+                        isUser = false,
+                        text = turn.result.narrative,
+                        result = turn.result,
+                    )
+                )
+            }
+        }
+        selectedImageBytes?.let { bytes ->
+            return AssistantSessionHandoff.Image(bytes.copyOf(), turns)
+        }
+        val text = selectedText?.trim().orEmpty()
+        return text.takeIf { it.isNotBlank() }?.let {
+            AssistantSessionHandoff.Text(
+                text = it,
+                sourceUrl = sourceUrl,
+                pageContext = pageContext,
+                turns = turns,
+            )
+        }
+    }
 
     private fun submit(question: String?) {
         if (mutableState.value.phase is AssistantSessionPhase.Submitting) return

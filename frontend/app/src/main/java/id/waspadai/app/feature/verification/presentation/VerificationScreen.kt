@@ -225,6 +225,16 @@ fun VerificationScreen(
                         contentType = event.contentType,
                         fileName = event.fileName,
                         turns = event.turns,
+                        source = event.source,
+                    )
+                )
+                is CaptureEvent.TextConversation -> onAction(
+                    VerificationAction.TextConversationReady(
+                        text = event.text,
+                        sourceUrl = event.sourceUrl,
+                        pageContext = event.pageContext,
+                        turns = event.turns,
+                        source = event.source,
                     )
                 )
                 CaptureEvent.Stopped -> onAction(VerificationAction.OverlayStopped)

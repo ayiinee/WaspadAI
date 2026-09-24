@@ -1,8 +1,11 @@
 package id.waspadai.app.feature.verification.presentation
 
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.core.capture.OverlayChatTurn
 import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.core.trigger.TriggerSource
+import id.waspadai.app.core.trigger.VerificationPageContext
 import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
 import id.waspadai.app.feature.community.domain.CommunityPostStatus
@@ -67,6 +70,61 @@ class VerificationViewModelTest {
         assertEquals(2, viewModel.state.value.conversation.size)
         assertTrue(viewModel.state.value.conversation[0] is VerificationConversationItem.UserMessage)
         assertTrue(viewModel.state.value.conversation[1] is VerificationConversationItem.Analysis)
+    }
+
+    @Test
+    fun `assistant image handoff restores attachment result and source`() {
+        val viewModel = viewModel(FakeRepository())
+        val result = VerificationResult(
+            narrative = "Area ini berisiko.",
+            riskLevel = RiskLevel.HIGH,
+            reasons = emptyList(),
+            recommendedActions = emptyList(),
+        )
+
+        viewModel.onAction(
+            VerificationAction.OverlayConversationReady(
+                imageBytes = byteArrayOf(1, 2, 3),
+                contentType = "image/png",
+                fileName = "waspadai-assistant.png",
+                turns = listOf(OverlayChatTurn(false, result.narrative, result)),
+                source = TriggerSource.ASSISTANT,
+            )
+        )
+
+        val message = viewModel.state.value.conversation.first() as VerificationConversationItem.UserMessage
+        assertEquals(TriggerSource.ASSISTANT, message.attachmentGroup.single().source)
+        assertTrue(viewModel.state.value.conversation.last() is VerificationConversationItem.Analysis)
+        assertTrue(viewModel.state.value.phase is VerificationPhase.Success)
+    }
+
+    @Test
+    fun `assistant text handoff restores context result and page metadata`() {
+        val viewModel = viewModel(FakeRepository())
+        val pageContext = VerificationPageContext(title = "Pesan masuk", before = "Pengirim", after = "Tautan")
+        val result = VerificationResult(
+            narrative = "Pesan meminta OTP.",
+            riskLevel = RiskLevel.HIGH,
+            reasons = emptyList(),
+            recommendedActions = emptyList(),
+        )
+
+        viewModel.onAction(
+            VerificationAction.TextConversationReady(
+                text = "Kirimkan kode OTP sekarang",
+                sourceUrl = "https://example.test/message",
+                pageContext = pageContext,
+                turns = listOf(OverlayChatTurn(false, result.narrative, result)),
+                source = TriggerSource.ASSISTANT,
+            )
+        )
+
+        val message = viewModel.state.value.conversation.first() as VerificationConversationItem.UserMessage
+        assertEquals("Kirimkan kode OTP sekarang", message.text)
+        assertEquals(TriggerSource.ASSISTANT, viewModel.state.value.draftSource)
+        assertEquals(pageContext, viewModel.state.value.draftPageContext)
+        assertEquals("https://example.test/message", viewModel.state.value.draftSourceUrl)
+        assertTrue(viewModel.state.value.phase is VerificationPhase.Success)
     }
 
     @Test
