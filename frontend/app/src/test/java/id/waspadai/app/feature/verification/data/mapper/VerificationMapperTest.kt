@@ -8,6 +8,7 @@ import id.waspadai.app.feature.verification.data.dto.EvidenceDto
 import id.waspadai.app.feature.verification.data.dto.NarrativeDto
 import id.waspadai.app.feature.verification.data.dto.PresentationDto
 import id.waspadai.app.feature.verification.data.dto.RecommendedActionDto
+import id.waspadai.app.feature.verification.data.dto.RulebookDto
 import id.waspadai.app.feature.verification.data.dto.SourceDto
 import id.waspadai.app.feature.verification.data.dto.VerificationResponseDto
 import org.junit.Assert.assertEquals
@@ -39,6 +40,34 @@ class VerificationMapperTest {
         assertThrows(MissingNarrativeException::class.java) {
             mapper.map(VerificationResponseDto())
         }
+    }
+
+    @Test
+    fun `marks non checkable image response as lightweight result`() {
+        val result = mapper.map(
+            VerificationResponseDto(
+                headline = "Gambar tidak memuat klaim yang bisa diperiksa",
+                rulebook = RulebookDto(retrievalMode = "SKIPPED_NON_CHECKABLE_IMAGE"),
+                presentation = PresentationDto(
+                    NarrativeDto(
+                        text = "Gambar ini belum memuat klaim yang bisa diperiksa.",
+                        paragraphs = listOf(
+                            "Gambar ini belum memuat klaim yang bisa diperiksa.",
+                            "Unggah screenshot berita, pesan, poster, dokumen, atau gunakan input teks.",
+                        ),
+                    )
+                ),
+            )
+        )
+
+        assertTrue(result.isNonCheckableImage)
+        assertEquals(
+            listOf(
+                "Gambar ini belum memuat klaim yang bisa diperiksa.",
+                "Unggah screenshot berita, pesan, poster, dokumen, atau gunakan input teks.",
+            ),
+            result.narrativeParagraphs,
+        )
     }
 
     @Test

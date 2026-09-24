@@ -17,12 +17,23 @@ class VerificationMapper {
         val narrative = response.presentation?.narrative?.text?.trim()
             ?.takeIf(String::isNotEmpty)
             ?: throw MissingNarrativeException()
+        val narrativeParagraphs = response.presentation.narrative.paragraphs
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+        val isNonCheckableImage =
+            response.rulebook?.retrievalMode == "SKIPPED_NON_CHECKABLE_IMAGE" ||
+                response.headline.trim().equals(
+                    "Gambar tidak memuat klaim yang bisa diperiksa",
+                    ignoreCase = true,
+                )
         return VerificationResult(
             narrative = narrative,
             riskLevel = RiskLevel.fromWire(response.riskLevel),
             headline = response.headline.trim(),
             verdict = Verdict.fromWire(response.verdict),
             factualStatus = FactualStatus.fromWire(response.dimensions.factualStatus),
+            narrativeParagraphs = narrativeParagraphs,
+            isNonCheckableImage = isNonCheckableImage,
             reasons = response.why.filter(String::isNotBlank),
             recommendedActions = response.recommendedActions.mapNotNull { action ->
                 val title = action.title?.trim().orEmpty()

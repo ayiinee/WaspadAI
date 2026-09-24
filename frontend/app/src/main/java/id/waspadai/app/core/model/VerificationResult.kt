@@ -5,6 +5,8 @@ data class VerificationResult(
     val riskLevel: RiskLevel,
     val reasons: List<String>,
     val recommendedActions: List<String>,
+    val narrativeParagraphs: List<String> = emptyList(),
+    val isNonCheckableImage: Boolean = false,
     val headline: String = "",
     val verdict: Verdict = Verdict.UNKNOWN,
     val factualStatus: FactualStatus = FactualStatus.UNKNOWN,
