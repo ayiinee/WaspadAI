@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     screenshot_retention_hours: int = 24
     max_image_bytes: int = 8_000_000
     community_rag_sync_enabled: bool = False
+    community_evidence_fixture_enabled: bool = False
     debug_enabled: bool = False
 
     @field_validator("*", mode="before")
@@ -73,6 +74,8 @@ class Settings(BaseSettings):
             not self.ai_service_base_url or self.ai_service_api_key is None
         ):
             raise ValueError("remote AI mode requires AI_SERVICE_BASE_URL and AI_SERVICE_API_KEY")
+        if self.app_env == "production" and self.community_evidence_fixture_enabled:
+            raise ValueError("COMMUNITY_EVIDENCE_FIXTURE_ENABLED must be false in production")
         if self.app_env == "production" and (
             not self.supabase_auth_is_configured or not self.database_is_configured
         ):

@@ -2,11 +2,34 @@ from __future__ import annotations
 
 import ipaddress
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.schemas.community import (  # noqa: F401 - compatibility re-exports
+    CommunityBootstrap,
+    CommunityCreator,
+    CommunityDetail,
+    CommunityEvidenceRecord,
+    CommunityEvidenceSource,
+    CommunityItem,
+    CommunityMediaItem,
+    CommunityPage,
+    CommunityPreviewResponse,
+    CommunityPublishRequest,
+    CommunityResponseItem,
+    CommunityResponseResult,
+    CommunitySocialResult,
+    CommunityStateResponse,
+    CommunityUpdateRequest,
+    CommunityUserSummary,
+    CommunityVoteCounts,
+    CommunityVoteRequest,
+    CommunityVoteResult,
+)
+from app.schemas.verification import AIResult
 
 
 class SenderContext(StrEnum):
@@ -108,38 +131,6 @@ class ImageVerificationRequest(BaseModel):
         return value
 
 
-class AIResult(BaseModel):
-    """The Product stores the complete, validated upstream-shaped result."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    request_id: str
-    trace_id: str
-    status: Literal["COMPLETED"]
-    mode: Literal["LIVE"]
-    mode_notice: str
-    input_summary: dict[str, Any]
-    verdict: str
-    risk_level: str
-    dimensions: dict[str, str]
-    headline: str
-    evidence_sufficiency: float
-    evidence_sufficiency_label: str
-    what_checked: list[str]
-    why: list[str]
-    evidence: list[dict[str, Any]]
-    recommended_actions: list[dict[str, Any]]
-    sources: list[dict[str, Any]]
-    uncertainty: str
-    requires_human_review: bool
-    community_status: str
-    privacy_notice: str
-    rulebook: dict[str, Any]
-    pipeline: list[dict[str, Any]]
-    presentation: dict[str, Any]
-    disclaimer: str
-
-
 class HistoryMeta(BaseModel):
     saved: bool
     case_id: UUID | None
@@ -172,91 +163,162 @@ class HistoryPage(BaseModel):
     next_cursor: str | None
 
 
-class CommunityVoteRequest(BaseModel):
+class LearningModuleItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vote: Literal["HOAKS", "WASPADA", "VALID"]
+    module_id: UUID
+    slug: str
+    title: str
+    summary: str
+    difficulty: int = Field(ge=1, le=5)
+    version: int = Field(ge=1)
+    total_lessons: int = Field(ge=0)
+    completed_lessons: int = Field(ge=0)
+    progress_percent: float = Field(ge=0, le=100)
+    topic: str | None = None
+    cover_image_url: str | None = None
 
 
-class CommunityVoteCounts(BaseModel):
+class LearningLesson(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    HOAKS: int = Field(default=0, ge=0)
-    WASPADA: int = Field(default=0, ge=0)
-    VALID: int = Field(default=0, ge=0)
+    lesson_id: UUID
+    title: str
+    body_md: str
+    duration_minutes: int = Field(ge=1)
+    display_order: int = Field(ge=0)
+    completed: bool
 
 
-class CommunityItem(BaseModel):
+class LearningCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     case_id: UUID
     title: str
-    redacted_text: str
-    status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
-    published_at: str
-    counts: CommunityVoteCounts
-    user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None = None
+    description: str
+    reference_url: str | None = None
 
 
-class CommunityPage(BaseModel):
+class LearningMedia(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    items: list[CommunityItem]
-    next_cursor: str | None
-
-
-class CommunityUserSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    assessments_count: int = Field(ge=0)
-    evidence_added_count: int = Field(ge=0)
-    resolved_cases_count: int = Field(ge=0)
-
-
-class CommunityDetail(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    case_id: UUID
+    media_id: UUID
+    media_type: Literal["IMAGE", "YOUTUBE"]
+    url: str
     title: str
-    redacted_text: str
-    status: Literal["PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE"]
-    published_at: str
-    counts: CommunityVoteCounts
-    user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
-    result: AIResult
-    execution_mode: Literal["MOCK", "REMOTE"]
+    alt_text: str = ""
 
 
-class CommunityVoteResult(BaseModel):
+class LearningModuleDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    case_id: UUID
-    user_vote: Literal["HOAKS", "WASPADA", "VALID"] | None
-    counts: CommunityVoteCounts
+    module_id: UUID
+    slug: str
+    title: str
+    summary: str
+    difficulty: int = Field(ge=1, le=5)
+    version: int = Field(ge=1)
+    total_lessons: int = Field(ge=0)
+    completed_lessons: int = Field(ge=0)
+    progress_percent: float = Field(ge=0, le=100)
+    lessons: list[LearningLesson]
+    topic: str | None = None
+    cover_image_url: str | None = None
+    cases: list[LearningCase] = Field(default_factory=list)
+    media: list[LearningMedia] = Field(default_factory=list)
 
 
-class CommunityPreviewResponse(BaseModel):
+class LessonCompleteResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    preview_id: UUID
-    expires_at: str
-    redacted_text: str
-    redacted_image_url: str | None
-    redactions: list[str]
-    confirmation_required: Literal[True] = True
+    lesson_id: UUID
+    module_id: UUID
+    completed: Literal[True] = True
+    completed_at: str
+    progress_percent: float = Field(ge=0, le=100)
 
 
-class CommunityPublishRequest(BaseModel):
+class QuizOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    preview_id: UUID
-    publication_consent: Literal[True]
-    rag_reuse_consent: bool = False
+    option_id: UUID
+    text: str
 
 
-class CommunityStateResponse(BaseModel):
+class QuizQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    case_id: UUID
-    community_state: Literal["PRIVATE", "PUBLISHED_UNVERIFIED", "VERIFIED_EVIDENCE", "WITHDRAWN"]
-    revision: int = Field(ge=1)
+    question_id: UUID
+    text: str
+    options: list[QuizOption]
+
+
+class LearningQuiz(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: UUID
+    module_version: int = Field(ge=1)
+    questions: list[QuizQuestion]
+
+
+class QuizAttemptAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: UUID
+    selected_option_id: UUID
+
+
+class QuizAttemptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_version: int = Field(ge=1)
+    answers: list[QuizAttemptAnswer] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def reject_duplicate_questions(self) -> QuizAttemptRequest:
+        question_ids = [answer.question_id for answer in self.answers]
+        if len(set(question_ids)) != len(question_ids):
+            raise ValueError("answers must contain each question at most once")
+        return self
+
+
+class QuizQuestionFeedback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_id: UUID
+    selected_option_id: UUID
+    correct_option_id: UUID | None = None
+    correct: bool
+    explanation: str
+
+
+class QuizAttemptResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attempt_id: UUID
+    score: float = Field(ge=0, le=100)
+    correct_answers: int = Field(ge=0)
+    total_questions: int = Field(ge=1)
+    feedback: list[QuizQuestionFeedback]
+
+
+class LearningProgressItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: UUID
+    completed_lessons: int = Field(ge=0)
+    total_lessons: int = Field(ge=0)
+    progress_percent: float = Field(ge=0, le=100)
+    latest_score: float | None = Field(default=None, ge=0, le=100)
+    best_score: float | None = Field(default=None, ge=0, le=100)
+    latest_correct_answers: int | None = Field(default=None, ge=0)
+    latest_total_questions: int | None = Field(default=None, ge=1)
+    updated_at: str
+    first_opened_at: str | None = None
+    last_opened_at: str | None = None
+
+
+class LearningProgressResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[LearningProgressItem]

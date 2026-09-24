@@ -27,6 +27,10 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
 
+[auth.email.template.recovery]
+subject = "Kode pemulihan akun WaspadAI"
+content_path = "./supabase/templates/recovery.html"
+
 [storage]
 enabled = true
 file_size_limit = "8MB"

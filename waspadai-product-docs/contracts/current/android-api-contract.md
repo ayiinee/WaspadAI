@@ -383,6 +383,8 @@ Community publication dikelola Product Backend. WaspadAI tidak mengakses endpoin
 ini dan tidak menulis ke database community.
 
 Kasus baru selalu privat. Tidak ada publikasi otomatis.
+Tombol publikasi hanya ditampilkan untuk hasil dengan `risk_level=UNKNOWN`
+(`Belum diketahui`). Backend menerapkan aturan yang sama saat membuat preview.
 
 ### 8.1 Membuat Preview Redaksi
 
@@ -419,7 +421,8 @@ Request final:
 {
   "preview_id": "preview_01example",
   "publication_consent": true,
-  "rag_reuse_consent": true
+  "rag_reuse_consent": true,
+  "caption": "Mohon bantu cek informasi yang beredar ini."
 }
 ```
 
@@ -429,6 +432,7 @@ Makna consent:
 | --- | --- |
 | `publication_consent` | Pengguna setuju konten sanitized tampil di komunitas. |
 | `rag_reuse_consent` | Pengguna setuju konten sanitized dipakai ulang sebagai kandidat evidence AI setelah dimoderasi. |
+| `caption` | Caption wajib, 1–5000 karakter, yang ditampilkan sebagai teks postingan. |
 
 Kedua consent harus eksplisit dan terpisah. Publikasi komunitas tidak otomatis
 menjadi izin reuse oleh AI.
@@ -438,16 +442,52 @@ Jika `publication_consent=false`, backend menolak request publikasi. Jika
 di community setelah validasi product, tetapi tidak pernah boleh dikirim ke
 WaspadAI sebagai community evidence.
 
+Response sukses mengembalikan entity community final, bukan `history_id`,
+`case_id`, atau `preview_id` sebagai ID navigasi:
+
+```json
+{
+  "id": "<community_id>",
+  "case_id": "<legacy_history_case_id>",
+  "creator": {"display_name": "Olivia", "is_current_user": true},
+  "media": [],
+  "published_at": "2026-09-23T01:00:00Z",
+  "like_count": 0,
+  "comment_count": 0
+}
+```
+
+Android wajib memasukkan object ini ke shared feed state, menavigasi dengan
+`id`, lalu membuka detail tanpa menunggu GET feed berikutnya. `case_id` hanya
+dipertahankan untuk kompatibilitas history lama.
+
 ### 8.3 Menarik Kasus
 
 ```http
 DELETE /api/v1/history/{case_id}/community
 ```
 
-Pemilik dapat menarik kasus selama belum berstatus `VERIFIED_EVIDENCE`.
+Pemilik dapat menarik postingannya pada kedua status publik. Penarikan bersifat
+soft-withdraw agar record audit tetap tersedia.
 Response `200` mengembalikan `CommunityStateResponse` dengan `community_state`
 `WITHDRAWN`. Pengulangan request withdrawal mengembalikan state dan revision yang
 sama. Withdrawal mencabut consent `COMMUNITY_PUBLICATION` dan `RAG_REUSE` terkait.
+
+### 8.4 Mengedit Caption
+
+```http
+PATCH /api/v1/community/{community_id}
+Content-Type: application/json
+```
+
+```json
+{"caption": "Caption yang sudah diperbarui."}
+```
+
+Hanya pemilik yang dapat mengedit caption. Caption wajib berisi 1–5000 karakter.
+Response sukses adalah `CommunityItem` terbaru dan backend menyiarkan event
+WebSocket `community.updated`. Perubahan hanya menyentuh caption publik; hasil
+verifikasi dan record audit tidak diubah.
 
 ## 9. Community Feed Dan Voting
 
@@ -455,10 +495,48 @@ Endpoint Product Backend:
 
 ```http
 GET    /api/v1/community?limit=20&cursor=<opaque_cursor>
-GET    /api/v1/community/{case_id}
-POST   /api/v1/community/{case_id}/vote
-DELETE /api/v1/community/{case_id}/vote
+GET    /api/v1/community/{community_id}
+PATCH  /api/v1/community/{community_id}
+POST   /api/v1/community/{community_id}/vote
+DELETE /api/v1/community/{community_id}/vote
+POST   /api/v1/community/{community_id}/like
+DELETE /api/v1/community/{community_id}/like
+POST   /api/v1/community/{community_id}/response
+WS     /api/v1/community/ws?access_token=<access_token>
 ```
+
+`creator.display_name` selalu berisi display name profil, termasuk untuk post
+milik pengguna sendiri. Kepemilikan ditentukan oleh `creator.is_current_user`,
+bukan dengan mengganti nama menjadi `Anda`.
+
+Like terhadap postingan sendiri diperbolehkan. Database tetap menjamin tepat
+satu like aktif melalui primary/unique key `(post_id, user_id)`. Larangan owner
+hanya berlaku untuk vote/response (`CANNOT_RESPOND_OWN_POST`).
+
+Feed dan detail memakai `media` sebagai struktur gambar kanonik (maksimal empat,
+berurutan berdasarkan `position`). `has_image` dan `image_url` tetap tersedia
+sementara untuk kompatibilitas client single-image lama.
+
+```json
+{
+  "has_image": true,
+  "image_url": "/api/v1/community/<community_id>/media/<media_id>",
+  "media": [
+    {
+      "id": "<media_id>",
+      "media_type": "IMAGE",
+      "url": "/api/v1/community/<community_id>/media/<media_id>",
+      "thumbnail_url": null,
+      "width": 1080,
+      "height": 1350,
+      "position": 0
+    }
+  ]
+}
+```
+
+URL media memerlukan bearer token yang sama dengan feed. Client harus memakai
+`id + url` sebagai cache identity dan tidak menambahkan cache-busting query.
 
 Vote request:
 
@@ -488,6 +566,21 @@ Aturan vote:
 - jumlah vote tidak boleh otomatis membuat kasus menjadi evidence terverifikasi.
 
 Hanya moderator/admin yang boleh menetapkan `VERIFIED_EVIDENCE`.
+
+Aturan interaksi sosial:
+
+- pemilik boleh like dan unlike postingannya sendiri;
+- primary key `(post_id, user_id)` menjamin satu like aktif per user/post;
+- pemilik tidak boleh mengirim response terhadap postingannya sendiri;
+- backend mengembalikan `403 CANNOT_RESPOND_OWN_POST` untuk self-response;
+- validasi ownership wajib dilakukan sebelum optional evidence di-upload.
+
+WebSocket adalah sinkronisasi realtime single-process tanpa Redis. Event yang
+didukung: `community.created`, `community.like.updated`,
+`community.comment.created`, `community.response.created`, dan
+`community.poll.updated`. Event `community.created` membawa object post lengkap
+agar client lain dapat prepend tanpa GET feed ulang. Deployment multi-worker
+memerlukan message broker eksternal dan berada di luar kontrak MVP ini.
 
 ## 10. Error Envelope
 

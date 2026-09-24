@@ -9,9 +9,13 @@ plugins {
 }
 
 val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) {
-        file.inputStream().use { input -> load(input) }
+    listOf(
+        rootProject.file("../.env"),
+        rootProject.file("local.properties"),
+    ).forEach { file ->
+        if (file.exists()) {
+            file.inputStream().use { input -> load(input) }
+        }
     }
 }
 
@@ -38,13 +42,28 @@ android {
         buildConfigField(
             "String",
             "WASPADAI_API_BASE_URL",
-            buildConfigString(publicConfig("WASPADAI_API_BASE_URL", "http://127.0.0.1:8001"))
+            buildConfigString(publicConfig("WASPADAI_API_BASE_URL", "http://10.0.2.2:8001"))
         )
         buildConfigField("boolean", "WASPADAI_REMOTE_ENABLED", publicConfig("WASPADAI_REMOTE_ENABLED", "true"))
         buildConfigField(
             "String",
             "WASPADAI_SUPABASE_ACCESS_TOKEN",
             buildConfigString(publicConfig("WASPADAI_SUPABASE_ACCESS_TOKEN"))
+        )
+        buildConfigField(
+            "String",
+            "WASPADAI_SUPABASE_URL",
+            buildConfigString(publicConfig("WASPADAI_SUPABASE_URL", publicConfig("SUPABASE_URL")))
+        )
+        buildConfigField(
+            "String",
+            "WASPADAI_SUPABASE_PUBLISHABLE_KEY",
+            buildConfigString(
+                publicConfig(
+                    "WASPADAI_SUPABASE_PUBLISHABLE_KEY",
+                    publicConfig("SUPABASE_PUBLISHABLE_KEY")
+                )
+            )
         )
     }
 
@@ -70,6 +89,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -81,6 +101,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.kotlinx.serialization.json)
@@ -91,6 +112,9 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.ktor3)
+    implementation(libs.markdown.renderer)
+    implementation(libs.markdown.renderer.m3)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

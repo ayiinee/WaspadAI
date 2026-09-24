@@ -27,7 +27,26 @@ def test_production_requires_auth_and_database() -> None:
             ai_service_mode="remote",
             ai_service_base_url="https://example.invalid",
             ai_service_api_key="test-key",
+            community_evidence_fixture_enabled=False,
             supabase_url=None,
             supabase_publishable_key=None,
             database_url=None,
+        )
+
+
+def test_production_rejects_community_evidence_fixture() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="COMMUNITY_EVIDENCE_FIXTURE_ENABLED must be false",
+    ):
+        Settings(
+            _env_file=None,
+            app_env="production",
+            ai_service_mode="remote",
+            ai_service_base_url="https://example.invalid",
+            ai_service_api_key="test-key",
+            supabase_url="https://example.supabase.co",
+            supabase_publishable_key="test-publishable-key",
+            database_url="postgresql://example",
+            community_evidence_fixture_enabled=True,
         )

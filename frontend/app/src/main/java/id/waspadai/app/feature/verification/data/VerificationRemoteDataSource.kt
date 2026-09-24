@@ -3,10 +3,13 @@ package id.waspadai.app.feature.verification.data
 import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.verification.data.dto.ErrorEnvelopeDto
 import id.waspadai.app.feature.verification.data.dto.HistoryPageDto
+import id.waspadai.app.feature.verification.data.dto.PageContextDto
 import id.waspadai.app.feature.verification.data.dto.TextVerificationRequestDto
 import id.waspadai.app.feature.verification.data.dto.VerificationEnvelopeDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
@@ -15,6 +18,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
@@ -26,14 +30,57 @@ class VerificationRemoteDataSource(
     private val config: WaspadAiApiConfig,
     private val tokenProvider: AccessTokenProvider,
 ) {
-    suspend fun submitText(text: String): VerificationEnvelopeDto {
+    suspend fun submitText(
+        text: String,
+        question: String? = null,
+        sourceUrl: String? = null,
+        senderContext: String = "UNKNOWN",
+        pageContext: id.waspadai.app.core.trigger.VerificationPageContext? = null,
+    ): VerificationEnvelopeDto {
         val idempotencyKey = UUID.randomUUID().toString()
         val accessToken = requireAccessToken()
-        var response = postText(text, accessToken, idempotencyKey)
+        val payload = TextVerificationRequestDto(
+            text = text,
+            question = question,
+            sourceUrl = sourceUrl,
+            senderContext = senderContext,
+            pageContext = pageContext?.let {
+                PageContextDto(title = it.title, before = it.before, after = it.after)
+            },
+        )
+        var response = postText(payload, accessToken, idempotencyKey)
         if (response.status == HttpStatusCode.Unauthorized) {
             val refreshedToken = tokenProvider.refreshAccessToken()
             if (!refreshedToken.isNullOrBlank()) {
-                response = postText(text, refreshedToken, idempotencyKey)
+                response = postText(payload, refreshedToken, idempotencyKey)
+            }
+        }
+        if (!response.status.isSuccess()) {
+            throw VerificationApiException(response.status, response.safeError())
+        }
+        return response.body()
+    }
+
+    suspend fun submitImage(
+        imageBytes: ByteArray,
+        contentType: String,
+        fileName: String,
+        question: String?,
+    ): VerificationEnvelopeDto {
+        val idempotencyKey = UUID.randomUUID().toString()
+        val accessToken = requireAccessToken()
+        var response = postImage(imageBytes, contentType, fileName, question, accessToken, idempotencyKey)
+        if (response.status == HttpStatusCode.Unauthorized) {
+            val refreshedToken = tokenProvider.refreshAccessToken()
+            if (!refreshedToken.isNullOrBlank()) {
+                response = postImage(
+                    imageBytes,
+                    contentType,
+                    fileName,
+                    question,
+                    refreshedToken,
+                    idempotencyKey,
+                )
             }
         }
         if (!response.status.isSuccess()) {
@@ -43,7 +90,7 @@ class VerificationRemoteDataSource(
     }
 
     private suspend fun postText(
-        text: String,
+        payload: TextVerificationRequestDto,
         accessToken: String,
         idempotencyKey: String,
     ): HttpResponse = client.post(config.textVerificationUrl) {
@@ -53,8 +100,43 @@ class VerificationRemoteDataSource(
                 append("Idempotency-Key", idempotencyKey)
             }
             accept(ContentType.Application.Json)
-            setBody(TextVerificationRequestDto(text = text))
+            setBody(payload)
         }
+
+    private suspend fun postImage(
+        imageBytes: ByteArray,
+        contentType: String,
+        fileName: String,
+        question: String?,
+        accessToken: String,
+        idempotencyKey: String,
+    ): HttpResponse = client.post(config.imageVerificationUrl) {
+        headers {
+            append(HttpHeaders.Authorization, "Bearer $accessToken")
+            append("Idempotency-Key", idempotencyKey)
+        }
+        accept(ContentType.Application.Json)
+        setBody(
+            MultiPartFormDataContent(
+                formData {
+                    append(
+                        key = "image",
+                        value = imageBytes,
+                        headers = Headers.build {
+                            append(HttpHeaders.ContentType, contentType)
+                            append(
+                                HttpHeaders.ContentDisposition,
+                                "form-data; name=\"image\"; filename=\"$fileName\""
+                            )
+                        },
+                    )
+                    question?.takeIf(String::isNotBlank)?.let { value ->
+                        append("question", value)
+                    }
+                }
+            )
+        )
+    }
 
     private suspend fun HttpResponse.safeError(): ProductApiError? {
         val rawBody = runCatching { bodyAsText() }.getOrNull() ?: return null

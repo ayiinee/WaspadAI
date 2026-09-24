@@ -80,10 +80,12 @@ async def open_single_connection_pool(dsn: str) -> AsyncConnectionPool:
     await pool.open(wait=True)
     return pool
 
+
 async def _reset_connection(connection: psycopg.AsyncConnection) -> None:
     await connection.execute("RESET ALL")
     if not connection.autocommit:
         await connection.rollback()
+
 
 async def set_test_claim(connection: psycopg.AsyncConnection, user_id: UUID) -> None:
     # Match the Product backend's transaction-local claim mechanism.
@@ -193,7 +195,6 @@ def test_private_operation_rls_and_claim_reset(live_config: LiveConfig) -> None:
                         (operation_id,),
                     )
                     assert await cursor.fetchone() is None
-
 
             # max_size=1 reuses the pooled client connection. The transaction-local
             # claim itself must not survive; auth.uid() is intentionally exercised
@@ -430,3 +431,105 @@ def test_backend_health_and_readiness(
         if os.name == "nt":
             asyncio.set_event_loop_policy(prior_policy)
         get_settings.cache_clear()
+
+
+def test_published_community_is_shared_and_social_is_idempotent(
+    live_config: LiveConfig,
+) -> None:
+    """User B can see A's case, like once, and submit a shared response."""
+
+    async def check() -> None:
+        pool = await open_single_connection_pool(live_config.database_url)
+        try:
+            case_id = uuid4()
+            operation_id = uuid4()
+            post_id = uuid4()
+            publication_consent_id = uuid4()
+            content_hash = "f" * 64
+            async with pool.connection() as connection:
+                async with connection.transaction(force_rollback=True):
+                    await set_test_claim(connection, live_config.user_a)
+                    await connection.execute(
+                        """insert into private.request_operations
+                           (id, user_id, route_key, idempotency_key, payload_hash,
+                            state, persistence_state, expires_at)
+                           values (%s, %s, 'community-cross-user', %s, %s,
+                                   'COMPLETED', 'SAVED', now() + interval '1 hour')""",
+                        (operation_id, live_config.user_a, uuid4(), content_hash),
+                    )
+                    await connection.execute(
+                        """insert into public.verification_cases
+                           (id, user_id, operation_id, product_request_id, input_type,
+                            input_source, sanitized_text, input_hash, headline, verdict,
+                            risk_level, requires_human_review, save_reason, community_state,
+                            retention_expires_at)
+                           values (%s, %s, %s, %s, 'TEXT', 'MANUAL', 'Shared case', %s,
+                                   'Shared case', 'UNVERIFIED', 'LOW', false, 'UNVERIFIED',
+                                   'PUBLISHED_UNVERIFIED', now() + interval '1 day')""",
+                        (case_id, live_config.user_a, operation_id, uuid4(), content_hash, ),
+                    )
+                    await connection.execute(
+                        """insert into public.verification_results
+                           (case_id, factual_status, source_authenticity, sender_identity,
+                            channel_status, scam_risk, content_authenticity, result_json,
+                            execution_mode)
+                           values (%s, 'UNVERIFIED', 'UNVERIFIED', 'UNVERIFIED',
+                                   'UNVERIFIED', 'LOW', 'NOT_APPLICABLE', %s, 'MOCK')""",
+                        (case_id, json.dumps({"fixture": True})),
+                    )
+                    await connection.execute(
+                        """insert into private.consent_records
+                           (id, user_id, scope, case_id, content_hash, policy_version)
+                           values (%s, %s, 'COMMUNITY_PUBLICATION', %s, %s, 'live-test')""",
+                        (publication_consent_id, live_config.user_a, case_id, content_hash),
+                    )
+                    await connection.execute(
+                        """insert into public.community_posts
+                           (id, case_id, owner_id, title, redacted_text, status,
+                            publication_consent_id, content_hash, revision)
+                           values (%s, %s, %s, 'Shared case', 'Shared case body',
+                                   'PUBLISHED_UNVERIFIED', %s, %s, 1)""",
+                        (post_id, case_id, live_config.user_a, publication_consent_id, content_hash),
+                    )
+
+                    await set_test_claim(connection, live_config.user_b)
+                    visible = await connection.execute(
+                        """select p.case_id from public.community_posts p
+                            join public.verification_results r on r.case_id = p.case_id
+                           where p.case_id = %s and p.status = 'PUBLISHED_UNVERIFIED'
+                             and p.withdrawn_at is null""",
+                        (case_id,),
+                    )
+                    assert await visible.fetchone() == (case_id,)
+                    await connection.execute(
+                        """insert into public.community_likes(post_id, user_id)
+                           values (%s, %s) on conflict do nothing""",
+                        (post_id, live_config.user_b),
+                    )
+                    await connection.execute(
+                        """insert into public.community_likes(post_id, user_id)
+                           values (%s, %s) on conflict do nothing""",
+                        (post_id, live_config.user_b),
+                    )
+                    like_count = await connection.execute(
+                        "select count(*) from public.community_likes where post_id = %s",
+                        (post_id,),
+                    )
+                    assert await like_count.fetchone() == (1,)
+                    await connection.execute(
+                        """insert into public.community_votes(post_id, user_id, vote, reasoning)
+                           values (%s, %s, 'VALID', 'Response from another user')
+                           on conflict (post_id, user_id) do update
+                           set vote = excluded.vote, reasoning = excluded.reasoning""",
+                        (post_id, live_config.user_b),
+                    )
+                    await set_test_claim(connection, live_config.user_a)
+                    response = await connection.execute(
+                        "select user_id from public.community_votes where post_id = %s",
+                        (post_id,),
+                    )
+                    assert (live_config.user_b,) in await response.fetchall()
+        finally:
+            await pool.close()
+
+    run_async(check())

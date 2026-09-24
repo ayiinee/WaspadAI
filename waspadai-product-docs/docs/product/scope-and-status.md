@@ -7,6 +7,10 @@ Status: `CURRENT`.
 | Supabase Auth | Android mengirim Bearer token ke Product API | Auth validation tersedia |
 | Verifikasi teks | `POST /api/v1/verifications/text`, `Idempotency-Key` wajib | `PARTIAL_RUNTIME`: MOCK dan adapter remote tersedia; live deployment belum diuji |
 | Verifikasi screenshot | `POST /api/v1/verifications/image` | `PARTIAL_RUNTIME`: multipart, batas ukuran, signature, MOCK, dan adapter remote tersedia; dimensi penuh/live deployment belum diuji |
+| Default Digital Assistant | `VoiceInteractionService` + `VoiceInteractionSession`, opt-in role | `PARTIAL_RUNTIME`: implementation dan preview/submit tersedia; matrix device/OEM belum dijalankan |
+| Share Sheet | Text, satu gambar, atau maksimal lima gambar | Tersedia; selalu diarahkan ke preview |
+| Quick Settings capture | One-shot MediaProjection per consent | Tersedia; Android 14+/OEM masih perlu device test |
+| Floating Verify | Fallback opsional, nonaktif secara default | Tersedia dari menu Akses Cepat |
 | Response Product | Wrapper `history`, `result`, `execution_mode` | Tersedia pada text slice |
 | History list/detail | Product API + database owner-only | Tersedia |
 | Community preview/feed/vote/withdrawal | Product API + database/Storage | `PARTIAL_RUNTIME`: preview, publication, feed, detail, vote klasifikasi, dan withdrawal tersedia; integration Supabase masih perlu dijalankan |
@@ -22,4 +26,6 @@ Schema migration tidak sama dengan fitur runtime. Tabel community, consent, mode
 - `X-Waspadai-API-Key`, database credential, dan service-role key tidak boleh berada di APK.
 - WaspadAI tidak menerima credential Supabase dan tidak mengakses database Product.
 - Community evidence kosong adalah kondisi valid; backend tidak boleh menurunkan gate agar mendapatkan hasil.
+- Accessibility Service dan shortcut tombol volume tidak termasuk manifest MVP.
+- Assistant tidak meminta izin mikrofon, tidak berjalan dari lock screen, dan tidak melewati `FLAG_SECURE`.
 

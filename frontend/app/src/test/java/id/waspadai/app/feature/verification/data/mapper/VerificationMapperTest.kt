@@ -1,12 +1,18 @@
 package id.waspadai.app.feature.verification.data.mapper
 
 import id.waspadai.app.core.model.RiskLevel
+import id.waspadai.app.core.model.FactualStatus
+import id.waspadai.app.core.model.Verdict
+import id.waspadai.app.feature.verification.data.dto.AssessmentDimensionsDto
+import id.waspadai.app.feature.verification.data.dto.EvidenceDto
 import id.waspadai.app.feature.verification.data.dto.NarrativeDto
 import id.waspadai.app.feature.verification.data.dto.PresentationDto
 import id.waspadai.app.feature.verification.data.dto.RecommendedActionDto
+import id.waspadai.app.feature.verification.data.dto.SourceDto
 import id.waspadai.app.feature.verification.data.dto.VerificationResponseDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VerificationMapperTest {
@@ -33,5 +39,42 @@ class VerificationMapperTest {
         assertThrows(MissingNarrativeException::class.java) {
             mapper.map(VerificationResponseDto())
         }
+    }
+
+    @Test
+    fun `maps complete critical response and ignores unsafe source urls`() {
+        val result = mapper.map(
+            VerificationResponseDto(
+                headline = "Peringatan penipuan",
+                verdict = "REFUTED",
+                riskLevel = "CRITICAL",
+                dimensions = AssessmentDimensionsDto(factualStatus = "MISLEADING"),
+                evidence = listOf(
+                    EvidenceDto(
+                        publisher = "Cek Fakta",
+                        title = "Klaim dibantah",
+                        url = "https://example.org/fact",
+                        excerpt = "Tidak ada program resmi tersebut.",
+                        stance = "CONTRADICTS",
+                        verificationStatus = "VERIFIED",
+                    )
+                ),
+                sources = listOf(
+                    SourceDto("Resmi", "Pengumuman", "https://example.org/source"),
+                    SourceDto("Tidak aman", "Lokal", "file:///data/private"),
+                ),
+                uncertainty = "Identitas pengirim belum diketahui.",
+                requiresHumanReview = true,
+                disclaimer = "Gunakan sumber resmi.",
+                presentation = PresentationDto(NarrativeDto("Jangan ikuti instruksi pengirim.")),
+            )
+        )
+
+        assertEquals(RiskLevel.CRITICAL, result.riskLevel)
+        assertEquals(Verdict.REFUTED, result.verdict)
+        assertEquals(FactualStatus.MISLEADING, result.factualStatus)
+        assertEquals(1, result.evidence.size)
+        assertEquals(1, result.sources.size)
+        assertTrue(result.requiresHumanReview)
     }
 }

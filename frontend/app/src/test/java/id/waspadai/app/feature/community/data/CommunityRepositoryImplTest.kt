@@ -1,0 +1,219 @@
+package id.waspadai.app.feature.community.data
+
+import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.core.network.WaspadAiApiConfig
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
+import io.ktor.http.content.TextContent
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CommunityRepositoryImplTest {
+    @Test
+    fun `forced refresh requests a backend-recorded fresh snapshot`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals(
+                "https://api.example.test/api/v1/community/bootstrap?refresh=true",
+                request.url.toString(),
+            )
+            respond(
+                """
+                {
+                  "summary":{"assessments_count":0,"evidence_added_count":0,"resolved_cases_count":0},
+                  "feed":{"items":[],"next_cursor":null}
+                }
+                """.trimIndent(),
+                headers = jsonHeaders(),
+            )
+        })
+
+        val result = repository.loadCommunity(
+            baseUrl = "https://api.example.test",
+            accessToken = "token",
+            forceRefresh = true,
+        )
+
+        assertTrue(result is AppResult.Success)
+    }
+
+    @Test
+    fun `feed maps one to four ordered media with absolute stable URLs`() = runTest {
+        for (count in 1..4) {
+            val mediaJson = (0 until count).joinToString(",") { index ->
+                """{"id":"media-$index","url":"/api/v1/community/case-1/media/media-$index","position":$index}"""
+            }
+            val repository = repositoryWith(MockEngine {
+                respond(
+                    """
+                    {
+                      "summary":{"assessments_count":0,"evidence_added_count":0,"resolved_cases_count":0},
+                      "feed":{"items":[{
+                        "case_id":"case-1","title":"Kasus","redacted_text":"Aman",
+                        "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-22T00:00:00Z",
+                        "has_image":true,"counts":{},"media":[$mediaJson]
+                      }],"next_cursor":null}
+                    }
+                    """.trimIndent(),
+                    headers = jsonHeaders(),
+                )
+            })
+
+            val result = repository.loadCommunity("https://api.example.test", "token")
+            val post = (result as AppResult.Success).value.posts.single()
+            assertEquals(count, post.media.size)
+            assertEquals(
+                "https://api.example.test/api/v1/community/case-1/media/media-0",
+                post.media.first().url,
+            )
+        }
+    }
+
+    @Test
+    fun `request preview sends authenticated case endpoint`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals(
+                "https://api.example.test/api/v1/history/case-1/community-preview",
+                request.url.toString(),
+            )
+            assertEquals("Bearer token", request.headers[HttpHeaders.Authorization])
+            respond(
+                """
+                {
+                  "preview_id": "preview-1",
+                  "expires_at": "2026-09-18T12:00:00Z",
+                  "redacted_text": "Pesan aman.",
+                  "redacted_image_url": null,
+                  "redactions": [],
+                  "confirmation_required": true
+                }
+                """.trimIndent(),
+                headers = jsonHeaders(),
+            )
+        })
+
+        val result = repository.requestPreview(
+            baseUrl = "https://api.example.test/",
+            accessToken = "token",
+            caseId = "case-1",
+        )
+
+        assertTrue(result is AppResult.Success)
+        assertEquals("preview-1", (result as AppResult.Success).value.previewId)
+    }
+
+    @Test
+    fun `publish sends both publication and rag consent`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals(
+                "https://api.example.test/api/v1/history/case-1/community",
+                request.url.toString(),
+            )
+            assertEquals("Bearer token", request.headers[HttpHeaders.Authorization])
+            val requestBody = Json.parseToJsonElement(
+                (request.body as TextContent).text
+            ).jsonObject
+            assertEquals("preview-1", requestBody["preview_id"]?.jsonPrimitive?.content)
+            assertEquals("true", requestBody["publication_consent"]?.jsonPrimitive?.content)
+            assertEquals("true", requestBody["rag_reuse_consent"]?.jsonPrimitive?.content)
+            assertEquals("Caption pengguna", requestBody["caption"]?.jsonPrimitive?.content)
+            respond(
+                """
+                {
+                  "id": "community-1",
+                  "case_id": "case-1",
+                  "creator": {"display_name":"Olivia","is_current_user":true},
+                  "title":"Kasus","redacted_text":"Aman",
+                  "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-22T00:00:00Z",
+                  "counts":{},"media":[]
+                }
+                """.trimIndent(),
+                headers = jsonHeaders(),
+            )
+        })
+
+        val result = repository.publishCase(
+            baseUrl = "https://api.example.test/",
+            accessToken = "token",
+            caseId = "case-1",
+            previewId = "preview-1",
+            ragReuseConsent = true,
+            caption = "Caption pengguna",
+        )
+
+        assertTrue(result is AppResult.Success)
+        assertEquals("community-1", (result as AppResult.Success).value.caseId)
+        assertEquals("case-1", result.value.historyCaseId)
+        assertTrue(result.value.isOwner)
+        assertEquals("community-1", repository.feedState.value?.posts?.first()?.caseId)
+    }
+
+    @Test
+    fun `edit sends trimmed caption to canonical community endpoint`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals("https://api.example.test/api/v1/community/community-1", request.url.toString())
+            assertEquals("PATCH", request.method.value)
+            val requestBody = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+            assertEquals("Caption baru", requestBody["caption"]?.jsonPrimitive?.content)
+            respond(
+                """
+                {
+                  "id":"community-1","case_id":"case-1",
+                  "creator":{"display_name":"Olivia","is_current_user":true},
+                  "title":"Kasus","redacted_text":"Caption baru",
+                  "status":"PUBLISHED_UNVERIFIED","published_at":"2026-09-23T00:00:00Z",
+                  "counts":{},"media":[]
+                }
+                """.trimIndent(),
+                headers = jsonHeaders(),
+            )
+        })
+
+        val result = repository.updatePost(
+            "https://api.example.test/", "token", "community-1", "  Caption baru  "
+        )
+
+        assertTrue(result is AppResult.Success)
+        assertEquals("Olivia", (result as AppResult.Success).value.creatorName)
+    }
+
+    @Test
+    fun `delete uses history case endpoint`() = runTest {
+        val repository = repositoryWith(MockEngine { request ->
+            assertEquals(
+                "https://api.example.test/api/v1/history/history-1/community",
+                request.url.toString(),
+            )
+            assertEquals("DELETE", request.method.value)
+            respond("{}", headers = jsonHeaders())
+        })
+
+        val result = repository.deletePost(
+            "https://api.example.test", "token", "history-1", "community-1"
+        )
+
+        assertTrue(result is AppResult.Success)
+    }
+
+    private fun repositoryWith(engine: MockEngine): CommunityRepositoryImpl {
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; explicitNulls = false })
+            }
+        }
+        return CommunityRepositoryImpl(client)
+    }
+
+    private fun jsonHeaders() =
+        headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+}

@@ -769,6 +769,10 @@ components:
         preview_id:
           format: uuid
           type: string
+        caption:
+          minLength: 1
+          maxLength: 5000
+          type: string
         redacted_image_url:
           anyOf:
           - format: uri
@@ -896,6 +900,7 @@ components:
       - preview_id
       - publication_consent
       - rag_reuse_consent
+      - caption
       type: object
     Quiz:
       additionalProperties: false

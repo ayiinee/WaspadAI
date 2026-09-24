@@ -72,3 +72,26 @@ def test_invalid_token_is_401_and_auth_network_failure_is_503() -> None:
                 raise AssertionError("auth outage was not fail-closed")
 
     anyio.run(check)
+
+
+def test_auth_retries_one_transient_network_failure() -> None:
+    async def check() -> None:
+        attempts = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise httpx.ConnectError("temporary disconnect", request=request)
+            return httpx.Response(200, json={"id": TEST_USER_ID, "email": None})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            principal = await get_current_user(
+                make_request(client),
+                HTTPAuthorizationCredentials(scheme="Bearer", credentials="sample-token"),
+            )
+
+        assert attempts == 2
+        assert principal.id == UUID(TEST_USER_ID)
+
+    anyio.run(check)

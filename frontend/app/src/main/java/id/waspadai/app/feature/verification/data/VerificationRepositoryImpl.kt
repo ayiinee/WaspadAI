@@ -7,6 +7,8 @@ import id.waspadai.app.feature.verification.data.mapper.VerificationMapper
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationRepository
+import id.waspadai.app.feature.verification.domain.TextVerificationInput
+import id.waspadai.app.feature.verification.domain.ImageVerificationInput
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
@@ -15,9 +17,15 @@ class VerificationRepositoryImpl(
     private val remoteDataSource: VerificationRemoteDataSource,
     private val mapper: VerificationMapper
 ) : VerificationRepository {
-    override suspend fun submitText(text: String): AppResult<VerificationResult> = try {
-        val envelope = remoteDataSource.submitText(text)
-        AppResult.Success(mapper.map(envelope.result))
+    override suspend fun submitText(input: TextVerificationInput): AppResult<VerificationResult> = try {
+        val envelope = remoteDataSource.submitText(
+            text = input.text,
+            question = input.question,
+            sourceUrl = input.sourceUrl,
+            senderContext = input.senderContext,
+            pageContext = input.pageContext,
+        )
+        AppResult.Success(mapper.map(envelope.result, envelope.history))
     } catch (error: CancellationException) {
         throw error
     } catch (error: MissingAccessTokenException) {
@@ -32,6 +40,31 @@ class VerificationRepositoryImpl(
         AppResult.Failure("Hasil pemeriksaan belum dapat ditampilkan dengan aman. Coba lagi.")
     } catch (error: Exception) {
         AppResult.Failure("Pemeriksaan belum berhasil. Coba lagi nanti.")
+    }
+
+    override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> = try {
+        val enrichedQuestion = buildImageQuestion(input.question, input.source)
+        val envelope = remoteDataSource.submitImage(
+            imageBytes = input.imageBytes,
+            contentType = input.contentType,
+            fileName = input.fileName,
+            question = enrichedQuestion,
+        )
+        AppResult.Success(mapper.map(envelope.result, envelope.history))
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: MissingAccessTokenException) {
+        AppResult.Failure("Sesi Supabase belum tersedia. Login terlebih dahulu sebelum memakai pemeriksaan gambar.")
+    } catch (error: VerificationApiException) {
+        AppResult.Failure(error.toSafeMessage())
+    } catch (error: HttpRequestTimeoutException) {
+        AppResult.Failure("Pemeriksaan gambar memerlukan waktu terlalu lama. Coba lagi nanti.")
+    } catch (error: IOException) {
+        AppResult.Failure("Koneksi belum tersedia. Periksa internet lalu coba lagi.")
+    } catch (error: MissingNarrativeException) {
+        AppResult.Failure("Hasil pemeriksaan gambar belum dapat ditampilkan dengan aman. Coba lagi.")
+    } catch (error: Exception) {
+        AppResult.Failure("Pemeriksaan gambar belum berhasil. Coba lagi nanti.")
     }
 
     override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> = try {
@@ -65,7 +98,7 @@ class VerificationRepositoryImpl(
             VerificationHistoryDetail(
                 caseId = envelope.history.caseId,
                 inputText = envelope.inputText,
-                result = mapper.map(envelope.result)
+                result = mapper.map(envelope.result, envelope.history)
             )
         )
     } catch (error: CancellationException) {
@@ -82,6 +115,27 @@ class VerificationRepositoryImpl(
         AppResult.Failure("History belum dapat ditampilkan dengan aman. Coba lagi.")
     } catch (error: Exception) {
         AppResult.Failure("Detail history belum dapat dimuat. Coba lagi nanti.")
+    }
+}
+
+private fun buildImageQuestion(
+    question: String?,
+    source: id.waspadai.app.core.trigger.TriggerSource,
+): String? {
+    val trimmedQuestion = question?.trim().orEmpty()
+    return when {
+        source == id.waspadai.app.core.trigger.TriggerSource.FLOATING_OVERLAY && trimmedQuestion.isNotBlank() ->
+            "Mode overlay aktif. Sorot area atau elemen visual yang mencurigakan. $trimmedQuestion"
+        source == id.waspadai.app.core.trigger.TriggerSource.FLOATING_OVERLAY ->
+            "Mode overlay aktif. Sorot area atau elemen visual yang mencurigakan pada gambar ini."
+        source == id.waspadai.app.core.trigger.TriggerSource.ASSISTANT && trimmedQuestion.isNotBlank() ->
+            "Tangkapan layar dipilih pengguna melalui WaspadAI Assistant. $trimmedQuestion"
+        source == id.waspadai.app.core.trigger.TriggerSource.ASSISTANT ->
+            "Periksa klaim dan risiko pada area layar yang dipilih pengguna."
+        source == id.waspadai.app.core.trigger.TriggerSource.QUICK_SETTINGS && trimmedQuestion.isBlank() ->
+            "Periksa klaim dan risiko pada tangkapan layar ini."
+        trimmedQuestion.isNotBlank() -> trimmedQuestion
+        else -> null
     }
 }
 

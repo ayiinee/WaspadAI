@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-from dotenv import dotenv_values
+from dotenv import dotenv_values, load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROOT_ENV = PROJECT_ROOT / ".env"

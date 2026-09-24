@@ -9,14 +9,53 @@ data class TextVerificationRequestDto(
     @SerialName("sender_context") val senderContext: String = "UNKNOWN",
     @SerialName("source_url") val sourceUrl: String? = null,
     val question: String? = null,
+    @SerialName("page_context") val pageContext: PageContextDto? = null,
+)
+
+@Serializable
+data class PageContextDto(
+    val title: String? = null,
+    val before: String? = null,
+    val after: String? = null,
 )
 
 @Serializable
 data class VerificationResponseDto(
+    val headline: String = "",
+    val verdict: String? = null,
     @SerialName("risk_level") val riskLevel: String? = null,
+    val dimensions: AssessmentDimensionsDto = AssessmentDimensionsDto(),
     val why: List<String> = emptyList(),
+    val evidence: List<EvidenceDto> = emptyList(),
     @SerialName("recommended_actions") val recommendedActions: List<RecommendedActionDto> = emptyList(),
-    val presentation: PresentationDto? = null
+    val sources: List<SourceDto> = emptyList(),
+    val uncertainty: String = "",
+    @SerialName("requires_human_review") val requiresHumanReview: Boolean = false,
+    val disclaimer: String = "",
+    val presentation: PresentationDto? = null,
+)
+
+@Serializable
+data class AssessmentDimensionsDto(
+    @SerialName("factual_status") val factualStatus: String? = null,
+)
+
+@Serializable
+data class EvidenceDto(
+    val publisher: String = "",
+    val title: String = "",
+    val url: String = "",
+    val excerpt: String = "",
+    val stance: String = "",
+    @SerialName("verification_status") val verificationStatus: String = "",
+)
+
+@Serializable
+data class SourceDto(
+    val publisher: String = "",
+    val title: String = "",
+    val url: String = "",
+    @SerialName("published_at") val publishedAt: String? = null,
 )
 
 @Serializable

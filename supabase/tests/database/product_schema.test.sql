@@ -1,6 +1,6 @@
 begin;
 
-select plan(31);
+select plan(35);
 
 select ok(to_regclass('public.verification_cases') is not null, 'verification cases table exists');
 select ok(to_regclass('public.verification_results') is not null, 'verification results table exists');
@@ -13,6 +13,8 @@ select ok(to_regclass('private.consent_records') is not null, 'consent records t
 select ok(to_regclass('public.contributions') is not null, 'contributions table exists');
 select ok(to_regclass('public.community_posts') is not null, 'community posts table exists');
 select ok(to_regclass('public.community_votes') is not null, 'community votes table exists');
+select ok(to_regclass('public.community_media') is not null, 'community media table exists');
+select ok(to_regclass('public.community_preview_media') is not null, 'community preview media table exists');
 select ok(to_regclass('public.contribution_sources') is not null, 'contribution sources table exists');
 select ok(to_regclass('public.moderation_decisions') is not null, 'moderation decisions table exists');
 select ok(to_regclass('private.outbox_events') is not null, 'outbox table exists');
@@ -35,6 +37,8 @@ select ok(
 select ok((select relrowsecurity from pg_class where oid = 'public.verification_cases'::regclass), 'cases use RLS');
 select ok((select relrowsecurity from pg_class where oid = 'private.stored_assets'::regclass), 'assets use RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.community_posts'::regclass), 'posts use RLS');
+select ok((select relrowsecurity from pg_class where oid = 'public.community_media'::regclass), 'community media uses RLS');
+select ok((select relrowsecurity from pg_class where oid = 'public.community_preview_media'::regclass), 'preview media uses RLS');
 select ok((select relrowsecurity from pg_class where oid = 'private.outbox_events'::regclass), 'outbox uses RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.quiz_attempts'::regclass), 'quiz attempts use RLS');
 select ok(not has_table_privilege('authenticated', 'public.verification_cases', 'SELECT'), 'clients cannot read raw history');

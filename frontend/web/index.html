@@ -7,13 +7,112 @@
       name="description"
       content="Demo browser WaspadAI untuk pemeriksaan pesan mencurigakan."
     />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23005c9e%22/><path d=%22M8 16l5 5 11-12%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
     <title>WaspadAI — Demo Browser</title>
   </head>
   <body>
-    <main class="page-shell">
+    <main id="auth-screen" class="auth-shell">
+      <section class="auth-frame" aria-label="Masuk ke WaspadAI">
+        <div class="auth-content">
+          <section class="auth-intro" aria-labelledby="auth-heading">
+            <h2 id="auth-heading">Periksa dengan lebih tenang</h2>
+            <p>Masuk untuk menyimpan dan melanjutkan pemeriksaan informasi Anda.</p>
+          </section>
+          <section class="auth-card">
+            <div class="auth-mode" role="tablist" aria-label="Pilihan autentikasi">
+              <button id="sign-in-tab" class="auth-mode-button active" type="button" role="tab" aria-selected="true">Masuk</button>
+              <button id="sign-up-tab" class="auth-mode-button" type="button" role="tab" aria-selected="false">Daftar</button>
+            </div>
+            <h3 id="auth-form-title">Selamat datang kembali</h3>
+            <form id="auth-form" novalidate>
+              <label>Email<input id="auth-email" type="email" autocomplete="email" inputmode="email" required /></label>
+              <label>Kata sandi<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required /></label>
+              <label id="confirm-password-field" hidden>Konfirmasi kata sandi<input id="auth-confirm-password" type="password" autocomplete="new-password" minlength="8" /></label>
+              <p id="auth-error" class="auth-error" role="alert" hidden></p>
+              <button id="auth-submit" class="auth-submit" type="submit">Masuk</button>
+            </form>
+          </section>
+          <p class="auth-terms">Dengan melanjutkan, Anda menyetujui penggunaan aplikasi WaspadAI.</p>
+        </div>
+      </section>
+    </main>
+
+    <main id="home-screen" class="page-shell" hidden>
+      <section class="home-frame" aria-label="Halaman Beranda WaspadAI">
+        <section class="home-content">
+          <div class="home-status-bar" aria-hidden="true">
+            <span>19:30</span>
+            <span class="home-status-icons">
+              <svg viewBox="0 0 24 24"><path d="M3 20h3v-4H3zm5 0h3v-7H8zm5 0h3V9h-3zm5 0h3V4h-3z" /></svg>
+              <svg viewBox="0 0 24 24"><path d="M3 9.5a14.5 14.5 0 0 1 18 0M6.5 13a9 9 0 0 1 11 0M10 16.5a3.5 3.5 0 0 1 4 0" /><circle cx="12" cy="19" r="1" /></svg>
+              <svg viewBox="0 0 28 14"><rect x="1" y="1" width="23" height="12" rx="3" /><path d="M26 5v4" /></svg>
+            </span>
+          </div>
+
+          <header class="home-hero">
+            <div class="home-brand-row">
+              <div>
+                <h1>WaspadAI</h1>
+                <div class="home-profile">
+                  <span class="home-profile-photo"><img src="/assets/home/profile.jpeg" alt="Foto profil Putu Alvin" /></span>
+                  <strong>Putu Alvin</strong>
+                </div>
+              </div>
+              <div class="home-header-actions">
+                <button type="button" aria-label="Notifikasi">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
+                </button>
+                <button type="button" aria-label="Pengaturan">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+                </button>
+              </div>
+            </div>
+            <button id="home-verify-hero" class="home-banner" type="button" aria-label="Mulai verifikasi informasi">
+              <img src="/assets/home/verification-banner.png" alt="Ragu sama informasi yang kamu terima? Mulai verifikasi dengan WaspadAI." />
+            </button>
+          </header>
+
+          <section class="home-body">
+            <div class="home-tools" role="search">
+              <label class="home-search">
+                <span class="sr-only">Cari kasus, materi, atau informasi</span>
+                <input id="home-search-input" type="search" placeholder="Cari kasus, materi, atau informasi..." />
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
+              </label>
+              <button id="home-filter" class="home-filter" type="button" aria-label="Tampilkan kasus waspada" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+              </button>
+            </div>
+
+            <section class="home-section" aria-labelledby="latest-verification-title">
+              <div class="home-section-heading">
+                <h2 id="latest-verification-title">Verifikasi Kasus Terbaru</h2>
+                <button id="home-see-cases" type="button">Lihat Semua</button>
+              </div>
+              <div id="home-case-list" class="home-case-list"></div>
+            </section>
+
+            <section class="home-section home-learning-section" aria-labelledby="learning-recommendation-title">
+              <div class="home-section-heading">
+                <h2 id="learning-recommendation-title">Rekomendasi Pembelajaran</h2>
+                <button id="home-see-learning" type="button">Lihat Semua</button>
+              </div>
+              <div id="home-learning-list" class="home-learning-list"></div>
+            </section>
+          </section>
+        </section>
+        <nav id="home-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
+
+    <main id="app-shell" class="page-shell" hidden>
       <section class="app-frame" aria-label="WaspadAI demo browser">
         <header class="app-header">
           <h1>WaspadAI</h1>
+          <button id="mode-toggle" class="mode-toggle" type="button" aria-label="Aktifkan pemeriksaan pesan" aria-pressed="true">
+            <span class="mode-toggle-track" aria-hidden="true"><span class="mode-toggle-thumb"></span></span>
+            <span class="mode-toggle-label">Periksa</span>
+          </button>
         </header>
 
         <section id="conversation" class="conversation" aria-label="Riwayat pemeriksaan"></section>
@@ -21,11 +120,16 @@
         <section class="composer-section" aria-label="Kirim pesan untuk diperiksa">
           <div id="attachment-preview" class="attachment-preview" hidden></div>
           <div class="composer-row">
-            <button class="toggle-button" type="button" aria-label="Aktifkan pemeriksaan pesan"><span aria-hidden="true"></span></button>
-            <label class="attach-button" for="image-input" title="Tambahkan gambar">
+            <div class="attach-menu-wrap">
+              <button id="attach-button" class="attach-button" type="button" aria-label="Tambahkan foto atau file" aria-expanded="false" aria-controls="attach-menu">
               <span aria-hidden="true">+</span>
-              <span class="sr-only">Tambahkan gambar</span>
-            </label>
+              <span class="sr-only">Tambahkan foto atau file</span>
+              </button>
+              <div id="attach-menu" class="attach-menu" hidden>
+                <button id="choose-photo" type="button"><span class="attach-option-icon photo-icon" aria-hidden="true">▧</span><span>Foto</span></button>
+                <button id="choose-file" type="button"><span class="attach-option-icon file-icon" aria-hidden="true">▤</span><span>File</span></button>
+              </div>
+            </div>
             <textarea
               id="message-input"
               rows="1"
@@ -38,6 +142,7 @@
             </button>
           </div>
           <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+          <input id="file-input" type="file" accept=".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.apk,application/pdf,text/plain,application/zip" hidden />
           <p class="composer-hint">Teks minimal 10 karakter. Gambar: JPG, PNG, atau WEBP, maksimal 8 MB.</p>
         </section>
 
@@ -50,7 +155,7 @@
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h5.5A2.5 2.5 0 0 1 12 8v12a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 5.5h-5.5A2.5 2.5 0 0 0 12 8v12a2.5 2.5 0 0 1 2.5-2.5H20z"/></svg>
             <span>Pelajari</span>
           </button>
-          <button class="center-nav" type="button" data-tab="Periksa" aria-label="Periksa informasi" aria-pressed="true">
+          <button class="center-nav active" type="button" data-tab="Periksa" aria-label="Periksa informasi" aria-pressed="true">
             <svg class="center-focus-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3"/></svg>
             <svg class="center-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="4.5"/><path d="m14 14 5 5"/></svg>
           </button>
@@ -63,6 +168,102 @@
             <span>Progres</span>
           </button>
         </nav>
+      </section>
+    </main>
+
+    <main id="community-screen" class="page-shell" hidden>
+      <section class="community-frame" aria-label="Halaman Koneksi">
+        <section class="community-content">
+          <header class="community-hero">
+            <button id="community-back" class="community-back" type="button" aria-label="Kembali ke pemeriksaan">←</button>
+            <h1>Koneksi</h1>
+            <section class="contribution-card" aria-label="Kontribusi Saya">
+              <div class="contribution-title"><strong>Kontribusi Saya</strong><span>›</span></div>
+              <div class="contribution-metrics">
+                <p><b>12</b><small>Penilaian</small></p>
+                <p><b>5</b><small>Bukti Ditambahkan</small></p>
+                <p><b>21</b><small>Kasus Selesai</small></p>
+              </div>
+            </section>
+          </header>
+          <section class="community-tools" aria-label="Cari dan filter kasus">
+            <label class="community-search"><span class="sr-only">Cari kasus</span><input id="community-search-input" type="search" placeholder="Cari kasus, materi, atau informasi..." /><span aria-hidden="true">⌕</span></label>
+            <select id="community-filter" aria-label="Filter kasus">
+              <option value="all">Semua kasus</option>
+              <option value="unrated">Belum dinilai</option>
+              <option value="rated">Sudah dinilai</option>
+            </select>
+          </section>
+          <section id="community-feed" class="community-feed" aria-live="polite"></section>
+        </section>
+        <nav id="community-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
+
+    <main id="community-detail-screen" class="page-shell" hidden>
+      <section class="community-frame" aria-label="Detail kasus komunitas">
+        <section id="community-detail-content" class="community-content"></section>
+        <nav id="community-detail-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
+
+    <main id="learn-screen" class="page-shell" hidden>
+      <section class="learn-frame" aria-label="Halaman Pelajari">
+        <section class="learn-content">
+          <header class="learn-header">
+            <div>
+              <p class="learn-eyebrow">Ruang belajar</p>
+              <h1>Pelajari</h1>
+              <p class="learn-subtitle">Bangun kebiasaan mengenali informasi yang aman.</p>
+            </div>
+            <div class="learn-streak" aria-label="Streak belajar 3 hari"><span>✦</span><strong>3</strong><small>hari</small></div>
+          </header>
+          <section class="learn-tools" aria-label="Cari materi">
+            <label class="learn-search"><span class="sr-only">Cari materi</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg><input id="learn-search-input" type="search" placeholder="Cari materi atau topik..." /></label>
+          </section>
+          <section class="learn-challenge" aria-label="Misi terbatas">
+            <div class="learn-challenge-icon" aria-hidden="true">⚡</div>
+            <div><p class="learn-card-kicker">MISI KILAT · TERBATAS</p><h2>Jadi detektif hoaks hari ini</h2><p>Jawab 3 skenario singkat sebelum waktunya habis.</p></div>
+            <button type="button" class="learn-arrow" aria-label="Mulai misi">›</button>
+          </section>
+          <section class="learn-today" aria-labelledby="learn-today-title">
+            <div class="learn-section-heading"><div><p class="learn-card-kicker">LANGKAH BERIKUTNYA</p><h2 id="learn-today-title">Target hari ini</h2></div><span class="learn-progress-label">1 dari 3</span></div>
+            <div class="learn-progress"><span style="width: 34%"></span></div>
+          </section>
+          <section id="learn-materials" class="learn-materials" aria-label="Daftar materi"></section>
+        </section>
+        <nav id="learn-nav" aria-label="Navigasi utama"></nav>
+      </section>
+    </main>
+
+    <main id="material-screen" class="page-shell" hidden>
+      <section class="material-frame" aria-label="Materi pembelajaran">
+        <section id="material-content" class="material-content"></section>
+        <nav id="material-nav" aria-label="Navigasi utama"></nav>
+        <div id="quiz-choice-modal" class="quiz-modal-backdrop" hidden>
+          <section class="quiz-choice-card" role="dialog" aria-modal="true" aria-labelledby="quiz-choice-title">
+            <button id="quiz-choice-close" class="quiz-modal-close" type="button" aria-label="Tutup">×</button>
+            <div class="quiz-choice-icon" aria-hidden="true">✓</div>
+            <p class="material-kicker">MATERI SELESAI</p>
+            <h2 id="quiz-choice-title">Siap menguji pemahamanmu?</h2>
+            <p>Kamu sudah menyelesaikan materi ini. Lanjutkan dengan latihan soal singkat atau kembali ke daftar materi.</p>
+            <div class="quiz-choice-actions">
+              <button id="quiz-start-button" class="material-primary-button" type="button">Mulai latihan soal</button>
+              <button id="quiz-later-button" class="material-secondary-button" type="button">Nanti saja</button>
+            </div>
+          </section>
+        </div>
+        <div id="quiz-screen" class="quiz-modal-backdrop" hidden>
+          <section class="quiz-card" role="dialog" aria-modal="true" aria-labelledby="quiz-title">
+            <header class="quiz-header">
+              <button id="quiz-back" class="material-back-button" type="button" aria-label="Kembali ke materi">←</button>
+              <div><p class="material-kicker">LATIHAN SOAL</p><h2 id="quiz-title">Cek pemahaman</h2></div>
+              <span id="quiz-count" class="quiz-count">1/3</span>
+            </header>
+            <div class="quiz-progress"><span id="quiz-progress-bar"></span></div>
+            <div id="quiz-body" class="quiz-body"></div>
+          </section>
+        </div>
       </section>
     </main>
     <script type="module" src="/src/main.js"></script>

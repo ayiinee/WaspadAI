@@ -13,9 +13,24 @@ Status: `CURRENT`, dengan flow yang belum diimplementasikan ditandai `TARGET`.
 
 Android tidak mengirim `output_mode` atau community evidence.
 
-## Verifikasi screenshot (`TARGET`)
+## Verifikasi kontekstual melalui System Assistant
 
-Android menampilkan preview/crop, lalu mengirim binary image sebagai multipart ke Product API. Product API meneruskan file sebagai binary, bukan Base64. Route Product image belum tersedia saat ini.
+1. Pengguna membuka **Akses Cepat WaspadAI** dan menyetujui penggantian Digital Assistant melalui role dialog sistem.
+2. Pengguna memanggil gesture assistant perangkat. Gesture dapat berupa long-press tombol samping, home-hold, atau corner swipe; aplikasi tidak menjanjikan satu gesture universal.
+3. `VoiceInteractionSession` menerima screenshot dan/atau `AssistStructure`. WaspadAI tidak meminta mikrofon dan tidak berjalan dari lock screen.
+4. Screenshot dapat di-crop dan teks dapat diedit di preview. Pada tahap ini belum ada request jaringan.
+5. Setelah **Periksa sekarang**, Android mengirim input ke Product API dan menampilkan verdict, factual status, risk, evidence, source, uncertainty, safe action, human-review notice, dan disclaimer.
+6. Pertanyaan lanjutan memakai crop atau teks yang sama selama session aktif. Menutup session membersihkan bitmap, byte array, teks, dan percakapan lokal.
+
+Jika screenshot tidak diberikan oleh sistem, teks dari `AssistStructure` dipakai. Jika keduanya tidak tersedia, panel menawarkan pembukaan aplikasi untuk upload manual; pengguna juga dapat memakai Share Sheet atau tile **Periksa layar**. Secure window tidak dilewati.
+
+## Fallback verifikasi
+
+- **Share Sheet:** `ACTION_SEND` menerima teks atau satu gambar; `ACTION_SEND_MULTIPLE` menerima maksimal lima gambar. Semua konten dibaca ke memori dan masuk preview sebelum submit.
+- **Quick Settings:** tile **Periksa layar** membuka consent MediaProjection. Capture bersifat one-shot; pada Android 14+ consent diminta untuk setiap capture.
+- **Floating Verify:** fallback lanjutan, nonaktif secara default, dan hanya tersedia dari menu **Akses Cepat WaspadAI**.
+
+Android mengirim binary image sebagai multipart ke Product API. Product API meneruskan file sebagai binary, bukan Base64.
 
 ## History
 

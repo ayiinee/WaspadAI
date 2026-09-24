@@ -3,10 +3,18 @@ package id.waspadai.app
 import android.app.Application
 import id.waspadai.app.core.network.ApiClient
 import id.waspadai.app.core.network.WaspadAiApiConfig
+import id.waspadai.app.feature.auth.data.SupabaseAuthRepository
+import id.waspadai.app.feature.auth.data.RememberedCredentialsStore
+import id.waspadai.app.feature.auth.data.EncryptedAuthSessionStore
 import id.waspadai.app.feature.community.data.CommunityRepositoryImpl
 import id.waspadai.app.feature.community.domain.CommunityRepository
+import id.waspadai.app.feature.learning.data.LearningRepositoryImpl
+import id.waspadai.app.feature.learning.domain.LearningRepository
+import id.waspadai.app.feature.home.data.HomeRepositoryImpl
+import id.waspadai.app.feature.home.domain.HomeRepository
+import id.waspadai.app.feature.profile.data.ProfileRepositoryImpl
+import id.waspadai.app.feature.profile.domain.ProfileRepository
 import id.waspadai.app.feature.verification.data.MockVerificationRepository
-import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
 import id.waspadai.app.feature.verification.data.VerificationRemoteDataSource
 import id.waspadai.app.feature.verification.data.VerificationRepositoryImpl
 import id.waspadai.app.feature.verification.data.mapper.VerificationMapper
@@ -19,13 +27,39 @@ class WaspadAIApplication : Application() {
         CommunityRepositoryImpl(apiClient)
     }
 
+    val learningRepository: LearningRepository by lazy {
+        LearningRepositoryImpl(apiClient)
+    }
+
+    val homeRepository: HomeRepository by lazy {
+        HomeRepositoryImpl(apiClient)
+    }
+
+    val profileRepository: ProfileRepository by lazy {
+        ProfileRepositoryImpl(apiClient)
+    }
+
+    val authRepository by lazy {
+        SupabaseAuthRepository(
+            client = apiClient,
+            supabaseUrl = BuildConfig.WASPADAI_SUPABASE_URL,
+            publishableKey = BuildConfig.WASPADAI_SUPABASE_PUBLISHABLE_KEY,
+            initialAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
+            sessionStore = EncryptedAuthSessionStore(this),
+        )
+    }
+
+    val rememberedCredentialsStore by lazy { RememberedCredentialsStore(this) }
+
+    val pendingTriggerStore by lazy { id.waspadai.app.core.trigger.PendingTriggerStore() }
+
     val verificationRepository: VerificationRepository by lazy {
         if (BuildConfig.WASPADAI_REMOTE_ENABLED) {
             VerificationRepositoryImpl(
                 remoteDataSource = VerificationRemoteDataSource(
                     client = apiClient,
                     config = WaspadAiApiConfig(BuildConfig.WASPADAI_API_BASE_URL),
-                    tokenProvider = StaticAccessTokenProvider(BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN)
+                    tokenProvider = authRepository,
                 ),
                 mapper = VerificationMapper()
             )

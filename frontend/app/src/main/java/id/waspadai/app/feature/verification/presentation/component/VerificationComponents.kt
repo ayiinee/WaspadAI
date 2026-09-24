@@ -1,5 +1,9 @@
-package id.waspadai.app.feature.verification.presentation.component
+﻿package id.waspadai.app.feature.verification.presentation.component
 
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,32 +17,48 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -46,10 +66,21 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import id.waspadai.app.R
+import id.waspadai.app.ui.theme.WaspadAIBlue
+import id.waspadai.app.ui.theme.WaspadAIDarkBlue
+import id.waspadai.app.ui.theme.WaspadAILightBlue
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.core.ui.BrandBlue
@@ -58,39 +89,58 @@ import id.waspadai.app.core.ui.Ink
 import id.waspadai.app.core.ui.RiskRed
 import id.waspadai.app.core.ui.SoftBlue
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.presentation.ImageVerificationPreview
 
 @Composable
-fun WaspadAiHeader(onHistoryClick: () -> Unit = {}) {
+fun WaspadAiHeader(
+    enabled: Boolean,
+    onOpenQuickAccess: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // Add the real system inset before the header content. This keeps the
-            // title below the clock/notch on devices with different status-bar heights.
-            .statusBarsPadding()
-            .height(72.dp)
-            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-            .background(Brush.linearGradient(listOf(DeepBlue, BrandBlue, Color(0xFF0078BF))))
+            .background(WaspadAIBlue)
     ) {
-        Text(
-            text = "WaspadAI",
-            color = Color.White,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 25.sp,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 32.dp)
+        Image(
+            painter = painterResource(id = R.drawable.community_header_background),
+            contentDescription = null,
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Crop,
+            alpha = .6f,
         )
-        IconButton(
-            onClick = onHistoryClick,
+        Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 20.dp)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(64.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.History,
-                contentDescription = "History verifikasi",
-                tint = Color.White
+            Text(
+                text = "WaspadAI",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 25.sp,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 32.dp)
             )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 20.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(WaspadAIDarkBlue)
+                    .border(1.5.dp, Color.White, RoundedCornerShape(18.dp))
+                    .clickable(enabled = enabled, onClick = onOpenQuickAccess)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Akses Cepat",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
         }
     }
 }
@@ -147,15 +197,6 @@ private fun HistoryRow(item: VerificationHistoryItem, onOpen: (String) -> Unit) 
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Text(
-            item.headline,
-            color = Ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(3.dp))
-        Text(
             "${item.verdict} • ${item.createdAt}",
             color = Color(0xFF557383),
             fontSize = 12.sp,
@@ -188,13 +229,32 @@ fun ModeNotice(isRemoteEnabled: Boolean) {
 }
 
 @Composable
-fun UserMessage(text: String, hasAttachment: Boolean) {
+fun UserMessage(
+    text: String,
+    hasAttachment: Boolean,
+    attachmentName: String? = null,
+    attachmentBytes: ByteArray? = null,
+    attachmentContentType: String? = null,
+    attachmentGroup: List<ImageVerificationPreview> = emptyList(),
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.End
     ) {
-        if (hasAttachment) AttachmentPlaceholder()
-        Spacer(Modifier.height(8.dp))
+        if (hasAttachment) {
+            AttachmentPreview(
+                attachments = attachmentGroup.ifEmpty {
+                    listOf(
+                        ImageVerificationPreview(
+                            imageBytes = attachmentBytes ?: byteArrayOf(),
+                            contentType = attachmentContentType.orEmpty(),
+                            fileName = attachmentName ?: "Gambar verifikasi",
+                        )
+                    )
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         Text(
             text = text,
             color = Color.White,
@@ -210,51 +270,177 @@ fun UserMessage(text: String, hasAttachment: Boolean) {
 }
 
 @Composable
-private fun AttachmentPlaceholder() {
-    Card(
-        modifier = Modifier.widthIn(max = 350.dp),
-        shape = RoundedCornerShape(17.dp),
-        colors = CardDefaults.cardColors(containerColor = BrandBlue)
+private fun AttachmentPreview(
+    attachments: List<ImageVerificationPreview>,
+) {
+    var selectedAttachment by remember { mutableStateOf<ImageVerificationPreview?>(null) }
+    when (attachments.size) {
+        1 -> SingleAttachmentPreview(
+            attachment = attachments.first(),
+            onClick = { selectedAttachment = attachments.first() },
+        )
+        else -> AttachmentCollage(
+            attachments = attachments,
+            onClick = { selectedAttachment = it },
+        )
+    }
+    selectedAttachment?.let { attachment ->
+        AttachmentPreviewDialog(attachment = attachment, onDismiss = { selectedAttachment = null })
+    }
+}
+
+@Composable
+private fun SingleAttachmentPreview(
+    attachment: ImageVerificationPreview,
+    onClick: () -> Unit,
+) {
+    val isDocument = attachment.fileName.endsWith(".pdf", ignoreCase = true)
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    if (isDocument) {
+        Row(
+            modifier = Modifier
+                .widthIn(max = 350.dp)
+                .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFE8493F)),
+                contentAlignment = Alignment.Center,
+            ) { Text("PDF", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = attachment.fileName,
+                color = Ink,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Preview ${attachment.fileName}",
+            modifier = Modifier
+                .widthIn(max = 350.dp)
+                .heightIn(max = 260.dp)
+                .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+@Composable
+private fun AttachmentCollage(
+    attachments: List<ImageVerificationPreview>,
+    onClick: (ImageVerificationPreview) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 350.dp)
+            .border(1.dp, WaspadAILightBlue.copy(alpha = .72f), RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .padding(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Column(Modifier.padding(9.dp)) {
-            Column(
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF8F1E7))
-                    .padding(13.dp)
+        attachments.chunked(2).forEach { rowAttachments ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text("Contoh lampiran", color = Color(0xFF70808A), fontSize = 12.sp)
-                Spacer(Modifier.height(7.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(Color(0xFFF2F5F4))
-                        .padding(9.dp)
-                ) {
-                    Box(
-                        Modifier
-                            .size(33.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(Color(0xFF9FB4BC)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("APK", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.width(9.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Lihat Pesanan", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("5,1 MB · APK", color = Color(0xFF71808A), fontSize = 10.sp)
-                    }
+                rowAttachments.forEach { attachment ->
+                    CollageTile(
+                        attachment = attachment,
+                        onClick = { onClick(attachment) },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
+                if (rowAttachments.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun AnalysisCard(result: VerificationResult, isSample: Boolean) {
+private fun CollageTile(
+    attachment: ImageVerificationPreview,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isDocument = attachment.fileName.endsWith(".pdf", ignoreCase = true)
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    Box(
+        modifier = modifier
+            .height(112.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF2F6F8))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!isDocument && bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Preview ${attachment.fileName}",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(if (isDocument) "PDF" else "Gambar", color = WaspadAIBlue, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AttachmentPreviewDialog(
+    attachment: ImageVerificationPreview,
+    onDismiss: () -> Unit,
+) {
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = .9f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Preview besar ${attachment.fileName}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Text(attachment.fileName, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun AnalysisCard(
+    result: VerificationResult,
+    isSample: Boolean,
+    onShareToCommunity: () -> Unit = {},
+) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -280,6 +466,20 @@ fun AnalysisCard(result: VerificationResult, isSample: Boolean) {
                 Text("CONTOH TAMPILAN", color = Color(0xFF728995), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(10.dp))
+            if (result.headline.isNotBlank()) {
+                Text(
+                    result.headline,
+                    color = Ink,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ResultPill("Truth: ${result.verdict.label}")
+                ResultPill("Fakta: ${result.factualStatus.label}")
+            }
+            Spacer(Modifier.height(10.dp))
             Text(result.narrative, color = Ink, fontSize = 16.sp, lineHeight = 22.sp)
             if (result.reasons.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
@@ -293,8 +493,121 @@ fun AnalysisCard(result: VerificationResult, isSample: Boolean) {
             }
             Spacer(Modifier.height(13.dp))
             RiskLabel(result.riskLevel)
+            if (result.evidence.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("Evidence", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                result.evidence.forEach { evidence ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = SoftBlue),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                evidence.title.ifBlank { evidence.publisher.ifBlank { "Bukti pendukung" } },
+                                color = Ink,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (evidence.publisher.isNotBlank()) {
+                                Text(evidence.publisher, color = BrandBlue, fontSize = 12.sp)
+                            }
+                            if (evidence.excerpt.isNotBlank()) {
+                                Text(evidence.excerpt, color = Ink, fontSize = 13.sp, lineHeight = 18.sp)
+                            }
+                            if (evidence.stance.isNotBlank() || evidence.verificationStatus.isNotBlank()) {
+                                Text(
+                                    listOf(evidence.stance, evidence.verificationStatus)
+                                        .filter(String::isNotBlank)
+                                        .joinToString(" • "),
+                                    color = Color(0xFF557383),
+                                    fontSize = 11.sp,
+                                )
+                            }
+                            if (evidence.url.isNotBlank()) {
+                                TextButton(
+                                    onClick = {
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(evidence.url)))
+                                        }
+                                    },
+                                ) { Text("Buka bukti") }
+                            }
+                        }
+                    }
+                }
+            }
+            if (result.sources.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("Sumber", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                result.sources.forEach { source ->
+                    Text(
+                        text = "${source.publisher.ifBlank { "Sumber" }} — ${source.title.ifBlank { source.url }}",
+                        color = BrandBlue,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source.url)))
+                                }
+                            }
+                            .padding(vertical = 7.dp),
+                    )
+                }
+            }
+            if (result.uncertainty.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text("Ketidakpastian", color = Ink, fontWeight = FontWeight.Bold)
+                Text(result.uncertainty, color = Color(0xFF557383), fontSize = 13.sp)
+            }
+            if (result.requiresHumanReview) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Hasil ini memerlukan peninjauan manusia sebelum dijadikan dasar keputusan.",
+                    color = Color(0xFF9B5D00),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            if (result.disclaimer.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text(result.disclaimer, color = Color(0xFF6A7880), fontSize = 11.sp, lineHeight = 16.sp)
+            }
+            if (result.communityEligible &&
+                result.communityState == "PRIVATE" &&
+                result.riskLevel == RiskLevel.UNKNOWN &&
+                !result.caseId.isNullOrBlank()
+            ) {
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = onShareToCommunity,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Bagikan ke Koneksi")
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun ResultPill(text: String) {
+    Text(
+        text = text,
+        color = BrandBlue,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(SoftBlue)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+    )
 }
 
 @Composable
@@ -308,6 +621,7 @@ private fun Bullet(value: String) {
 @Composable
 private fun RiskLabel(riskLevel: RiskLevel) {
     val color = when (riskLevel) {
+        RiskLevel.CRITICAL -> Color(0xFF8C1D18)
         RiskLevel.HIGH -> RiskRed
         RiskLevel.MEDIUM -> Color(0xFFB86E00)
         RiskLevel.LOW -> Color(0xFF197A3D)
@@ -357,60 +671,223 @@ fun FailureNotice(message: String, onDismiss: () -> Unit) {
 fun VerificationComposer(
     value: String,
     enabled: Boolean,
+    pendingAttachments: List<ImageVerificationPreview> = emptyList(),
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
-    onRequestImageCapture: () -> Unit
+    onRemovePendingAttachment: (Int) -> Unit,
+    onRequestImageCapture: () -> Unit,
+    onRequestFileCapture: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
+    var isAttachmentMenuVisible by remember { mutableStateOf(false) }
+    val sendColor by animateColorAsState(
+        targetValue = if (enabled) BrandBlue else Color(0xFF9FC8DD),
+        label = "sendColor",
+    )
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .then(modifier)
+            .background(Color.White, RoundedCornerShape(29.dp))
+            .border(2.dp, WaspadAILightBlue, RoundedCornerShape(29.dp))
+            .clip(RoundedCornerShape(29.dp)),
     ) {
-        Box(
-            modifier = Modifier
-                .width(42.dp)
-                .height(28.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(BrandBlue)
-                .padding(4.dp),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Box(Modifier.size(20.dp).background(Color.White, CircleShape))
+        if (pendingAttachments.isNotEmpty()) {
+            PendingAttachmentDrafts(
+                attachments = pendingAttachments,
+                onRemove = onRemovePendingAttachment,
+            )
+            Spacer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(WaspadAILightBlue.copy(alpha = .7f)),
+            )
         }
-        Spacer(Modifier.width(9.dp))
-        Box(
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(BrandBlue)
-                .clickable(enabled = enabled, onClick = onRequestImageCapture),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .heightIn(min = 58.dp)
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("+", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Medium)
-        }
-        Spacer(Modifier.width(8.dp))
-        OutlinedTextField(
+            Box(contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(BrandBlue)
+                        .clickable(enabled = enabled) { isAttachmentMenuVisible = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Tambah lampiran",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = isAttachmentMenuVisible,
+                    onDismissRequest = { isAttachmentMenuVisible = false },
+                    modifier = Modifier
+                        .widthIn(min = 180.dp)
+                        .border(1.dp, WaspadAILightBlue, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = Color.White,
+                    shadowElevation = 8.dp,
+                ) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("File", color = DeepBlue, fontWeight = FontWeight.SemiBold)
+                            Text("PDF, DOCX, dan lainnya", color = Color(0xFF71808A), fontSize = 11.sp)
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Description, contentDescription = null, tint = WaspadAIBlue)
+                    },
+                    onClick = {
+                        isAttachmentMenuVisible = false
+                        onRequestFileCapture()
+                    },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("Gambar", color = DeepBlue, fontWeight = FontWeight.SemiBold)
+                            Text("JPG, PNG, atau WEBP", color = Color(0xFF71808A), fontSize = 11.sp)
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Image, contentDescription = null, tint = WaspadAIBlue)
+                    },
+                    onClick = {
+                        isAttachmentMenuVisible = false
+                        onRequestImageCapture()
+                    },
+                )
+            }
+            }
+            Spacer(Modifier.width(10.dp))
+            BasicTextField(
             value = value,
             onValueChange = onValueChange,
             enabled = enabled,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Ketik pesan untuk diperiksa…", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            textStyle = TextStyle(color = Ink, fontSize = 15.sp),
             singleLine = true,
-            shape = RoundedCornerShape(28.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { onSubmit() })
-        )
-        Spacer(Modifier.width(8.dp))
-        Box(
+            keyboardActions = KeyboardActions(onSend = { onSubmit() }),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (value.isBlank()) {
+                        Text(
+                            if (pendingAttachments.isNotEmpty()) "Tulis pesan untuk lampiran…"
+                            else "Ketik pesan untuk diperiksa…",
+                            color = Color(0xFF71808A),
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    innerTextField()
+                }
+            },
+            )
+            Spacer(Modifier.width(8.dp))
+            Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(46.dp)
                 .clip(CircleShape)
-                .background(if (enabled) BrandBlue else Color(0xFF9FC8DD))
+                .background(sendColor)
                 .clickable(enabled = enabled, onClick = onSubmit),
             contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                imageVector = Icons.Rounded.ArrowUpward,
+                contentDescription = "Kirim pemeriksaan",
+                tint = Color.White,
+                modifier = Modifier.size(27.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingAttachmentDrafts(
+    attachments: List<ImageVerificationPreview>,
+    onRemove: (Int) -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 9.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(
+            items = attachments,
+            key = { index, attachment -> "$index-${attachment.fileName}" },
+        ) { index, attachment ->
+            PendingAttachmentDraft(
+                attachment = attachment,
+                onRemove = { onRemove(index) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PendingAttachmentDraft(
+    attachment: ImageVerificationPreview,
+    onRemove: () -> Unit,
+) {
+    val isDocument = attachment.fileName.endsWith(".pdf", ignoreCase = true)
+    val bitmap = remember(attachment.imageBytes) {
+        BitmapFactory.decodeByteArray(attachment.imageBytes, 0, attachment.imageBytes.size)
+    }
+    Box(
+        modifier = Modifier
+            .size(width = 96.dp, height = 72.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF2F6F8)),
+    ) {
+        if (isDocument) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Color(0xFFE8493F)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("PDF", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        } else if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Draft ${attachment.fileName}",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(24.dp)
+                .padding(2.dp)
+                .background(Color.Black.copy(alpha = .5f), CircleShape),
         ) {
-            Text("↑", color = Color.White, fontSize = 27.sp)
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Hapus ${attachment.fileName}",
+                tint = Color.White,
+                modifier = Modifier.size(15.dp),
+            )
         }
     }
 }
@@ -432,7 +909,7 @@ fun BottomNavigation(activeTab: String, onTabSelected: (String) -> Unit) {
             NavigationItem("Pelajari", "▤", activeTab) { onTabSelected("Pelajari") }
             Spacer(Modifier.weight(1f))
             NavigationItem("Koneksi", "♧", activeTab) { onTabSelected("Koneksi") }
-            NavigationItem("Progres", "▥", activeTab) { onTabSelected("Progres") }
+            NavigationItem("Profil", "●", activeTab) { onTabSelected("Profil") }
         }
         Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 0.dp).clickable { onTabSelected("Periksa") },

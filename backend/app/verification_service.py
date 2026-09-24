@@ -11,13 +11,16 @@ import httpx
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from app.community_evidence_service import (
+    build_image_community_evidence,
+    build_text_community_evidence,
+)
 from app.config import Settings
 from app.database import user_transaction
 from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_image_review_required_result, build_review_required_result
 from app.models import (
-    AIResult,
     HistoryItem,
     HistoryMeta,
     HistoryPage,
@@ -25,9 +28,12 @@ from app.models import (
     TextVerificationRequest,
     VerificationEnvelope,
 )
+from app.schemas.verification import AIResult
+from app.supabase_storage import upload_verification_input
 
 VERIFY_TEXT_ROUTE = "POST /api/v1/verifications/text"
 VERIFY_IMAGE_ROUTE = "POST /api/v1/verifications/image"
+DEFAULT_TEXT_QUESTION = "Apakah isi teks ini benar dan aman ditindaklanjuti?"
 _ai_semaphores: dict[int, asyncio.Semaphore] = {}
 
 
@@ -42,6 +48,38 @@ def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
         else None,
         "output_mode": "BOTH",
     }
+
+
+def remote_text_payload(
+    request: TextVerificationRequest,
+    community_evidence: list[dict[str, Any]] | None = None,
+) -> dict[str, object]:
+    payload = canonical_payload(request)
+    if payload["question"] is None:
+        payload["question"] = DEFAULT_TEXT_QUESTION
+    payload["output_mode"] = "BOTH"
+    payload["community_evidence"] = _community_evidence_for_ai(community_evidence)
+    return payload
+
+
+def _community_evidence_for_ai(
+    community_evidence: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Adapt the product evidence shape to the currently deployed AI contract."""
+
+    adapted: list[dict[str, Any]] = []
+    for record in community_evidence or []:
+        item = dict(record)
+        sources: list[dict[str, Any]] = []
+        for source in record.get("sources", []):
+            source_item = dict(source)
+            source_url = source_item.pop("source_url", None)
+            if source_url is not None:
+                source_item["url"] = source_url
+            sources.append(source_item)
+        item["sources"] = sources
+        adapted.append(item)
+    return adapted
 
 
 def payload_hash(request: TextVerificationRequest) -> str:
@@ -97,7 +135,15 @@ async def verify_text(
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
                 raise error
             try:
-                result = await verify_remote_text(http_client, settings, request)
+                community_evidence = await build_text_community_evidence(
+                    pool, settings, user_id, request
+                )
+                result = await verify_remote_text(
+                    http_client,
+                    settings,
+                    request,
+                    community_evidence=community_evidence,
+                )
             except ProductAPIError as error:
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
                 raise
@@ -148,6 +194,22 @@ async def verify_image(
     if operation["state"] == "COMPLETED" and cached_response is not None:
         return VerificationEnvelope.model_validate(cached_response)
 
+    input_asset_object_path: str | None = None
+    if settings.store_screenshots_enabled:
+        if http_client is None:
+            raise ProductAPIError(
+                503, "STORAGE_UNAVAILABLE", "Storage Supabase belum dapat dihubungi.", True
+            )
+        input_asset_object_path = await upload_verification_input(
+            http_client,
+            settings,
+            user_id=user_id,
+            idempotency_key=idempotency_key,
+            digest=digest,
+            image_bytes=image_bytes,
+            content_type=content_type,
+        )
+
     cached_result = operation.get("ai_result_cache")
     result = AIResult.model_validate(cached_result) if cached_result is not None else None
     execution_mode = "MOCK"
@@ -160,8 +222,16 @@ async def verify_image(
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
                 raise error
             try:
+                community_evidence = await build_image_community_evidence(
+                    pool, settings, user_id, request.question
+                )
                 result = await verify_remote_image(
-                    http_client, settings, image_bytes, content_type, request
+                    http_client,
+                    settings,
+                    image_bytes,
+                    content_type,
+                    request,
+                    community_evidence=community_evidence,
                 )
             except ProductAPIError as error:
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
@@ -181,6 +251,9 @@ async def verify_image(
             result=result,
             execution_mode=execution_mode,
             input_type="IMAGE",
+            input_asset_object_path=input_asset_object_path,
+            input_asset_content_type=content_type,
+            input_asset_size_bytes=len(image_bytes),
         )
     except ProductAPIError:
         raise
@@ -367,11 +440,19 @@ async def _persist_terminal_result(
     result: AIResult,
     execution_mode: str,
     input_type: str,
+    input_asset_object_path: str | None = None,
+    input_asset_content_type: str | None = None,
+    input_asset_size_bytes: int | None = None,
 ) -> VerificationEnvelope:
     eligible = requires_history(result, settings)
     reason = save_reason(result, settings) if eligible else "NOT_REQUIRED"
     case_id = uuid4() if eligible else None
     community_state = "PRIVATE" if eligible else "NOT_AVAILABLE"
+    sanitized_text = (
+        request.text
+        if request is not None
+        else (result.headline or result.privacy_notice or "")
+    )
     envelope = _envelope(
         request_id=operation_id,
         case_id=case_id,
@@ -395,7 +476,7 @@ async def _persist_terminal_result(
                     operation_id,
                     operation_id,
                     input_type,
-                    request.text if request is not None else None,
+                    sanitized_text,
                     digest,
                     result.headline,
                     result.verdict,
@@ -406,6 +487,26 @@ async def _persist_terminal_result(
                     settings.history_retention_days,
                 ),
             )
+            if input_asset_object_path is not None and input_asset_content_type is not None:
+                await connection.execute(
+                    """insert into private.stored_assets
+                           (user_id, case_id, bucket, object_path, purpose, mime_type,
+                            size_bytes, sha256, expires_at)
+                       values (%s, %s, 'verification-inputs', %s, 'SCREENSHOT_OPT_IN',
+                               %s, %s, %s, now() + make_interval(hours => %s))
+                       on conflict (bucket, object_path) do update
+                           set case_id = excluded.case_id,
+                               deleted_at = null""",
+                    (
+                        user_id,
+                        case_id,
+                        input_asset_object_path,
+                        input_asset_content_type,
+                        input_asset_size_bytes or 0,
+                        digest,
+                        settings.screenshot_retention_hours,
+                    ),
+                )
             dimensions = result.dimensions
             await connection.execute(
                 """insert into public.verification_results
@@ -540,6 +641,7 @@ async def verify_remote_text(
     http_client: httpx.AsyncClient,
     settings: Settings,
     request: TextVerificationRequest | None,
+    community_evidence: list[dict[str, Any]] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
         raise ProductAPIError(
@@ -553,19 +655,16 @@ async def verify_remote_text(
                 headers={
                     "X-Waspadai-API-Key": settings.ai_service_api_key.get_secret_value(),
                     "Accept": "application/json",
+                    "Content-Type": "application/json",
                 },
-                json={
-                    **canonical_payload(request),
-                    "output_mode": "BOTH",
-                    "community_evidence": [],
-                },
+                json=remote_text_payload(request, community_evidence),
             )
 
     try:
         response = await asyncio.wait_for(
             post_to_ai(), timeout=settings.ai_service_deadline_seconds
         )
-    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
+    except (TimeoutError, httpx.TimeoutException) as error:
         raise ProductAPIError(
             504, "FACT_CHECK_UPSTREAM_TIMEOUT", "Pemeriksaan AI melewati batas waktu.", True
         ) from error
@@ -602,6 +701,7 @@ async def verify_remote_image(
     image_bytes: bytes,
     content_type: str,
     request: ImageVerificationRequest,
+    community_evidence: list[dict[str, Any]] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
         raise ProductAPIError(
@@ -620,7 +720,11 @@ async def verify_remote_image(
                 data={
                     "question": request.question or "",
                     "output_mode": "BOTH",
-                    "community_evidence_json": "[]",
+                    "community_evidence_json": json.dumps(
+                        _community_evidence_for_ai(community_evidence),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
                 },
             )
 
@@ -628,7 +732,7 @@ async def verify_remote_image(
         response = await asyncio.wait_for(
             post_to_ai(), timeout=settings.ai_service_deadline_seconds
         )
-    except (asyncio.TimeoutError, httpx.TimeoutException) as error:
+    except (TimeoutError, httpx.TimeoutException) as error:
         raise ProductAPIError(
             504, "FACT_CHECK_UPSTREAM_TIMEOUT", "Pemeriksaan AI melewati batas waktu.", True
         ) from error
