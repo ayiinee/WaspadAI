@@ -41,7 +41,9 @@ from app.learning_service import (
 )
 from app.models import (
     ConversationDetail,
+    ConversationItem,
     ConversationPage,
+    ConversationUpdateRequest,
     HistoryPage,
     ImageVerificationRequest,
     LearningCase,
@@ -59,11 +61,15 @@ from app.privacy.image_validation import (
     matches_image_signature,
     validate_image_dimensions,
 )
+from app.supabase_storage import delete_verification_input
 from app.verification_service import (
+    delete_conversation,
+    get_conversation_attachment,
     get_conversation_detail,
     get_history_detail,
     list_conversations,
     list_history,
+    rename_conversation,
     verify_image,
     verify_text,
 )
@@ -305,6 +311,80 @@ def create_app() -> FastAPI:
             conversation_id,
         )
 
+    @app.patch(
+        "/api/v1/conversations/{conversation_id}",
+        tags=["Conversations"],
+        response_model=ConversationItem,
+    )
+    async def rename_conversation_endpoint(
+        conversation_id: UUID,
+        payload: ConversationUpdateRequest,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> ConversationItem:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await rename_conversation(
+            pool, app.state.settings, user.id, conversation_id, payload.title
+        )
+
+    @app.delete(
+        "/api/v1/conversations/{conversation_id}",
+        tags=["Conversations"],
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    async def delete_conversation_endpoint(
+        conversation_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        assets = await delete_conversation(
+            pool, app.state.settings, user.id, conversation_id
+        )
+        for bucket, object_path in assets:
+            await delete_verification_input(
+                app.state.http_client,
+                app.state.settings,
+                bucket=bucket,
+                object_path=object_path,
+            )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @app.get(
+        "/api/v1/conversations/{conversation_id}/attachments/{case_id}",
+        tags=["Conversations"],
+        response_class=Response,
+    )
+    async def get_conversation_attachment_endpoint(
+        conversation_id: UUID,
+        case_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> Response:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        body, content_type = await get_conversation_attachment(
+            pool,
+            app.state.settings,
+            user.id,
+            conversation_id,
+            case_id,
+            app.state.http_client,
+        )
+        return Response(
+            content=body,
+            media_type=content_type,
+            headers={"Cache-Control": "private, no-store"},
+        )
+
     @app.get(
         "/api/v1/learning/modules",
         tags=["Learning"],
@@ -369,14 +449,20 @@ def create_app() -> FastAPI:
             )
         return await get_module_quiz(pool, app.state.settings, user.id, module_id)
 
-    @app.get("/api/v1/learning/modules/{module_id}/cases", tags=["Learning"], response_model=list[LearningCase])
+    @app.get(
+        "/api/v1/learning/modules/{module_id}/cases",
+        tags=["Learning"],
+        response_model=list[LearningCase],
+    )
     async def get_module_cases_endpoint(
         module_id: UUID,
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> list[LearningCase]:
         pool = app.state.db_pool
         if pool is None:
-            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
         return await get_module_cases(pool, app.state.settings, user.id, module_id)
 
     @app.get("/api/v1/learning/media/{object_path:path}", tags=["Learning"])
@@ -386,7 +472,9 @@ def create_app() -> FastAPI:
     ) -> Response:
         pool = app.state.db_pool
         if pool is None:
-            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
         content, content_type = await get_learning_media_asset(
             pool, app.state.settings, user.id, object_path, app.state.http_client
         )
@@ -396,14 +484,20 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "private, max-age=86400"},
         )
 
-    @app.post("/api/v1/learning/modules/{module_id}/open", tags=["Learning"], status_code=status.HTTP_204_NO_CONTENT)
+    @app.post(
+        "/api/v1/learning/modules/{module_id}/open",
+        tags=["Learning"],
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
     async def open_learning_module_endpoint(
         module_id: UUID,
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> None:
         pool = app.state.db_pool
         if pool is None:
-            raise ProductAPIError(503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True)
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
         await open_learning_module(pool, app.state.settings, user.id, module_id)
 
     @app.post(

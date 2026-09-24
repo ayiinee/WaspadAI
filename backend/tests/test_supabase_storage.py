@@ -6,7 +6,11 @@ import anyio
 import httpx
 
 from app.config import Settings
-from app.supabase_storage import upload_verification_input, verification_input_path
+from app.supabase_storage import (
+    delete_verification_input,
+    upload_verification_input,
+    verification_input_path,
+)
 
 
 def test_verification_input_path_uses_private_user_prefix() -> None:
@@ -59,5 +63,32 @@ def test_upload_verification_input_targets_verification_bucket() -> None:
 
         assert object_path is not None
         assert object_path.startswith(f"{user_id}/")
+
+    anyio.run(check)
+
+
+def test_delete_verification_input_uses_private_object_endpoint() -> None:
+    async def check() -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.method == "DELETE"
+            assert str(request.url) == (
+                "https://example.supabase.co/storage/v1/object/verification-inputs/user/case.png"
+            )
+            assert request.headers["Authorization"] == "Bearer service-role"
+            assert request.headers["apikey"] == "service-role"
+            return httpx.Response(200)
+
+        settings = Settings(
+            _env_file=None,
+            supabase_url="https://example.supabase.co",
+            supabase_service_role_key="service-role",
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await delete_verification_input(
+                client,
+                settings,
+                bucket="verification-inputs",
+                object_path="user/case.png",
+            )
 
     anyio.run(check)

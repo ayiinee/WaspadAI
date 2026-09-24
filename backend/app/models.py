@@ -181,6 +181,26 @@ class ConversationPage(BaseModel):
     next_cursor: str | None
 
 
+class ConversationUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def normalize_title(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Judul percakapan tidak boleh kosong.")
+        return normalized
+
+
+class ConversationAttachment(BaseModel):
+    available: bool = False
+    content_type: str | None = None
+    size_bytes: int | None = None
+
+
 class ConversationTurn(BaseModel):
     case_id: UUID
     input_type: Literal["TEXT", "IMAGE"]
@@ -189,6 +209,7 @@ class ConversationTurn(BaseModel):
     execution_mode: Literal["MOCK", "REMOTE"]
     history: HistoryMeta
     result: AIResult
+    attachment: ConversationAttachment | None = None
 
 
 class ConversationDetail(BaseModel):

@@ -21,6 +21,7 @@ from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_image_review_required_result, build_review_required_result
 from app.models import (
+    ConversationAttachment,
     ConversationDetail,
     ConversationItem,
     ConversationPage,
@@ -33,12 +34,19 @@ from app.models import (
     VerificationEnvelope,
 )
 from app.schemas.verification import AIResult
-from app.supabase_storage import upload_verification_input
+from app.supabase_storage import delete_verification_input, upload_verification_input
 
 VERIFY_TEXT_ROUTE = "POST /api/v1/verifications/text"
 VERIFY_IMAGE_ROUTE = "POST /api/v1/verifications/image"
 DEFAULT_TEXT_QUESTION = "Apakah isi teks ini benar dan aman ditindaklanjuti?"
 _ai_semaphores: dict[int, asyncio.Semaphore] = {}
+
+
+def conversation_title(input_text: str) -> str:
+    normalized = " ".join(input_text.split())
+    if not normalized:
+        return "Pemeriksaan gambar"
+    return " ".join(normalized.split(" ")[:7])[:80]
 
 
 def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
@@ -260,22 +268,6 @@ async def verify_image(
     if operation["state"] == "COMPLETED" and cached_response is not None:
         return VerificationEnvelope.model_validate(cached_response)
 
-    input_asset_object_path: str | None = None
-    if settings.store_screenshots_enabled:
-        if http_client is None:
-            raise ProductAPIError(
-                503, "STORAGE_UNAVAILABLE", "Storage Supabase belum dapat dihubungi.", True
-            )
-        input_asset_object_path = await upload_verification_input(
-            http_client,
-            settings,
-            user_id=user_id,
-            idempotency_key=idempotency_key,
-            digest=digest,
-            image_bytes=image_bytes,
-            content_type=content_type,
-        )
-
     cached_result = operation.get("ai_result_cache")
     result = AIResult.model_validate(cached_result) if cached_result is not None else None
     execution_mode = "MOCK"
@@ -307,6 +299,22 @@ async def verify_image(
         else:
             result = build_image_review_required_result(request.question, digest)
 
+    input_asset_object_path: str | None = None
+    if settings.store_screenshots_enabled and requires_history(result, settings):
+        if http_client is None:
+            raise ProductAPIError(
+                503, "STORAGE_UNAVAILABLE", "Storage Supabase belum dapat dihubungi.", True
+            )
+        input_asset_object_path = await upload_verification_input(
+            http_client,
+            settings,
+            user_id=user_id,
+            idempotency_key=idempotency_key,
+            digest=digest,
+            image_bytes=image_bytes,
+            content_type=content_type,
+        )
+
     try:
         return await _persist_terminal_result(
             pool=pool,
@@ -324,8 +332,14 @@ async def verify_image(
             input_asset_size_bytes=len(image_bytes),
         )
     except ProductAPIError:
+        await _delete_unpersisted_input(
+            http_client, settings, input_asset_object_path
+        )
         raise
     except Exception as error:
+        await _delete_unpersisted_input(
+            http_client, settings, input_asset_object_path
+        )
         await _record_persistence_failure(pool, settings, user_id, operation["id"], result)
         raise ProductAPIError(
             503,
@@ -333,6 +347,26 @@ async def verify_image(
             "Hasil pemeriksaan belum dapat disimpan. Coba lagi dengan Idempotency-Key yang sama.",
             retryable=True,
         ) from error
+
+
+async def _delete_unpersisted_input(
+    http_client: httpx.AsyncClient | None,
+    settings: Settings,
+    object_path: str | None,
+) -> None:
+    if http_client is None or object_path is None:
+        return
+    try:
+        await delete_verification_input(
+            http_client,
+            settings,
+            bucket="verification-inputs",
+            object_path=object_path,
+        )
+    except ProductAPIError:
+        # Preserve the original persistence error; storage cleanup can be retried
+        # independently through the bucket retention policy.
+        pass
 
 
 async def list_history(
@@ -473,6 +507,108 @@ async def list_conversations(
     return ConversationPage(items=items, next_cursor=next_cursor)
 
 
+async def rename_conversation(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    conversation_id: UUID,
+    title: str,
+) -> ConversationItem:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """update public.verification_conversations
+                  set title = %s
+                where id = %s and deleted_at is null
+            returning id, title, latest_message_preview, latest_message_role,
+                      last_verdict, created_at, updated_at""",
+            (title, conversation_id),
+        )
+        row = await query.fetchone()
+    if row is None:
+        raise ProductAPIError(404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan.")
+    return ConversationItem(
+        conversation_id=row["id"],
+        title=row["title"],
+        latest_message_preview=row["latest_message_preview"],
+        latest_message_role=row["latest_message_role"],
+        last_verdict=row["last_verdict"],
+        created_at=_iso8601(row["created_at"]),
+        updated_at=_iso8601(row["updated_at"]),
+    )
+
+
+async def delete_conversation(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    conversation_id: UUID,
+) -> list[tuple[str, str]]:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        owner_query = await connection.execute(
+            """select id from public.verification_conversations
+                where id = %s and deleted_at is null""",
+            (conversation_id,),
+        )
+        if await owner_query.fetchone() is None:
+            raise ProductAPIError(404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan.")
+        assets_query = await connection.execute(
+            """select asset.bucket, asset.object_path
+                 from private.stored_assets asset
+                 join public.verification_cases c on c.id = asset.case_id
+                where c.conversation_id = %s and asset.deleted_at is null
+                  and asset.purpose = 'SCREENSHOT_OPT_IN'""",
+            (conversation_id,),
+        )
+        assets = [(row["bucket"], row["object_path"]) for row in await assets_query.fetchall()]
+        await connection.execute(
+            """update private.stored_assets asset set deleted_at = now()
+                 from public.verification_cases c
+                where asset.case_id = c.id and c.conversation_id = %s
+                  and asset.purpose = 'SCREENSHOT_OPT_IN' and asset.deleted_at is null""",
+            (conversation_id,),
+        )
+        await connection.execute(
+            """update public.verification_conversations set deleted_at = now()
+                where id = %s""",
+            (conversation_id,),
+        )
+    return assets
+
+
+async def get_conversation_attachment(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    conversation_id: UUID,
+    case_id: UUID,
+    http_client: httpx.AsyncClient,
+) -> tuple[bytes, str]:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """select asset.bucket, asset.object_path, asset.mime_type
+                 from public.verification_conversations conversation
+                 join public.verification_cases c on c.conversation_id = conversation.id
+                 join private.stored_assets asset on asset.case_id = c.id
+                where conversation.id = %s and c.id = %s
+                  and conversation.deleted_at is null and asset.deleted_at is null
+                  and asset.purpose = 'SCREENSHOT_OPT_IN'""",
+            (conversation_id, case_id),
+        )
+        asset = await query.fetchone()
+    if asset is None:
+        raise ProductAPIError(404, "ATTACHMENT_NOT_FOUND", "Lampiran tidak ditemukan.")
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Lampiran belum dapat dimuat.", True)
+    key = settings.supabase_service_role_key.get_secret_value()
+    response = await http_client.get(
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{asset['bucket']}/{asset['object_path']}",
+        headers={"Authorization": f"Bearer {key}", "apikey": key},
+    )
+    if response.is_error:
+        raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Lampiran belum dapat dimuat.", True)
+    return response.content, asset["mime_type"]
+
+
 async def get_conversation_detail(
     pool: AsyncConnectionPool,
     settings: Settings,
@@ -491,9 +627,15 @@ async def get_conversation_detail(
             raise ProductAPIError(404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan.")
         turns_query = await connection.execute(
             """select c.id, c.input_type, c.sanitized_text, c.save_reason,
-                      c.community_state, c.created_at, r.result_json, r.execution_mode
+                      c.community_state, c.created_at, r.result_json, r.execution_mode,
+                      asset.id is not null as attachment_available,
+                      asset.mime_type as attachment_content_type,
+                      asset.size_bytes as attachment_size_bytes
                  from public.verification_cases c
                  join public.verification_results r on r.case_id = c.id
+            left join private.stored_assets asset
+                   on asset.case_id = c.id and asset.deleted_at is null
+                  and asset.purpose = 'SCREENSHOT_OPT_IN'
                 where c.conversation_id = %s and c.deleted_at is null
                 order by c.turn_index asc""",
             (conversation_id,),
@@ -519,6 +661,11 @@ async def get_conversation_detail(
                     community_state=row["community_state"],
                 ),
                 result=result,
+                attachment=ConversationAttachment(
+                    available=row["attachment_available"],
+                    content_type=row["attachment_content_type"],
+                    size_bytes=row["attachment_size_bytes"],
+                ) if row["input_type"] == "IMAGE" else None,
             )
         )
     return ConversationDetail(
@@ -649,7 +796,7 @@ async def _persist_terminal_result(
                     (
                         resolved_conversation_id,
                         user_id,
-                        result.headline,
+                        conversation_title(sanitized_text),
                         latest_preview,
                         result.verdict,
                         retention_days,
@@ -691,6 +838,15 @@ async def _persist_terminal_result(
                         where conversation_id = %s""",
                     (retention_days, resolved_conversation_id),
                 )
+                await connection.execute(
+                    """update private.stored_assets asset
+                          set expires_at = now() + make_interval(days => %s)
+                         from public.verification_cases c
+                        where asset.case_id = c.id and c.conversation_id = %s
+                          and asset.purpose = 'SCREENSHOT_OPT_IN'
+                          and asset.deleted_at is null""",
+                    (retention_days, resolved_conversation_id),
+                )
             await connection.execute(
                 """insert into public.verification_cases
                        (id, user_id, operation_id, product_request_id, conversation_id, turn_index,
@@ -727,7 +883,8 @@ async def _persist_terminal_result(
                                %s, %s, %s, now() + make_interval(hours => %s))
                        on conflict (bucket, object_path) do update
                            set case_id = excluded.case_id,
-                               deleted_at = null""",
+                              expires_at = excluded.expires_at,
+                              deleted_at = null""",
                     (
                         user_id,
                         case_id,
@@ -735,7 +892,7 @@ async def _persist_terminal_result(
                         input_asset_content_type,
                         input_asset_size_bytes or 0,
                         digest,
-                        settings.screenshot_retention_hours,
+                        settings.history_retention_days * 24,
                     ),
                 )
             dimensions = result.dimensions

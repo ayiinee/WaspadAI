@@ -80,6 +80,29 @@ async def upload_verification_input(
     return object_path
 
 
+async def delete_verification_input(
+    http_client: httpx.AsyncClient,
+    settings: Settings,
+    *,
+    bucket: str,
+    object_path: str,
+) -> None:
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        return
+    key = settings.supabase_service_role_key.get_secret_value()
+    response = await http_client.delete(
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{bucket}/{object_path}",
+        headers={"Authorization": f"Bearer {key}", "apikey": key},
+    )
+    if response.is_error and response.status_code != 404:
+        raise ProductAPIError(
+            503,
+            "STORAGE_UNAVAILABLE",
+            "Lampiran percakapan belum dapat dibersihkan.",
+            retryable=True,
+        )
+
+
 def _extension_for_content_type(content_type: str) -> str:
     return {
         "image/png": "png",

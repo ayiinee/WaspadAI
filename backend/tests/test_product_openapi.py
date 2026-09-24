@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app.auth import AuthenticatedUser, get_current_user
 from app.errors import ProductAPIError
 from app.main import create_app
+from app.models import ConversationItem
 from app.schemas.community import CommunityStateResponse
 
 
@@ -20,6 +21,19 @@ def test_product_routes_and_idempotency_header_are_exported() -> None:
     assert "/api/v1/history/{case_id}" in specification["paths"]
     assert "/api/v1/conversations" in specification["paths"]
     assert "/api/v1/conversations/{conversation_id}" in specification["paths"]
+    assert {"get", "patch", "delete"} <= set(
+        specification["paths"]["/api/v1/conversations/{conversation_id}"]
+    )
+    assert (
+        "/api/v1/conversations/{conversation_id}/attachments/{case_id}"
+        in specification["paths"]
+    )
+    update_schema = specification["components"]["schemas"]["ConversationUpdateRequest"]
+    assert update_schema["properties"]["title"]["maxLength"] == 80
+    attachment_schema = specification["components"]["schemas"]["ConversationAttachment"]
+    assert {"available", "content_type", "size_bytes"} <= set(
+        attachment_schema["properties"]
+    )
     assert "/api/v1/home" in specification["paths"]
     assert "/api/v1/verifications/image" in specification["paths"]
     text_request = specification["components"]["schemas"]["TextVerificationRequest"]
@@ -155,3 +169,88 @@ def test_self_response_error_contract(monkeypatch) -> None:
     assert response.json()["error"]["message"] == (
         "User cannot respond to their own community case"
     )
+
+
+def test_rename_conversation_normalizes_title(monkeypatch) -> None:
+    user_id = uuid4()
+    conversation_id = uuid4()
+    captured_title: str | None = None
+
+    async def rename(*args: object) -> ConversationItem:
+        nonlocal captured_title
+        captured_title = str(args[-1])
+        return ConversationItem(
+            conversation_id=conversation_id,
+            title=captured_title,
+            latest_message_preview="Preview",
+            latest_message_role="ASSISTANT",
+            last_verdict="UNVERIFIED",
+            created_at="2026-09-25T00:00:00Z",
+            updated_at="2026-09-25T00:00:00Z",
+        )
+
+    monkeypatch.setattr("app.main.create_pool", lambda _settings: None)
+    monkeypatch.setattr("app.main.rename_conversation", rename)
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id, None)
+    with TestClient(app) as client:
+        app.state.db_pool = object()
+        response = client.patch(
+            f"/api/v1/conversations/{conversation_id}",
+            json={"title": "  Judul    baru  "},
+        )
+        app.state.db_pool = None
+
+    assert response.status_code == 200
+    assert captured_title == "Judul baru"
+    assert response.json()["title"] == "Judul baru"
+
+
+def test_delete_conversation_soft_deletes_then_cleans_assets(monkeypatch) -> None:
+    user_id = uuid4()
+    conversation_id = uuid4()
+    cleaned: list[tuple[str, str]] = []
+
+    async def delete(*_args: object) -> list[tuple[str, str]]:
+        return [("verification-inputs", "user/input.png")]
+
+    async def clean(*_args: object, bucket: str, object_path: str, **_kwargs: object) -> None:
+        cleaned.append((bucket, object_path))
+
+    monkeypatch.setattr("app.main.create_pool", lambda _settings: None)
+    monkeypatch.setattr("app.main.delete_conversation", delete)
+    monkeypatch.setattr("app.main.delete_verification_input", clean)
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id, None)
+    with TestClient(app) as client:
+        app.state.db_pool = object()
+        response = client.delete(f"/api/v1/conversations/{conversation_id}")
+        app.state.db_pool = None
+
+    assert response.status_code == 204
+    assert cleaned == [("verification-inputs", "user/input.png")]
+
+
+def test_conversation_attachment_preserves_private_mime_response(monkeypatch) -> None:
+    user_id = uuid4()
+    conversation_id = uuid4()
+    case_id = uuid4()
+
+    async def attachment(*_args: object) -> tuple[bytes, str]:
+        return b"private-image", "image/png"
+
+    monkeypatch.setattr("app.main.create_pool", lambda _settings: None)
+    monkeypatch.setattr("app.main.get_conversation_attachment", attachment)
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id, None)
+    with TestClient(app) as client:
+        app.state.db_pool = object()
+        response = client.get(
+            f"/api/v1/conversations/{conversation_id}/attachments/{case_id}"
+        )
+        app.state.db_pool = None
+
+    assert response.status_code == 200
+    assert response.content == b"private-image"
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "private, no-store"

@@ -9,14 +9,31 @@ from pydantic import ValidationError
 from app.config import Settings
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_not_required_result, build_review_required_result
-from app.models import TextVerificationRequest
+from app.models import ConversationUpdateRequest, TextVerificationRequest
 from app.verification_service import (
     _persist_terminal_result,
     canonical_payload,
+    conversation_title,
     payload_hash,
     requires_history,
     save_reason,
 )
+
+
+def test_conversation_title_uses_first_seven_normalized_words() -> None:
+    assert conversation_title("  satu   dua tiga empat lima enam tujuh delapan  ") == (
+        "satu dua tiga empat lima enam tujuh"
+    )
+
+
+def test_conversation_update_normalizes_before_validating_length() -> None:
+    request = ConversationUpdateRequest(title="  Judul    ringkas  ")
+    assert request.title == "Judul ringkas"
+
+    with pytest.raises(ValidationError):
+        ConversationUpdateRequest(title=" ")
+    with pytest.raises(ValidationError):
+        ConversationUpdateRequest(title="x" * 81)
 
 
 def request_payload(**overrides: object) -> dict[str, object]:
