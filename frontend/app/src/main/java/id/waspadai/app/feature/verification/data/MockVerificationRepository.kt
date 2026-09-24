@@ -5,12 +5,15 @@ import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.domain.ImageVerificationInput
+import id.waspadai.app.feature.verification.domain.TextVerificationInput
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import kotlinx.coroutines.delay
 
 class MockVerificationRepository : VerificationRepository {
-    override suspend fun submitText(text: String): AppResult<VerificationResult> {
+    override suspend fun submitText(input: TextVerificationInput): AppResult<VerificationResult> {
         delay(700)
+        val text = input.text
         val lowerText = text.lowercase()
         val result = when {
             listOf("otp", "pin", "password", "kode verifikasi").any(lowerText::contains) -> {
@@ -59,22 +62,16 @@ class MockVerificationRepository : VerificationRepository {
         return AppResult.Success(result)
     }
 
-    override suspend fun submitImage(
-        imageBytes: ByteArray,
-        contentType: String,
-        fileName: String,
-        question: String?,
-        overlayModeEnabled: Boolean,
-    ): AppResult<VerificationResult> {
+    override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> {
         delay(700)
-        val modeText = if (overlayModeEnabled) {
+        val modeText = if (input.source == id.waspadai.app.core.trigger.TriggerSource.FLOATING_OVERLAY) {
             " Mode overlay aktif untuk menandai bagian visual yang perlu diperhatikan."
         } else {
             ""
         }
         return AppResult.Success(
             VerificationResult(
-                narrative = "Gambar \"$fileName\" dianalisis dalam mode simulasi.$modeText Periksa sumber asli gambar dan jangan mengikuti instruksi pembayaran, tautan, atau kode yang terlihat mencurigakan.",
+                narrative = "Gambar \"${input.fileName}\" dianalisis dalam mode simulasi.$modeText Periksa sumber asli gambar dan jangan mengikuti instruksi pembayaran, tautan, atau kode yang terlihat mencurigakan.",
                 riskLevel = RiskLevel.MEDIUM,
                 reasons = listOf(
                     "Validasi gambar live belum aktif pada mode simulasi.",

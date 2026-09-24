@@ -2,6 +2,7 @@ package id.waspadai.app.feature.verification.domain
 
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.core.trigger.TriggerSource
 
 class SubmitImageVerificationUseCase(
     private val repository: VerificationRepository
@@ -11,12 +12,14 @@ class SubmitImageVerificationUseCase(
         contentType: String,
         fileName: String,
         question: String?,
-        overlayModeEnabled: Boolean,
+        source: TriggerSource = TriggerSource.IN_APP,
     ): AppResult<VerificationResult> = repository.submitImage(
-        imageBytes = imageBytes,
-        contentType = contentType,
-        fileName = fileName,
-        question = question,
-        overlayModeEnabled = overlayModeEnabled,
+        ImageVerificationInput(
+            imageBytes = imageBytes,
+            contentType = contentType,
+            fileName = fileName,
+            question = question,
+            source = source,
+        )
     )
 }

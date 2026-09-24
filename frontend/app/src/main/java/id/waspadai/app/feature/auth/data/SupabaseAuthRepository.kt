@@ -20,11 +20,15 @@ class SupabaseAuthRepository(
     private val supabaseUrl: String,
     private val publishableKey: String,
     initialAccessToken: String = "",
+    private val sessionStore: AuthSessionStore = NoOpAuthSessionStore,
 ) : AccessTokenProvider {
-    private var accessToken: String = initialAccessToken.trim()
-    private var refreshToken: String = ""
+    private val restoredSession = sessionStore.load()
+    private var accessToken: String = restoredSession?.accessToken ?: initialAccessToken.trim()
+    private var refreshToken: String = restoredSession?.refreshToken.orEmpty()
 
     override suspend fun currentAccessToken(): String? = accessToken.takeIf(String::isNotBlank)
+
+    fun hasSession(): Boolean = accessToken.isNotBlank()
 
     override suspend fun refreshAccessToken(): String? {
         val token = refreshToken.takeIf(String::isNotBlank) ?: return currentAccessToken()
@@ -104,6 +108,7 @@ class SupabaseAuthRepository(
     fun clearSession() {
         accessToken = ""
         refreshToken = ""
+        sessionStore.clear()
     }
 
     private suspend inline fun <reified T> requestSession(path: String, body: T): SupabaseSessionDto {
@@ -141,6 +146,7 @@ class SupabaseAuthRepository(
                 "Login berhasil dibuat, tetapi Supabase belum mengembalikan sesi. Periksa email konfirmasi lalu masuk kembali."
             )
         }
+        sessionStore.save(StoredAuthSession(accessToken, refreshToken))
     }
 
     private fun ensureConfigured() {

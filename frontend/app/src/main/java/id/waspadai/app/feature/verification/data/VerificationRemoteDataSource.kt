@@ -3,6 +3,7 @@ package id.waspadai.app.feature.verification.data
 import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.verification.data.dto.ErrorEnvelopeDto
 import id.waspadai.app.feature.verification.data.dto.HistoryPageDto
+import id.waspadai.app.feature.verification.data.dto.PageContextDto
 import id.waspadai.app.feature.verification.data.dto.TextVerificationRequestDto
 import id.waspadai.app.feature.verification.data.dto.VerificationEnvelopeDto
 import io.ktor.client.HttpClient
@@ -29,14 +30,29 @@ class VerificationRemoteDataSource(
     private val config: WaspadAiApiConfig,
     private val tokenProvider: AccessTokenProvider,
 ) {
-    suspend fun submitText(text: String): VerificationEnvelopeDto {
+    suspend fun submitText(
+        text: String,
+        question: String? = null,
+        sourceUrl: String? = null,
+        senderContext: String = "UNKNOWN",
+        pageContext: id.waspadai.app.core.trigger.VerificationPageContext? = null,
+    ): VerificationEnvelopeDto {
         val idempotencyKey = UUID.randomUUID().toString()
         val accessToken = requireAccessToken()
-        var response = postText(text, accessToken, idempotencyKey)
+        val payload = TextVerificationRequestDto(
+            text = text,
+            question = question,
+            sourceUrl = sourceUrl,
+            senderContext = senderContext,
+            pageContext = pageContext?.let {
+                PageContextDto(title = it.title, before = it.before, after = it.after)
+            },
+        )
+        var response = postText(payload, accessToken, idempotencyKey)
         if (response.status == HttpStatusCode.Unauthorized) {
             val refreshedToken = tokenProvider.refreshAccessToken()
             if (!refreshedToken.isNullOrBlank()) {
-                response = postText(text, refreshedToken, idempotencyKey)
+                response = postText(payload, refreshedToken, idempotencyKey)
             }
         }
         if (!response.status.isSuccess()) {
@@ -74,7 +90,7 @@ class VerificationRemoteDataSource(
     }
 
     private suspend fun postText(
-        text: String,
+        payload: TextVerificationRequestDto,
         accessToken: String,
         idempotencyKey: String,
     ): HttpResponse = client.post(config.textVerificationUrl) {
@@ -84,7 +100,7 @@ class VerificationRemoteDataSource(
                 append("Idempotency-Key", idempotencyKey)
             }
             accept(ContentType.Application.Json)
-            setBody(TextVerificationRequestDto(text = text))
+            setBody(payload)
         }
 
     private suspend fun postImage(

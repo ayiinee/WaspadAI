@@ -1,12 +1,12 @@
 ﻿package id.waspadai.app.feature.verification.presentation.component
 
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -70,17 +69,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import id.waspadai.app.R
 import id.waspadai.app.ui.theme.WaspadAIBlue
-import id.waspadai.app.ui.theme.WaspadAICaution
 import id.waspadai.app.ui.theme.WaspadAIDarkBlue
 import id.waspadai.app.ui.theme.WaspadAILightBlue
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import id.waspadai.app.core.model.RiskLevel
@@ -95,9 +93,8 @@ import id.waspadai.app.feature.verification.presentation.ImageVerificationPrevie
 
 @Composable
 fun WaspadAiHeader(
-    overlayModeEnabled: Boolean,
     enabled: Boolean,
-    onToggleOverlayMode: () -> Unit,
+    onOpenQuickAccess: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -126,46 +123,23 @@ fun WaspadAiHeader(
                     .align(Alignment.CenterStart)
                     .padding(start = 32.dp)
             )
-            val thumbOffset by animateDpAsState(
-                targetValue = if (overlayModeEnabled) 27.dp else 3.dp,
-                label = "tanyainThumb",
-            )
-            val trackColor by animateColorAsState(
-                targetValue = if (overlayModeEnabled) WaspadAICaution else WaspadAIDarkBlue,
-                label = "tanyainTrack",
-            )
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 20.dp)
-                    .width(92.dp)
-                    .height(32.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(trackColor)
+                    .background(WaspadAIDarkBlue)
                     .border(1.5.dp, Color.White, RoundedCornerShape(18.dp))
-                    .toggleable(
-                        value = overlayModeEnabled,
-                        enabled = enabled,
-                        role = Role.Switch,
-                        onValueChange = { onToggleOverlayMode() },
-                    ),
+                    .clickable(enabled = enabled, onClick = onOpenQuickAccess)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .offset(x = thumbOffset)
-                        .align(Alignment.CenterStart)
-                        .width(62.dp)
-                        .height(26.dp)
-                        .background(Color.White, RoundedCornerShape(15.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Tanyain",
-                        color = WaspadAIBlue,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
-                }
+                Text(
+                    text = "Akses Cepat",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
             }
         }
     }
@@ -466,6 +440,7 @@ fun AnalysisCard(
     isSample: Boolean,
     onShareToCommunity: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -491,6 +466,20 @@ fun AnalysisCard(
                 Text("CONTOH TAMPILAN", color = Color(0xFF728995), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(10.dp))
+            if (result.headline.isNotBlank()) {
+                Text(
+                    result.headline,
+                    color = Ink,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ResultPill("Truth: ${result.verdict.label}")
+                ResultPill("Fakta: ${result.factualStatus.label}")
+            }
+            Spacer(Modifier.height(10.dp))
             Text(result.narrative, color = Ink, fontSize = 16.sp, lineHeight = 22.sp)
             if (result.reasons.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
@@ -504,6 +493,87 @@ fun AnalysisCard(
             }
             Spacer(Modifier.height(13.dp))
             RiskLabel(result.riskLevel)
+            if (result.evidence.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("Evidence", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                result.evidence.forEach { evidence ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = SoftBlue),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                evidence.title.ifBlank { evidence.publisher.ifBlank { "Bukti pendukung" } },
+                                color = Ink,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (evidence.publisher.isNotBlank()) {
+                                Text(evidence.publisher, color = BrandBlue, fontSize = 12.sp)
+                            }
+                            if (evidence.excerpt.isNotBlank()) {
+                                Text(evidence.excerpt, color = Ink, fontSize = 13.sp, lineHeight = 18.sp)
+                            }
+                            if (evidence.stance.isNotBlank() || evidence.verificationStatus.isNotBlank()) {
+                                Text(
+                                    listOf(evidence.stance, evidence.verificationStatus)
+                                        .filter(String::isNotBlank)
+                                        .joinToString(" • "),
+                                    color = Color(0xFF557383),
+                                    fontSize = 11.sp,
+                                )
+                            }
+                            if (evidence.url.isNotBlank()) {
+                                TextButton(
+                                    onClick = {
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(evidence.url)))
+                                        }
+                                    },
+                                ) { Text("Buka bukti") }
+                            }
+                        }
+                    }
+                }
+            }
+            if (result.sources.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("Sumber", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                result.sources.forEach { source ->
+                    Text(
+                        text = "${source.publisher.ifBlank { "Sumber" }} — ${source.title.ifBlank { source.url }}",
+                        color = BrandBlue,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source.url)))
+                                }
+                            }
+                            .padding(vertical = 7.dp),
+                    )
+                }
+            }
+            if (result.uncertainty.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text("Ketidakpastian", color = Ink, fontWeight = FontWeight.Bold)
+                Text(result.uncertainty, color = Color(0xFF557383), fontSize = 13.sp)
+            }
+            if (result.requiresHumanReview) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Hasil ini memerlukan peninjauan manusia sebelum dijadikan dasar keputusan.",
+                    color = Color(0xFF9B5D00),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            if (result.disclaimer.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text(result.disclaimer, color = Color(0xFF6A7880), fontSize = 11.sp, lineHeight = 16.sp)
+            }
             if (result.communityEligible &&
                 result.communityState == "PRIVATE" &&
                 result.riskLevel == RiskLevel.UNKNOWN &&
@@ -527,6 +597,20 @@ fun AnalysisCard(
 }
 
 @Composable
+private fun ResultPill(text: String) {
+    Text(
+        text = text,
+        color = BrandBlue,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(SoftBlue)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+    )
+}
+
+@Composable
 private fun Bullet(value: String) {
     Row(Modifier.padding(top = 5.dp)) {
         Text("•", fontSize = 18.sp, color = Ink, modifier = Modifier.padding(end = 9.dp))
@@ -537,6 +621,7 @@ private fun Bullet(value: String) {
 @Composable
 private fun RiskLabel(riskLevel: RiskLevel) {
     val color = when (riskLevel) {
+        RiskLevel.CRITICAL -> Color(0xFF8C1D18)
         RiskLevel.HIGH -> RiskRed
         RiskLevel.MEDIUM -> Color(0xFFB86E00)
         RiskLevel.LOW -> Color(0xFF197A3D)

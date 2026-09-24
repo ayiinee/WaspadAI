@@ -15,9 +15,32 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SupabaseAuthRepositoryTest {
+    @Test
+    fun `restores persisted session after process recreation and clears it on logout`() = runTest {
+        val store = FakeSessionStore(StoredAuthSession("restored-access", "restored-refresh"))
+        val repository = SupabaseAuthRepository(
+            client = httpClient(MockEngine { error("Network must not be called") }),
+            supabaseUrl = "",
+            publishableKey = "",
+            sessionStore = store,
+        )
+
+        assertTrue(repository.hasSession())
+        assertEquals("restored-access", repository.currentAccessToken())
+
+        repository.signOut()
+
+        assertFalse(repository.hasSession())
+        assertNull(repository.currentAccessToken())
+        assertEquals(1, store.clearCount)
+    }
+
     @Test
     fun `password recovery sends email verifies code and updates password with recovery session`() = runTest {
         var requestIndex = 0
@@ -71,4 +94,20 @@ class SupabaseAuthRepositoryTest {
     }
 
     private fun jsonHeaders() = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+
+    private class FakeSessionStore(initial: StoredAuthSession?) : AuthSessionStore {
+        private var value = initial
+        var clearCount = 0
+
+        override fun load(): StoredAuthSession? = value
+
+        override fun save(session: StoredAuthSession) {
+            value = session
+        }
+
+        override fun clear() {
+            value = null
+            clearCount += 1
+        }
+    }
 }

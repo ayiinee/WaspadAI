@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -39,13 +40,19 @@ import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.presentation.VerificationRoute
+import id.waspadai.app.feature.verification.presentation.VerificationAction
 import id.waspadai.app.feature.verification.presentation.VerificationViewModel
 import id.waspadai.app.ui.theme.WaspadAITheme
 import id.waspadai.app.feature.community.presentation.CommunityAction
 import id.waspadai.app.core.ui.CommunityNotificationState
 import id.waspadai.app.core.ui.LocalCommunityNotification
 import id.waspadai.app.core.overlay.FloatingVerifyService
+import id.waspadai.app.core.trigger.CapturedContext
+import id.waspadai.app.core.trigger.IncomingTriggerParser
+import id.waspadai.app.core.trigger.PendingVerificationTrigger
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import android.widget.Toast
 
 private const val VerificationRouteName = "verification"
 private const val HomeRouteName = "home"
@@ -56,6 +63,7 @@ private const val WelcomeRouteName = "welcome"
 
 class MainActivity : ComponentActivity() {
     private val openTanyaAreaFull = MutableStateFlow(false)
+    private val pendingTrigger = MutableStateFlow<PendingVerificationTrigger?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,14 +79,18 @@ class MainActivity : ComponentActivity() {
             FloatingVerifyService.EXTRA_OPEN_FULL,
             false,
         ) == true
+        consumeTriggerIntent(intent)
         setContent {
             WaspadAITheme {
                 val shouldOpenTanyaArea by openTanyaAreaFull.collectAsStateWithLifecycle()
+                val trigger by pendingTrigger.collectAsStateWithLifecycle()
                 WaspadAiApp(
                     app = app,
                     sharedCaseId = sharedCaseId,
                     openTanyaAreaFull = shouldOpenTanyaArea,
                     onTanyaAreaOpened = { openTanyaAreaFull.value = false },
+                    pendingTrigger = trigger,
+                    onTriggerConsumed = { pendingTrigger.value = null },
                 )
             }
         }
@@ -90,6 +102,34 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(FloatingVerifyService.EXTRA_OPEN_FULL, false)) {
             openTanyaAreaFull.value = true
         }
+        consumeTriggerIntent(intent)
+    }
+
+    private fun consumeTriggerIntent(intent: Intent?) {
+        intent ?: return
+        if (intent.getBooleanExtra(EXTRA_CONSUME_PENDING_TRIGGER, false)) {
+            pendingTrigger.value = (application as WaspadAIApplication).pendingTriggerStore.take()
+            intent.removeExtra(EXTRA_CONSUME_PENDING_TRIGGER)
+            return
+        }
+        if (intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE) {
+            lifecycleScope.launch {
+                IncomingTriggerParser(contentResolver).parse(intent)
+                    .onSuccess { pendingTrigger.value = it }
+                    .onFailure {
+                        Toast.makeText(
+                            this@MainActivity,
+                            it.message ?: "Konten share tidak dapat dibaca.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                intent.action = null
+            }
+        }
+    }
+
+    companion object {
+        const val EXTRA_CONSUME_PENDING_TRIGGER = "consume_pending_verification_trigger"
     }
 }
 
@@ -99,6 +139,8 @@ private fun WaspadAiApp(
     sharedCaseId: String? = null,
     openTanyaAreaFull: Boolean = false,
     onTanyaAreaOpened: () -> Unit = {},
+    pendingTrigger: PendingVerificationTrigger? = null,
+    onTriggerConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -134,6 +176,17 @@ private fun WaspadAiApp(
                 }
             }
             onTanyaAreaOpened()
+        }
+    }
+    LaunchedEffect(pendingTrigger?.id, currentRoute) {
+        if (pendingTrigger != null && currentRoute != null && currentRoute != WelcomeRouteName) {
+            if (currentRoute != VerificationRouteName) {
+                navController.navigate(VerificationRouteName) {
+                    popUpTo(HomeRouteName) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
         }
     }
     val navigateToTopLevel: (String) -> Unit = { destination ->
@@ -178,7 +231,14 @@ private fun WaspadAiApp(
             markOpened = { showCommunityBadge = false },
         )
     ) {
-    NavHost(navController = navController, startDestination = WelcomeRouteName) {
+    val startDestination = rememberSaveable {
+        when {
+            !app.authRepository.hasSession() -> WelcomeRouteName
+            sharedCaseId != null -> CommunityRouteName
+            else -> HomeRouteName
+        }
+    }
+    NavHost(navController = navController, startDestination = startDestination) {
         composable(WelcomeRouteName) {
             AuthLandingScreen(
                 rememberedCredentials = app.rememberedCredentialsStore.load(),
@@ -244,6 +304,36 @@ private fun WaspadAiApp(
                     isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED,
                 ),
             )
+            LaunchedEffect(pendingTrigger?.id) {
+                val trigger = pendingTrigger ?: return@LaunchedEffect
+                val sharedText = trigger.contexts
+                    .filterIsInstance<CapturedContext.Text>()
+                    .joinToString("\n\n") { it.text }
+                if (sharedText.isNotBlank()) {
+                    val firstText = trigger.contexts.filterIsInstance<CapturedContext.Text>().first()
+                    viewModel.onAction(
+                        VerificationAction.TextContextSelected(
+                            text = sharedText,
+                            source = firstText.source,
+                            pageContext = firstText.pageContext,
+                        )
+                    )
+                }
+                val images = trigger.contexts
+                    .filterIsInstance<CapturedContext.Image>()
+                    .map { image ->
+                        VerificationAction.ImageSelected(
+                            imageBytes = image.imageBytes,
+                            contentType = image.contentType,
+                            fileName = image.fileName,
+                            source = image.source,
+                        )
+                    }
+                if (images.isNotEmpty()) {
+                    viewModel.onAction(VerificationAction.AttachmentsSelected(images))
+                }
+                onTriggerConsumed()
+            }
             VerificationRoute(
                 viewModel = viewModel,
                 onDestinationSelected = navigateToTopLevel,
@@ -294,6 +384,8 @@ private fun WaspadAiApp(
                     communityViewModel.onAction(CommunityAction.ResetPrivateState)
                     learningViewModel.onAction(LearningAction.ResetPrivateState)
                     app.rememberedCredentialsStore.clear()
+                    app.pendingTriggerStore.clear()
+                    onTriggerConsumed()
                     FloatingVerifyService.stop(app)
                     navController.navigate(WelcomeRouteName) {
                         popUpTo(navController.graph.id) { inclusive = true }

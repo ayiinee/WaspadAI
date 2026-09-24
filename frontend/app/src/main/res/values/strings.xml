@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">WaspadAI</string>
+    <string name="quick_tile_label">Periksa layar</string>
 </resources>

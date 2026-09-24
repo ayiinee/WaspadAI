@@ -5,6 +5,7 @@ import id.waspadai.app.core.network.ApiClient
 import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.auth.data.SupabaseAuthRepository
 import id.waspadai.app.feature.auth.data.RememberedCredentialsStore
+import id.waspadai.app.feature.auth.data.EncryptedAuthSessionStore
 import id.waspadai.app.feature.community.data.CommunityRepositoryImpl
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.learning.data.LearningRepositoryImpl
@@ -44,10 +45,13 @@ class WaspadAIApplication : Application() {
             supabaseUrl = BuildConfig.WASPADAI_SUPABASE_URL,
             publishableKey = BuildConfig.WASPADAI_SUPABASE_PUBLISHABLE_KEY,
             initialAccessToken = BuildConfig.WASPADAI_SUPABASE_ACCESS_TOKEN,
+            sessionStore = EncryptedAuthSessionStore(this),
         )
     }
 
     val rememberedCredentialsStore by lazy { RememberedCredentialsStore(this) }
+
+    val pendingTriggerStore by lazy { id.waspadai.app.core.trigger.PendingTriggerStore() }
 
     val verificationRepository: VerificationRepository by lazy {
         if (BuildConfig.WASPADAI_REMOTE_ENABLED) {

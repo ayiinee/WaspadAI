@@ -26,6 +26,23 @@ Status: `CURRENT`.
 
 Uji Supabase Auth, database role/RLS, Product API, dan internal AI pada staging dengan data sintetis. Remote integration baru dianggap aktif bila exported schema kedua service kompatibel dan smoke test membuktikan request/response aktual.
 
+## Android context trigger
+
+- Unit: normalisasi `AssistStructure`, prioritas screenshot, state machine tanpa network sebelum konfirmasi, `CRITICAL`, full result mapping, dan pembersihan buffer pending.
+- Auth: session restore melalui encrypted store abstraction, refresh/retry, dan clear saat logout.
+- Intent: share teks, satu gambar, banyak gambar, MIME tidak valid, URI tidak terbaca, file kosong, ukuran, dan batas lima attachment.
+- Device: Android 10, Android 14, Android 16/targetSdk 36; minimal satu Pixel/AOSP dan satu Samsung/OEM.
+- Manual: WhatsApp, browser, secure window, multi-window, rotasi, session expired, lock screen, dan mengembalikan default assistant ke Gemini/assistant sebelumnya.
+
+Perintah lokal Android:
+
+```powershell
+cd frontend
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
+```
+
+Verifikasi dokumentasi:
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-docs.ps1
 ```

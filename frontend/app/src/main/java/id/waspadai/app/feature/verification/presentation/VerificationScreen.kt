@@ -1,16 +1,22 @@
 package id.waspadai.app.feature.verification.presentation
 
 import android.app.Activity
+import android.app.StatusBarManager
+import android.app.role.RoleManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
+import android.graphics.drawable.Icon
 import android.graphics.pdf.PdfRenderer
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,8 +55,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -60,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,6 +77,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.waspadai.app.core.capture.CaptureEvent
 import id.waspadai.app.core.capture.CaptureResultBus
 import id.waspadai.app.core.overlay.FloatingVerifyService
+import id.waspadai.app.core.trigger.WaspadAIQuickTileService
+import id.waspadai.app.R
 import id.waspadai.app.feature.verification.presentation.component.AnalysisCard
 import id.waspadai.app.feature.verification.presentation.component.FailureNotice
 import id.waspadai.app.feature.verification.presentation.component.HistoryPanel
@@ -109,7 +121,29 @@ fun VerificationScreen(
 ) {
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    val quickTileLabel = stringResource(R.string.quick_tile_label)
     val pickerScope = rememberCoroutineScope()
+    var showQuickAccess by rememberSaveable { mutableStateOf(false) }
+    val roleManager = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            context.getSystemService(RoleManager::class.java)
+        } else {
+            null
+        }
+    }
+    var assistantRoleHeld by remember(roleManager) {
+        mutableStateOf(
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true &&
+                roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)
+        )
+    }
+    val assistantRoleRequest = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        assistantRoleHeld = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+    }
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
     val mediaProjectionManager = context.getSystemService(MediaProjectionManager::class.java)
     val mediaProjectionConsent = rememberLauncherForActivityResult(
@@ -189,6 +223,61 @@ fun VerificationScreen(
         OverlayPrivacyDialog(
             onDismiss = { onAction(VerificationAction.DismissOverlayPrivacy) },
             onContinue = startOverlayFlow,
+        )
+    }
+
+    if (showQuickAccess) {
+        QuickAccessDialog(
+            assistantAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true,
+            assistantEnabled = assistantRoleHeld,
+            bubbleEnabled = state.isOverlayModeEnabled,
+            onDismiss = { showQuickAccess = false },
+            onSetAssistant = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true
+                ) {
+                    assistantRoleRequest.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
+                } else {
+                    runCatching {
+                        context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                    }.onFailure {
+                        Toast.makeText(
+                            context,
+                            "Pemilihan assistant tidak tersedia di perangkat ini.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            },
+            onAddQuickTile = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    context.getSystemService(StatusBarManager::class.java).requestAddTileService(
+                        ComponentName(context, WaspadAIQuickTileService::class.java),
+                        quickTileLabel,
+                        Icon.createWithResource(context, R.mipmap.ic_launcher),
+                        context.mainExecutor,
+                    ) {
+                        Toast.makeText(
+                            context,
+                            "Permintaan tile Periksa layar selesai.",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Buka panel Quick Settings lalu tambahkan tile Periksa layar.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            },
+            onToggleBubble = {
+                if (state.isOverlayModeEnabled && !state.isOverlayPrivacyDialogVisible) {
+                    FloatingVerifyService.stop(context)
+                }
+                onAction(VerificationAction.RequestOverlayMode)
+            },
         )
     }
 
@@ -384,13 +473,11 @@ fun VerificationScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             WaspadAiHeader(
-                overlayModeEnabled = state.isOverlayModeEnabled,
                 enabled = !isSubmitting,
-                onToggleOverlayMode = {
-                    if (state.isOverlayModeEnabled && !state.isOverlayPrivacyDialogVisible) {
-                        FloatingVerifyService.stop(context)
-                    }
-                    onAction(VerificationAction.RequestOverlayMode)
+                onOpenQuickAccess = {
+                    assistantRoleHeld = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                        roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+                    showQuickAccess = true
                 },
             )
             LazyColumn(
@@ -460,6 +547,98 @@ fun VerificationScreen(
                     bottom = composerBottomPadding,
                 ),
         )
+    }
+}
+
+@Composable
+private fun QuickAccessDialog(
+    assistantAvailable: Boolean,
+    assistantEnabled: Boolean,
+    bubbleEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onSetAssistant: () -> Unit,
+    onAddQuickTile: () -> Unit,
+    onToggleBubble: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Akses Cepat WaspadAI") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    "Pilih cara memanggil verifikasi saat kamu menemukan konten mencurigakan. " +
+                        "Tidak ada screenshot atau teks yang dikirim sebelum kamu menekan Periksa sekarang."
+                )
+                QuickAccessStatus(
+                    title = "Gesture assistant perangkat",
+                    status = when {
+                        assistantEnabled -> "Aktif"
+                        assistantAvailable -> "Belum dipilih"
+                        else -> "Tidak didukung langsung"
+                    },
+                    detail = "Gesture berbeda tiap perangkat: long-press tombol samping, home-hold, atau corner swipe.",
+                )
+                Button(
+                    onClick = onSetAssistant,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !assistantEnabled,
+                ) {
+                    Text(if (assistantEnabled) "WaspadAI sudah menjadi assistant" else "Pilih WaspadAI sebagai assistant")
+                }
+                Text(
+                    "Mengganti assistant sebelumnya memerlukan persetujuan sistem. Kamu dapat mengembalikannya melalui Default Apps.",
+                    fontSize = 12.sp,
+                    color = Color(0xFF557383),
+                )
+                QuickAccessStatus(
+                    title = "Konteks layar",
+                    status = if (assistantEnabled) "Siap bila diizinkan aplikasi sumber" else "Memerlukan assistant",
+                    detail = "Secure window tetap dilindungi. WaspadAI tidak mencoba melewati FLAG_SECURE.",
+                )
+                QuickAccessStatus(
+                    title = "Quick Settings",
+                    status = "Fallback",
+                    detail = "Tile Periksa layar meminta persetujuan capture satu kali untuk setiap pemeriksaan.",
+                )
+                TextButton(onClick = onAddQuickTile, modifier = Modifier.fillMaxWidth()) {
+                    Text("Tambahkan tile Periksa layar")
+                }
+                QuickAccessStatus(
+                    title = "Floating Verify",
+                    status = if (bubbleEnabled) "Aktif" else "Nonaktif (disarankan)",
+                    detail = "Fallback lanjutan yang membutuhkan izin tampil di atas aplikasi lain.",
+                )
+                TextButton(onClick = onToggleBubble, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (bubbleEnabled) "Matikan floating bubble" else "Aktifkan floating bubble")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Selesai") }
+        },
+    )
+}
+
+@Composable
+private fun QuickAccessStatus(title: String, status: String, detail: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F8FB)),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(status, color = Color(0xFF0A6FA4), fontSize = 12.sp)
+            }
+            Text(detail, color = Color(0xFF557383), fontSize = 12.sp)
+        }
     }
 }
 

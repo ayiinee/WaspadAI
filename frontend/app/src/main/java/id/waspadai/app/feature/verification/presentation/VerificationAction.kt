@@ -1,9 +1,17 @@
 package id.waspadai.app.feature.verification.presentation
 
 import id.waspadai.app.core.capture.OverlayChatTurn
+import id.waspadai.app.core.trigger.TriggerSource
+import id.waspadai.app.core.trigger.VerificationPageContext
 
 sealed interface VerificationAction {
     data class InputChanged(val value: String) : VerificationAction
+
+    data class TextContextSelected(
+        val text: String,
+        val source: TriggerSource,
+        val pageContext: VerificationPageContext? = null,
+    ) : VerificationAction
 
     data object SubmitText : VerificationAction
 
@@ -13,7 +21,7 @@ sealed interface VerificationAction {
         val imageBytes: ByteArray,
         val contentType: String,
         val fileName: String,
-        val overlayModeEnabled: Boolean = false,
+        val source: TriggerSource = TriggerSource.IN_APP,
     ) : VerificationAction
 
     data class AttachmentsSelected(

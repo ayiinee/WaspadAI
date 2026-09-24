@@ -1,12 +1,16 @@
 package id.waspadai.app.feature.verification.presentation
 
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.core.trigger.TriggerSource
+import id.waspadai.app.core.trigger.VerificationPageContext
 import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 
 data class VerificationUiState(
     val draft: String = "",
+    val draftSource: TriggerSource = TriggerSource.IN_APP,
+    val draftPageContext: VerificationPageContext? = null,
     val conversation: List<VerificationConversationItem> = emptyList(),
     val history: List<VerificationHistoryItem> = emptyList(),
     val isHistoryVisible: Boolean = false,
@@ -75,5 +79,5 @@ data class ImageVerificationPreview(
     val imageBytes: ByteArray,
     val contentType: String,
     val fileName: String,
-    val overlayModeEnabled: Boolean = false,
+    val source: TriggerSource = TriggerSource.IN_APP,
 )

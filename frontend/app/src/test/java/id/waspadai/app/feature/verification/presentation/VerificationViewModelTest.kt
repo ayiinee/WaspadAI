@@ -16,8 +16,10 @@ import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
+import id.waspadai.app.feature.verification.domain.ImageVerificationInput
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
+import id.waspadai.app.feature.verification.domain.TextVerificationInput
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationRepository
@@ -265,17 +267,11 @@ class VerificationViewModelTest {
             communityState = "PRIVATE",
         )
 
-        override suspend fun submitText(text: String): AppResult<VerificationResult> =
+        override suspend fun submitText(input: TextVerificationInput): AppResult<VerificationResult> =
             AppResult.Success(result)
 
-        override suspend fun submitImage(
-            imageBytes: ByteArray,
-            contentType: String,
-            fileName: String,
-            question: String?,
-            overlayModeEnabled: Boolean,
-        ): AppResult<VerificationResult> {
-            lastImageQuestion = question
+        override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> {
+            lastImageQuestion = input.question
             return AppResult.Success(result)
         }
 

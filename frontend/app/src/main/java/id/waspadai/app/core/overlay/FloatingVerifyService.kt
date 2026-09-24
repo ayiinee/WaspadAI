@@ -47,6 +47,7 @@ import id.waspadai.app.core.capture.MediaProjectionController
 import id.waspadai.app.core.capture.OverlayChatTurn
 import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.core.trigger.TriggerSource
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
@@ -394,7 +395,7 @@ class FloatingVerifyService : Service() {
                         contentType = "image/png",
                         fileName = selectedFileName ?: "tanya-area.png",
                         question = cleanQuestion,
-                        overlayModeEnabled = true,
+                        source = TriggerSource.FLOATING_OVERLAY,
                     )
                 }
             }.getOrElse { AppResult.Failure(it.message ?: "Analisis gagal dijalankan.") }

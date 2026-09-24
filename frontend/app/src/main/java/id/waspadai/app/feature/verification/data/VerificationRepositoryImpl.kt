@@ -7,6 +7,8 @@ import id.waspadai.app.feature.verification.data.mapper.VerificationMapper
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
 import id.waspadai.app.feature.verification.domain.VerificationRepository
+import id.waspadai.app.feature.verification.domain.TextVerificationInput
+import id.waspadai.app.feature.verification.domain.ImageVerificationInput
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
@@ -15,8 +17,14 @@ class VerificationRepositoryImpl(
     private val remoteDataSource: VerificationRemoteDataSource,
     private val mapper: VerificationMapper
 ) : VerificationRepository {
-    override suspend fun submitText(text: String): AppResult<VerificationResult> = try {
-        val envelope = remoteDataSource.submitText(text)
+    override suspend fun submitText(input: TextVerificationInput): AppResult<VerificationResult> = try {
+        val envelope = remoteDataSource.submitText(
+            text = input.text,
+            question = input.question,
+            sourceUrl = input.sourceUrl,
+            senderContext = input.senderContext,
+            pageContext = input.pageContext,
+        )
         AppResult.Success(mapper.map(envelope.result, envelope.history))
     } catch (error: CancellationException) {
         throw error
@@ -34,18 +42,12 @@ class VerificationRepositoryImpl(
         AppResult.Failure("Pemeriksaan belum berhasil. Coba lagi nanti.")
     }
 
-    override suspend fun submitImage(
-        imageBytes: ByteArray,
-        contentType: String,
-        fileName: String,
-        question: String?,
-        overlayModeEnabled: Boolean,
-    ): AppResult<VerificationResult> = try {
-        val enrichedQuestion = buildImageQuestion(question, overlayModeEnabled)
+    override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> = try {
+        val enrichedQuestion = buildImageQuestion(input.question, input.source)
         val envelope = remoteDataSource.submitImage(
-            imageBytes = imageBytes,
-            contentType = contentType,
-            fileName = fileName,
+            imageBytes = input.imageBytes,
+            contentType = input.contentType,
+            fileName = input.fileName,
             question = enrichedQuestion,
         )
         AppResult.Success(mapper.map(envelope.result, envelope.history))
@@ -116,13 +118,22 @@ class VerificationRepositoryImpl(
     }
 }
 
-private fun buildImageQuestion(question: String?, overlayModeEnabled: Boolean): String? {
+private fun buildImageQuestion(
+    question: String?,
+    source: id.waspadai.app.core.trigger.TriggerSource,
+): String? {
     val trimmedQuestion = question?.trim().orEmpty()
     return when {
-        overlayModeEnabled && trimmedQuestion.isNotBlank() ->
+        source == id.waspadai.app.core.trigger.TriggerSource.FLOATING_OVERLAY && trimmedQuestion.isNotBlank() ->
             "Mode overlay aktif. Sorot area atau elemen visual yang mencurigakan. $trimmedQuestion"
-        overlayModeEnabled ->
+        source == id.waspadai.app.core.trigger.TriggerSource.FLOATING_OVERLAY ->
             "Mode overlay aktif. Sorot area atau elemen visual yang mencurigakan pada gambar ini."
+        source == id.waspadai.app.core.trigger.TriggerSource.ASSISTANT && trimmedQuestion.isNotBlank() ->
+            "Tangkapan layar dipilih pengguna melalui WaspadAI Assistant. $trimmedQuestion"
+        source == id.waspadai.app.core.trigger.TriggerSource.ASSISTANT ->
+            "Periksa klaim dan risiko pada area layar yang dipilih pengguna."
+        source == id.waspadai.app.core.trigger.TriggerSource.QUICK_SETTINGS && trimmedQuestion.isBlank() ->
+            "Periksa klaim dan risiko pada tangkapan layar ini."
         trimmedQuestion.isNotBlank() -> trimmedQuestion
         else -> null
     }

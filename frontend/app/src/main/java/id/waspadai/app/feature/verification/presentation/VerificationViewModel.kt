@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import id.waspadai.app.core.common.AppResult
+import id.waspadai.app.core.trigger.TriggerSource
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
@@ -36,6 +37,7 @@ class VerificationViewModel(
     fun onAction(action: VerificationAction) {
         when (action) {
             is VerificationAction.InputChanged -> updateInput(action.value)
+            is VerificationAction.TextContextSelected -> selectTextContext(action)
             VerificationAction.SubmitText -> submitText()
             VerificationAction.RequestImageCapture -> Unit
             is VerificationAction.ImageSelected -> showImagePreview(action)
@@ -54,7 +56,7 @@ class VerificationViewModel(
                     imageBytes = action.imageBytes,
                     contentType = action.contentType,
                     fileName = action.fileName,
-                    overlayModeEnabled = true,
+                    source = TriggerSource.FLOATING_OVERLAY,
                 )
             )
             is VerificationAction.OverlayConversationReady -> importOverlayConversation(action)
@@ -86,12 +88,23 @@ class VerificationViewModel(
         _state.update { current -> current.copy(draft = value, phase = VerificationPhase.Idle) }
     }
 
+    private fun selectTextContext(action: VerificationAction.TextContextSelected) {
+        _state.update { current ->
+            current.copy(
+                draft = action.text.take(25_000),
+                draftSource = action.source,
+                draftPageContext = action.pageContext,
+                phase = VerificationPhase.Idle,
+            )
+        }
+    }
+
     private fun importOverlayConversation(action: VerificationAction.OverlayConversationReady) {
         val attachment = ImageVerificationPreview(
             imageBytes = action.imageBytes,
             contentType = action.contentType,
             fileName = action.fileName,
-            overlayModeEnabled = true,
+            source = TriggerSource.FLOATING_OVERLAY,
         )
         val imported = buildList<VerificationConversationItem> {
             add(
@@ -139,11 +152,19 @@ class VerificationViewModel(
                     phase = VerificationPhase.Submitting
                 )
             }
-            when (val result = submitTextVerification(text)) {
+            when (
+                val result = submitTextVerification(
+                    text = text,
+                    pageContext = state.value.draftPageContext,
+                    source = state.value.draftSource,
+                )
+            ) {
                 is AppResult.Success -> _state.update { current ->
                     communityRepository?.invalidateCommunityCache()
                     current.copy(
                         draft = "",
+                        draftSource = TriggerSource.IN_APP,
+                        draftPageContext = null,
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
                         phase = VerificationPhase.Success(result.value)
                     )
@@ -157,10 +178,10 @@ class VerificationViewModel(
 
     private fun submitImage(
         action: VerificationAction.ImageSelected,
-        forceOverlayModeEnabled: Boolean? = null,
+        forceSource: TriggerSource? = null,
     ) {
         val question = state.value.draft.trim().takeIf(String::isNotBlank)
-        val overlayModeEnabled = forceOverlayModeEnabled ?: state.value.isOverlayModeEnabled
+        val source = forceSource ?: action.source
         val userMessage = question ?: "Gambar dikirim untuk diperiksa."
         _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
         viewModelScope.launch {
@@ -177,7 +198,7 @@ class VerificationViewModel(
                                 imageBytes = action.imageBytes,
                                 contentType = action.contentType,
                                 fileName = action.fileName,
-                                overlayModeEnabled = overlayModeEnabled,
+                                source = source,
                             )
                         ),
                     ),
@@ -190,13 +211,15 @@ class VerificationViewModel(
                     contentType = action.contentType,
                     fileName = action.fileName,
                     question = question,
-                    overlayModeEnabled = overlayModeEnabled,
+                    source = source,
                 )
             ) {
                 is AppResult.Success -> _state.update { current ->
                     communityRepository?.invalidateCommunityCache()
                     current.copy(
                         draft = "",
+                        draftSource = TriggerSource.IN_APP,
+                        draftPageContext = null,
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
                         phase = VerificationPhase.Success(result.value)
                     )
@@ -282,7 +305,7 @@ class VerificationViewModel(
                     imageBytes = selection.imageBytes,
                     contentType = selection.contentType,
                     fileName = selection.fileName,
-                    overlayModeEnabled = selection.overlayModeEnabled,
+                    source = selection.source,
                 )
             }
             current.copy(
@@ -333,7 +356,7 @@ class VerificationViewModel(
                     contentType = attachment.contentType,
                     fileName = attachment.fileName,
                     question = question,
-                    overlayModeEnabled = attachment.overlayModeEnabled,
+                    source = attachment.source,
                 )) {
                     is AppResult.Success -> _state.update { current ->
                         current.copy(
@@ -347,7 +370,13 @@ class VerificationViewModel(
                     }
                 }
             }
-            _state.update { current -> current.copy(draft = "") }
+            _state.update { current ->
+                current.copy(
+                    draft = "",
+                    draftSource = TriggerSource.IN_APP,
+                    draftPageContext = null,
+                )
+            }
         }
     }
 

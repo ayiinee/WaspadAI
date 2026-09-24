@@ -4,6 +4,7 @@ import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.network.WaspadAiApiConfig
 import id.waspadai.app.feature.verification.data.mapper.VerificationMapper
+import id.waspadai.app.feature.verification.domain.TextVerificationInput
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -28,7 +29,7 @@ class VerificationRepositoryImplTest {
             respond(envelopeJson(inputText = null), headers = jsonHeaders())
         })
 
-        val result = repository.submitText("Tolong cek pesan OTP ini")
+        val result = repository.submitText(TextVerificationInput("Tolong cek pesan OTP ini"))
 
         assertTrue(result is AppResult.Success)
         assertEquals(RiskLevel.HIGH, (result as AppResult.Success).value.riskLevel)

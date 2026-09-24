@@ -26,3 +26,15 @@ Status: `CURRENT`.
 - [ ] Timeout Android 150 detik dan upstream AI 120 detik.
 - [ ] Rollback dan deindex/tombstone behavior diuji.
 
+## Android context trigger
+
+- [ ] Dialog role menjelaskan bahwa assistant sebelumnya akan tergantikan dan cara memulihkannya.
+- [ ] Copy menyebut “gesture assistant perangkat”, bukan menjanjikan long-press power universal.
+- [ ] Tidak ada Accessibility Service atau `RECORD_AUDIO` di merged manifest.
+- [ ] Assistant preview tidak mengirim network request sebelum **Periksa sekarang**.
+- [ ] Screenshot tidak tersedia memakai `AssistStructure`; bila keduanya kosong, fallback ditampilkan.
+- [ ] Secure window tidak dapat dicapture dan tidak dicoba untuk dilewati.
+- [ ] Android 14+ meminta consent MediaProjection baru untuk setiap quick capture.
+- [ ] Session close, lock screen, logout, dan process restart diuji untuk cleanup/restore yang sesuai.
+- [ ] Role assistant, Share Sheet, Quick Settings tile, dan bubble fallback diuji pada matrix Pixel/AOSP dan Samsung/OEM.
+
