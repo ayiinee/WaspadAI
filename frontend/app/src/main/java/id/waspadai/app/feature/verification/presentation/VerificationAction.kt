@@ -1,5 +1,7 @@
 package id.waspadai.app.feature.verification.presentation
 
+import id.waspadai.app.core.capture.OverlayChatTurn
+
 sealed interface VerificationAction {
     data class InputChanged(val value: String) : VerificationAction
 
@@ -41,6 +43,15 @@ sealed interface VerificationAction {
         val contentType: String,
         val fileName: String,
     ) : VerificationAction
+
+    data class OverlayConversationReady(
+        val imageBytes: ByteArray,
+        val contentType: String,
+        val fileName: String,
+        val turns: List<OverlayChatTurn>,
+    ) : VerificationAction
+
+    data class OverlayPermissionExpired(val message: String) : VerificationAction
 
     data object OverlayStopped : VerificationAction
 

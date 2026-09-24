@@ -159,6 +159,17 @@ fun VerificationScreen(
                     )
                 )
                 is CaptureEvent.Failure -> onAction(VerificationAction.ImageSelectionFailed(event.message))
+                is CaptureEvent.PermissionExpired -> onAction(
+                    VerificationAction.OverlayPermissionExpired(event.message)
+                )
+                is CaptureEvent.Conversation -> onAction(
+                    VerificationAction.OverlayConversationReady(
+                        imageBytes = event.imageBytes,
+                        contentType = event.contentType,
+                        fileName = event.fileName,
+                        turns = event.turns,
+                    )
+                )
                 CaptureEvent.Stopped -> onAction(VerificationAction.OverlayStopped)
             }
         }
@@ -546,13 +557,11 @@ private fun OverlayPrivacyDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Aktifkan overlay WaspadAI") },
+        title = { Text("Aktifkan Tanya Area") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("WaspadAI akan menampilkan bubble di atas aplikasi lain.")
-                Text("Screenshot hanya diambil setelah kamu menekan Verify pada bubble.")
-                Text("Hasil tangkapan layar akan ditampilkan untuk preview sebelum dikirim.")
-            }
+            Text(
+                "Tombol Tanyain akan bergeser ke kanan saat aktif. Setelah lanjut, Android meminta izin berbagi layar agar kamu dapat memilih area; gambar hanya ditangkap setelah Kirim area dan baru dianalisis setelah kamu menyetujui pratinjaunya."
+            )
         },
         confirmButton = {
             Button(onClick = onContinue) {
