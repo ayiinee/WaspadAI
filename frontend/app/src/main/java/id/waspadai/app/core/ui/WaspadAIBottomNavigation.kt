@@ -9,13 +9,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Home
@@ -31,7 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -39,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
 import id.waspadai.app.R
 import id.waspadai.app.ui.theme.WaspadAIBlue
@@ -46,7 +55,55 @@ import id.waspadai.app.ui.theme.WaspadAILightBlue
 
 private val BottomNavigationBarHeight = 66.dp
 private val CenterCtaDiameter = 72.dp
-val WaspadAIBottomNavigationHeight = BottomNavigationBarHeight + CenterCtaDiameter / 2
+private val CenterCtaProtrusion = CenterCtaDiameter / 2
+val WaspadAIBottomNavigationHeight = BottomNavigationBarHeight + CenterCtaProtrusion
+
+@Composable
+fun waspadAIBottomNavigationContentPadding() =
+    WaspadAIBottomNavigationHeight +
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+private object WaspadAIBottomNavigationShape : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val corner = with(density) { 28.dp.toPx() }
+        val notchRadius = with(density) { 40.dp.toPx() }
+        val notchShoulder = with(density) { 14.dp.toPx() }
+        val notchDepth = with(density) { 40.dp.toPx() }
+        val notchControl = with(density) { 8.dp.toPx() }
+        val centerX = size.width / 2f
+        val path = Path().apply {
+            moveTo(0f, corner)
+            quadraticTo(0f, 0f, corner, 0f)
+            lineTo(centerX - notchRadius - notchShoulder, 0f)
+            cubicTo(
+                centerX - notchRadius - notchControl,
+                0f,
+                centerX - notchRadius - notchControl * 0.75f,
+                notchDepth,
+                centerX,
+                notchDepth,
+            )
+            cubicTo(
+                centerX + notchRadius + notchControl * 0.75f,
+                notchDepth,
+                centerX + notchRadius + notchControl,
+                0f,
+                centerX + notchRadius + notchShoulder,
+                0f,
+            )
+            lineTo(size.width - corner, 0f)
+            quadraticTo(size.width, 0f, size.width, corner)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
 
 data class CommunityNotificationState(
     val showBadge: Boolean = false,
@@ -64,22 +121,29 @@ fun WaspadAIBottomNavigation(
     val centerNavigationInteraction = remember { MutableInteractionSource() }
     val communityNotification = LocalCommunityNotification.current
     val isVerificationSelected = selectedDestination == "Periksa"
+    val navigationBarInset = WindowInsets.navigationBars
+        .asPaddingValues()
+        .calculateBottomPadding()
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(WaspadAIBottomNavigationHeight),
+            .height(WaspadAIBottomNavigationHeight + navigationBarInset)
+            .testTag("bottom-navigation-wrapper"),
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(BottomNavigationBarHeight)
-                .align(Alignment.BottomCenter),
+                .height(BottomNavigationBarHeight + navigationBarInset)
+                .align(Alignment.BottomCenter)
+                .testTag("bottom-navigation-bar"),
             color = Color.White,
-            shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+            shape = WaspadAIBottomNavigationShape,
             shadowElevation = 4.dp,
         ) {
             Row(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(BottomNavigationBarHeight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BottomDestination(
@@ -122,6 +186,7 @@ fun WaspadAIBottomNavigation(
                 .align(Alignment.TopCenter)
                 .zIndex(1f)
                 .size(CenterCtaDiameter)
+                .testTag("bottom-navigation-cta")
                 .shadow(8.dp, CircleShape)
                 .background(
                     if (isVerificationSelected) WaspadAIBlue else Color(0xFFAAB4BE),

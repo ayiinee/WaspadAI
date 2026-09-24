@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -52,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.feature.community.domain.CommunityDetailSnapshot
 import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.community.domain.CommunityVote
@@ -98,27 +98,25 @@ fun CommunityDetailScreen(
             imageUrl = snapshot.media.firstOrNull()?.url ?: post.imageUrl,
         )
     } ?: post
-    Scaffold(
-        containerColor = WaspadAIBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WaspadAIBottomNavigation(
-                selectedDestination = "Koneksi",
-                onDestinationSelected = onDestinationSelected,
-                modifier = Modifier.navigationBarsPadding(),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = WaspadAIBackground,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
             // Header tetap terlihat saat detail kasus digulir.
             CommunityPageHeader(title = "Detail Kasus", onBack = onBack)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 14.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    top = 14.dp,
+                    bottom = bottomNavigationPadding + 14.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item {
@@ -201,6 +199,12 @@ fun CommunityDetailScreen(
                 }
             }
         }
+        }
+        WaspadAIBottomNavigation(
+            selectedDestination = "Koneksi",
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 

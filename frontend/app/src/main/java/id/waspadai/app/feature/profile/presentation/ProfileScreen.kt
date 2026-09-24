@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.core.ui.WaspadAIPageHeader
+import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.feature.profile.domain.ProfileActivityItem
 import id.waspadai.app.feature.profile.domain.ProfileLearningItem
 import id.waspadai.app.ui.theme.WaspadAIBackground
@@ -76,6 +78,7 @@ fun ProfileRoute(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var passwordDialogVisible by remember { mutableStateOf(false) }
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
 
     LaunchedEffect(state.message) {
         state.message?.let { message ->
@@ -88,60 +91,50 @@ fun ProfileRoute(
         onAction(ProfileAction.Back)
     }
 
-    Scaffold(
-        containerColor = WaspadAIBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WaspadAIBottomNavigation(
-                selectedDestination = "Profil",
-                onDestinationSelected = onDestinationSelected,
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            WaspadAIPageHeader(
-                title = state.page.title(),
-                modifier = Modifier.testTag("profile-header"),
-                onBack = if (state.page == ProfilePage.Dashboard) null else {
-                    { onAction(ProfileAction.Back) }
-                },
-            )
-
-            Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = WaspadAIBackground,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { padding ->
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                    .fillMaxSize()
+                    .padding(padding),
             ) {
-                when {
-                    state.loading -> ProfileLoadingState()
-                    state.page == ProfilePage.Dashboard -> ProfileDashboard(
-                        state = state,
-                        accessToken = accessToken,
-                        onAction = onAction,
-                    )
-                    state.page == ProfilePage.Edit -> EditProfilePage(
-                        state = state,
-                        accessToken = accessToken,
-                        onAction = onAction,
-                    )
-                    state.page == ProfilePage.Settings -> SettingsPage(
-                        onPassword = { passwordDialogVisible = true },
-                        onLogout = { scope.launch { onLogout() } },
-                    )
-                    state.page == ProfilePage.ItemDetail -> ItemDetailPage(state)
-                    else -> ActivityDetailPage(
-                        state = state,
-                        onAction = onAction,
-                        onCommunityPostSelected = onCommunityPostSelected,
-                    )
+                WaspadAIPageHeader(
+                    title = state.page.title(),
+                    modifier = Modifier.testTag("profile-header"),
+                    onBack = if (state.page == ProfilePage.Dashboard) null else {
+                        { onAction(ProfileAction.Back) }
+                    },
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(bottom = bottomNavigationPadding),
+                ) {
+                    when {
+                        state.loading -> ProfileLoadingState()
+                        state.page == ProfilePage.Dashboard -> ProfileDashboard(state, accessToken, onAction)
+                        state.page == ProfilePage.Edit -> EditProfilePage(state, accessToken, onAction)
+                        state.page == ProfilePage.Settings -> SettingsPage(
+                            onPassword = { passwordDialogVisible = true },
+                            onLogout = { scope.launch { onLogout() } },
+                        )
+                        state.page == ProfilePage.ItemDetail -> ItemDetailPage(state)
+                        else -> ActivityDetailPage(state, onAction, onCommunityPostSelected)
+                    }
                 }
             }
         }
+        WaspadAIBottomNavigation(
+            selectedDestination = "Profil",
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 
     if (passwordDialogVisible) {

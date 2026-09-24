@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -137,6 +136,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.core.ui.WaspadAIPageHeader
+import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
@@ -324,23 +324,19 @@ fun CommunityScreen(
             }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = WaspadAIBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WaspadAIBottomNavigation(
-                selectedDestination = "Koneksi",
-                onDestinationSelected = onDestinationSelected,
-                modifier = Modifier.navigationBarsPadding(),
-            )
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = WaspadAIBackground,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(bottom = bottomNavigationPadding),
+            ) {
             // Header tetap terlihat saat daftar koneksi digulir.
             CommunityPageHeader(
                 title = "Koneksi",
@@ -412,6 +408,12 @@ fun CommunityScreen(
                 )
             }
         }
+        }
+        WaspadAIBottomNavigation(
+            selectedDestination = "Koneksi",
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 
     deletingPost?.let { post ->

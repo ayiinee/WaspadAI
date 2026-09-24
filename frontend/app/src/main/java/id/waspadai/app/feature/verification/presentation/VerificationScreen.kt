@@ -100,6 +100,7 @@ import id.waspadai.app.feature.verification.presentation.component.VerificationC
 import id.waspadai.app.feature.verification.presentation.component.VerificationChatHeader
 import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeader
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.ui.theme.WaspadAITheme
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -503,6 +504,7 @@ fun VerificationScreen(
     val keyboardBottom = WindowInsets.ime.getBottom(density)
     val shouldShowBottomNavigation = isBottomNavigationVisible && keyboardBottom == 0
     val contentGutter = if (configuration.screenWidthDp < 360) 16.dp else 20.dp
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
     val verificationComposer: @Composable (Modifier) -> Unit = { composerModifier ->
         VerificationComposer(
             value = state.draft,
@@ -632,7 +634,7 @@ fun VerificationScreen(
                     start = contentGutter,
                     end = contentGutter,
                     top = 6.dp,
-                    bottom = 24.dp,
+                    bottom = bottomNavigationPadding + 24.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -683,8 +685,10 @@ fun VerificationScreen(
             item { Spacer(Modifier.padding(bottom = 1.dp)) }
             }
             }
+        }
             AnimatedVisibility(
                 visible = shouldShowBottomNavigation,
+                modifier = Modifier.align(Alignment.BottomCenter),
                 enter = slideInVertically(
                     initialOffsetY = { fullHeight -> fullHeight },
                     animationSpec = tween(220),
@@ -697,10 +701,8 @@ fun VerificationScreen(
                 WaspadAIBottomNavigation(
                     selectedDestination = "Periksa",
                     onDestinationSelected = onDestinationSelected,
-                    modifier = Modifier.navigationBarsPadding(),
                 )
             }
-        }
         }
     }
 }

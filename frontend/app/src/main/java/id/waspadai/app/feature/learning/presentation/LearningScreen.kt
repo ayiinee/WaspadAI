@@ -73,6 +73,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.core.ui.WaspadAIPageHeader
+import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
@@ -333,18 +334,13 @@ private fun LearningListScreen(
     onDestinationSelected: (String) -> Unit,
 ) {
     val completedCount = materials.count { statusFor(it)?.kind == "completed" }
-    Scaffold(
-        containerColor = WaspadAIBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WaspadAIBottomNavigation(
-                selectedDestination = "Pelajari",
-                onDestinationSelected = onDestinationSelected,
-                modifier = Modifier.navigationBarsPadding(),
-            )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = WaspadAIBackground,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { padding ->
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             LearningPageHeader(
                 title = "Pelajari",
                 onBack = { onDestinationSelected("Periksa") },
@@ -352,7 +348,7 @@ private fun LearningListScreen(
             )
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 18.dp),
+                contentPadding = PaddingValues(bottom = bottomNavigationPadding + 18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item {
@@ -399,6 +395,12 @@ private fun LearningListScreen(
                 }
             }
         }
+        }
+        WaspadAIBottomNavigation(
+            selectedDestination = "Pelajari",
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -632,18 +634,18 @@ private fun LearningDetailScreen(
         }
     }
 
-    Scaffold(
-        containerColor = WaspadAIBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WaspadAIBottomNavigation(
-                selectedDestination = "Pelajari",
-                onDestinationSelected = onDestinationSelected,
-                modifier = Modifier.navigationBarsPadding(),
-            )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = WaspadAIBackground,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(bottom = bottomNavigationPadding),
+            ) {
             LearningPageHeader(title = material.title, onBack = onBack)
             if (showOverview) {
                 LearningMaterialOverview(
@@ -712,6 +714,12 @@ private fun LearningDetailScreen(
                 }
             }
         }
+        }
+        WaspadAIBottomNavigation(
+            selectedDestination = "Pelajari",
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 
     if (showQuizChoice) {

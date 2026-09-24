@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -68,6 +67,7 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAIHoax
@@ -98,40 +98,37 @@ fun HomeScreen(
     onCommunityCaseSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = WaspadAIBackground,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WaspadAIBottomNavigation(
-                selectedDestination = "Beranda",
-                onDestinationSelected = onDestinationSelected,
-                modifier = Modifier.navigationBarsPadding(),
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 20.dp),
-        ) {
-            item {
-                HomeHero(
-                    displayName = uiState.displayName,
-                )
-            }
-            item {
-                HomeBody(
-                    uiState = uiState,
-                    onAction = onAction,
-                    onCasesClick = { onDestinationSelected("Koneksi") },
-                    onCaseClick = onCommunityCaseSelected,
-                    onVerifyClick = { onDestinationSelected("Periksa") },
-                    onLearningClick = { onDestinationSelected("Pelajari") },
-                )
+    val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = WaspadAIBackground,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(bottom = bottomNavigationPadding + 20.dp),
+            ) {
+                item { HomeHero(displayName = uiState.displayName) }
+                item {
+                    HomeBody(
+                        uiState = uiState,
+                        onAction = onAction,
+                        onCasesClick = { onDestinationSelected("Koneksi") },
+                        onCaseClick = onCommunityCaseSelected,
+                        onVerifyClick = { onDestinationSelected("Periksa") },
+                        onLearningClick = { onDestinationSelected("Pelajari") },
+                    )
+                }
             }
         }
+        WaspadAIBottomNavigation(
+            selectedDestination = "Beranda",
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
