@@ -53,6 +53,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,6 +75,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import id.waspadai.app.core.capture.CaptureEvent
 import id.waspadai.app.core.capture.CaptureResultBus
 import id.waspadai.app.core.overlay.FloatingVerifyService
@@ -121,6 +125,7 @@ fun VerificationScreen(
 ) {
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val quickTileLabel = stringResource(R.string.quick_tile_label)
     val pickerScope = rememberCoroutineScope()
     var showQuickAccess by rememberSaveable { mutableStateOf(false) }
@@ -143,6 +148,24 @@ fun VerificationScreen(
     ) {
         assistantRoleHeld = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+        if (!assistantRoleHeld) {
+            Toast.makeText(
+                context,
+                "Pilih WaspadAI pada menu Aplikasi asisten digital.",
+                Toast.LENGTH_LONG,
+            ).show()
+            context.openAssistantSettings()
+        }
+    }
+    DisposableEffect(lifecycleOwner, roleManager) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                assistantRoleHeld = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
     val mediaProjectionManager = context.getSystemService(MediaProjectionManager::class.java)
@@ -237,19 +260,18 @@ fun VerificationScreen(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                     roleManager?.isRoleAvailable(RoleManager.ROLE_ASSISTANT) == true
                 ) {
-                    assistantRoleRequest.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
-                } else {
                     runCatching {
-                        context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                        assistantRoleRequest.launch(
+                            roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
+                        )
                     }.onFailure {
-                        Toast.makeText(
-                            context,
-                            "Pemilihan assistant tidak tersedia di perangkat ini.",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        context.openAssistantSettings()
                     }
+                } else {
+                    context.openAssistantSettings()
                 }
             },
+            onOpenAssistantSettings = { context.openAssistantSettings() },
             onAddQuickTile = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     context.getSystemService(StatusBarManager::class.java).requestAddTileService(
@@ -557,6 +579,7 @@ private fun QuickAccessDialog(
     bubbleEnabled: Boolean,
     onDismiss: () -> Unit,
     onSetAssistant: () -> Unit,
+    onOpenAssistantSettings: () -> Unit,
     onAddQuickTile: () -> Unit,
     onToggleBubble: () -> Unit,
 ) {
@@ -593,6 +616,12 @@ private fun QuickAccessDialog(
                     fontSize = 12.sp,
                     color = Color(0xFF557383),
                 )
+                TextButton(
+                    onClick = onOpenAssistantSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Buka pengaturan assistant perangkat")
+                }
                 QuickAccessStatus(
                     title = "Konteks layar",
                     status = if (assistantEnabled) "Siap bila diizinkan aplikasi sumber" else "Memerlukan assistant",
@@ -620,6 +649,31 @@ private fun QuickAccessDialog(
             TextButton(onClick = onDismiss) { Text("Selesai") }
         },
     )
+}
+
+private fun Context.openAssistantSettings() {
+    val candidates = listOf(
+        Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+    )
+    val target = candidates.firstOrNull { it.resolveActivity(packageManager) != null }
+    if (target == null) {
+        Toast.makeText(
+            this,
+            "Pengaturan assistant tidak tersedia di perangkat ini.",
+            Toast.LENGTH_LONG,
+        ).show()
+        return
+    }
+    runCatching {
+        startActivity(target.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+    }.onFailure {
+        Toast.makeText(
+            this,
+            "Pengaturan assistant belum dapat dibuka.",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
 }
 
 @Composable
