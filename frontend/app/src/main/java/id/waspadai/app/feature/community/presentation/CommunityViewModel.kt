@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -315,7 +316,9 @@ class CommunityViewModel(
         detailJobs[postId] = viewModelScope.launch {
             // A detail open is the canonical "seen" event. It is idempotent
             // per user and post. It must not delay the detail refresh.
-            launch { communityRepository.markCommunitySeen(baseUrl, accessToken, postId) }
+            val seenRequest = async {
+                communityRepository.markCommunitySeen(baseUrl, accessToken, postId)
+            }
             when (val result = communityRepository.loadCommunityDetail(baseUrl, accessToken, postId)) {
                 is AppResult.Success -> _uiState.update {
                     it.copy(
@@ -345,6 +348,10 @@ class CommunityViewModel(
                         detailError = result.message.takeIf { _ -> it.detailByPostId[postId] == null },
                     )
                 }
+            }
+            when (val seen = seenRequest.await()) {
+                is AppResult.Success -> applySocialMetadata(seen.value)
+                is AppResult.Failure -> Unit
             }
             detailJobs.remove(postId)
         }
@@ -510,7 +517,12 @@ class CommunityViewModel(
         val current = uiState.value
         viewModelScope.launch {
             when (val result = communityRepository.shareCommunity(current.baseUrlDraft.trim(), current.accessTokenDraft.trim(), postId)) {
-                is AppResult.Success -> _uiState.update { it.copy(shareLink = result.value.shareUrl ?: "/community/$postId") }
+                is AppResult.Success -> {
+                    applySocialMetadata(result.value)
+                    _uiState.update {
+                        it.copy(shareLink = result.value.shareUrl ?: "/community/$postId")
+                    }
+                }
                 is AppResult.Failure -> _uiState.update { it.copy(detailError = result.message, backendMessage = result.message) }
             }
         }

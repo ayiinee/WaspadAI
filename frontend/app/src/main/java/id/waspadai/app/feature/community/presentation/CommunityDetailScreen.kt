@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,6 +60,7 @@ import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAICaution
 import id.waspadai.app.ui.theme.WaspadAIHoax
 import id.waspadai.app.ui.theme.WaspadAIValid
+import kotlinx.coroutines.launch
 
 @Composable
 fun CommunityDetailScreen(
@@ -64,6 +68,7 @@ fun CommunityDetailScreen(
     accessToken: String,
     onBack: () -> Unit,
     onSupportClick: () -> Unit,
+    onShareClick: () -> Unit,
     onVerdictClick: (CommunityVerdict) -> Unit,
     detail: CommunityDetailSnapshot? = null,
     imageBaseUrl: String = "",
@@ -75,6 +80,8 @@ fun CommunityDetailScreen(
     onDestinationSelected: (String) -> Unit,
 ) {
     var assessmentExpanded by rememberSaveable(post.id) { mutableStateOf(false) }
+    val responsesRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
     val contentGutter = if (LocalConfiguration.current.screenWidthDp < 360) 16.dp else 28.dp
     val displayPost = detail?.let { snapshot ->
         post.copy(
@@ -131,6 +138,19 @@ fun CommunityDetailScreen(
                         CommunityEvidenceImage(imageUrl, accessToken, displayPost.author)
                     }
                     Spacer(Modifier.height(12.dp))
+                    CommunitySocialActions(
+                        post = displayPost,
+                        onLikeClick = onSupportClick,
+                        onCommentClick = {
+                            coroutineScope.launch { responsesRequester.bringIntoView() }
+                        },
+                        onShareClick = onShareClick,
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = Color.Black.copy(alpha = .12f),
+                        thickness = 1.dp,
+                    )
                     if (isDetailLoading && detail == null) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
@@ -174,6 +194,7 @@ fun CommunityDetailScreen(
                         caseId = displayPost.id,
                         imageBaseUrl = imageBaseUrl,
                         accessToken = accessToken,
+                        modifier = Modifier.bringIntoViewRequester(responsesRequester),
                     )
                     Spacer(Modifier.height(18.dp))
                     }
@@ -280,11 +301,6 @@ private fun CommunityInsight(post: CommunityPost) {
                 color = Color.Black,
                 fontSize = 12.sp,
             )
-            Text(
-                text = "Pilih penilaian Anda untuk ikut memperbarui hasil polling.",
-                color = Color.Black,
-                fontSize = 11.sp,
-            )
         }
     }
 }
@@ -298,8 +314,9 @@ private fun CommunityResponses(
     caseId: String,
     imageBaseUrl: String,
     accessToken: String,
+    modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Text(
             text = "Tanggapan komunitas (${responses.size})",
             color = Color.Black,

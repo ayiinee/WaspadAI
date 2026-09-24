@@ -63,7 +63,7 @@ class CommunityOwnerMenuTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Total penilaian komunitas").performClick()
+        composeRule.onNodeWithContentDescription("Sukai postingan").performClick()
         composeRule.runOnIdle {
             assertEquals("other", supportedPostId)
             assertNull(openedPostId)

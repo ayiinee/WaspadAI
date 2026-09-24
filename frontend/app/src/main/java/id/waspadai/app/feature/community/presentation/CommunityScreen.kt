@@ -238,6 +238,9 @@ fun CommunityRoute(
                 onSupportClick = {
                     viewModel.onAction(CommunityAction.SupportClicked(visiblePost.id))
                 },
+                onShareClick = {
+                    viewModel.onAction(CommunityAction.ShareClicked(visiblePost.id))
+                },
                 onVerdictClick = { verdict ->
                     viewModel.onAction(CommunityAction.VerdictSelected(visiblePost.id, verdict))
                 },
@@ -1026,66 +1029,14 @@ private fun CommunityPostCard(
                 lineHeight = 12.sp,
             )
             Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                InlineAction(
-                    icon = if (post.isSupported) {
-                        Icons.Rounded.Favorite
-                    } else {
-                        Icons.Rounded.FavoriteBorder
-                    },
-                    label = post.likeCount.toString(),
-                    contentDescription = "Total penilaian komunitas",
-                    tint = if (post.isSupported) CommunityLikePink else CommunityActionGray,
-                    iconModifier = Modifier.communityLikeEffect(likeAnimation),
-                    onClick = onSupportClick,
-                )
-                InlineAction(
-                    icon = null,
-                    label = post.commentCount.toString(),
-                    contentDescription = "Komentar",
-                    tint = CommunityActionGray,
-                    labelTint = CommunityActionGray,
-                    iconContent = {
-                        RoundCommentIcon(
-                            tint = CommunityActionGray,
-                            contentDescription = "Komentar",
-                            filled = false,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    onClick = onOpenDetails,
-                )
-                InlineAction(
-                    icon = Icons.Rounded.Visibility,
-                    label = post.viewCount.toString(),
-                    contentDescription = "Dilihat ${post.viewCount} kali",
-                    tint = CommunityActionGray,
-                    onClick = {},
-                )
-                Spacer(Modifier.weight(1f))
-                val shareInteractionSource = remember { MutableInteractionSource() }
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable(
-                            interactionSource = shareInteractionSource,
-                            indication = null,
-                            onClick = onShareClick,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Share,
-                        contentDescription = "Bagikan kasus",
-                        tint = CommunityActionGray,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
+            CommunitySocialActions(
+                post = post,
+                likeAnimation = likeAnimation,
+                onLikeClick = onSupportClick,
+                onCommentClick = onOpenDetails,
+                onSeenClick = onOpenDetails,
+                onShareClick = onShareClick,
+            )
         }
         HorizontalDivider(color = Color.Black.copy(alpha = .16f), thickness = 1.dp)
     }
@@ -1481,6 +1432,75 @@ private fun VerdictButton(
 }
 
 @Composable
+internal fun CommunitySocialActions(
+    post: CommunityPost,
+    onLikeClick: () -> Unit,
+    onCommentClick: () -> Unit,
+    onShareClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSeenClick: (() -> Unit)? = null,
+    likeAnimation: CommunityLikeAnimation = rememberCommunityLikeAnimation(post.id, post.isSupported),
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        InlineAction(
+            icon = if (post.isSupported) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            label = post.likeCount.toString(),
+            contentDescription = if (post.isSupported) "Batalkan suka" else "Sukai postingan",
+            tint = if (post.isSupported) CommunityLikePink else CommunityActionGray,
+            iconModifier = Modifier.communityLikeEffect(likeAnimation),
+            onClick = onLikeClick,
+        )
+        InlineAction(
+            icon = null,
+            label = post.commentCount.toString(),
+            contentDescription = "Lihat tanggapan",
+            tint = CommunityActionGray,
+            labelTint = CommunityActionGray,
+            iconContent = {
+                RoundCommentIcon(
+                    tint = CommunityActionGray,
+                    contentDescription = "Lihat tanggapan",
+                    filled = false,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            onClick = onCommentClick,
+        )
+        InlineAction(
+            icon = Icons.Rounded.Visibility,
+            label = post.viewCount.toString(),
+            contentDescription = "Dilihat ${post.viewCount} kali",
+            tint = CommunityActionGray,
+            enabled = onSeenClick != null,
+            onClick = onSeenClick ?: {},
+        )
+        Spacer(Modifier.weight(1f))
+        val shareInteractionSource = remember { MutableInteractionSource() }
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clickable(
+                    interactionSource = shareInteractionSource,
+                    indication = null,
+                    onClick = onShareClick,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Share,
+                contentDescription = "Bagikan kasus",
+                tint = CommunityActionGray,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun InlineAction(
     icon: ImageVector?,
     label: String,
@@ -1491,6 +1511,7 @@ private fun InlineAction(
     labelTint: Color = CommunityActionGray,
     iconModifier: Modifier = Modifier,
     iconContent: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Row(
@@ -1498,6 +1519,7 @@ private fun InlineAction(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = enabled,
                 onClick = onClick,
             )
             .padding(horizontal = 4.dp, vertical = 8.dp),
@@ -1523,7 +1545,7 @@ private fun InlineAction(
     }
 }
 
-private val CommunityActionGray = Color.Black.copy(alpha = .52f)
+internal val CommunityActionGray = Color.Black.copy(alpha = .52f)
 internal val CommunityLikePink = Color(0xFFF21D4B)
 
 @Composable

@@ -176,6 +176,48 @@ class CommunityViewModelTest {
     }
 
     @Test
+    fun `opening detail applies seen count returned by backend`() = runTest {
+        val repository = FakeCommunityRepository().apply {
+            seenResponse = AppResult.Success(
+                social(liked = false, likeCount = 4, viewCount = 3, shareCount = 0)
+            )
+        }
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.LoadPostDetail("fake-case-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(3, viewModel.uiState.value.posts.first().viewCount)
+        assertEquals(3, viewModel.uiState.value.detailByPostId.getValue("fake-case-1").viewCount)
+    }
+
+    @Test
+    fun `sharing applies social counters and exposes share link`() = runTest {
+        val repository = FakeCommunityRepository().apply {
+            shareResponse = AppResult.Success(
+                social(
+                    liked = false,
+                    likeCount = 4,
+                    viewCount = 2,
+                    shareCount = 1,
+                    shareUrl = "https://example.test/community/fake-case-1",
+                )
+            )
+        }
+        val viewModel = viewModel(repository, token = "valid-token")
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(CommunityAction.ShareClicked("fake-case-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.posts.first().shareCount)
+        assertEquals("https://example.test/community/fake-case-1", viewModel.uiState.value.shareLink)
+    }
+
+    @Test
     fun `like then unlike updates UI immediately and stale like response cannot win`() = runTest {
         val repository = FakeCommunityRepository()
         val viewModel = viewModel(repository, token = "valid-token")
@@ -312,6 +354,22 @@ class CommunityViewModelTest {
         shareUrl = null,
     )
 
+    private fun social(
+        liked: Boolean,
+        likeCount: Int,
+        viewCount: Int,
+        shareCount: Int,
+        shareUrl: String? = null,
+    ) = CommunitySocialUpdate(
+        communityId = "fake-case-1",
+        liked = liked,
+        likeCount = likeCount,
+        viewCount = viewCount,
+        commentCount = 1,
+        shareCount = shareCount,
+        shareUrl = shareUrl,
+    )
+
     // ──────────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
@@ -342,6 +400,8 @@ class CommunityViewModelTest {
         var deleteCalls = 0
         val likeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
         val unlikeResponse = CompletableDeferred<AppResult<CommunitySocialUpdate>>()
+        var seenResponse: AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
+        var shareResponse: AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
         val events = MutableSharedFlow<CommunityRealtimeEvent>(extraBufferCapacity = 1)
 
         private val fakePosts = listOf(
@@ -436,13 +496,13 @@ class CommunityViewModelTest {
             baseUrl: String,
             accessToken: String,
             caseId: String,
-        ): AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
+        ): AppResult<CommunitySocialUpdate> = seenResponse
 
         override suspend fun shareCommunity(
             baseUrl: String,
             accessToken: String,
             caseId: String,
-        ): AppResult<CommunitySocialUpdate> = AppResult.Failure("not used")
+        ): AppResult<CommunitySocialUpdate> = shareResponse
 
         override suspend fun updatePost(
             baseUrl: String,
