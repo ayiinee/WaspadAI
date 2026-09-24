@@ -12,8 +12,15 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -28,8 +35,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
@@ -51,6 +58,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -73,18 +84,23 @@ import id.waspadai.app.feature.verification.presentation.component.HistoryPanel
 import id.waspadai.app.feature.verification.presentation.component.ThinkingBubble
 import id.waspadai.app.feature.verification.presentation.component.UserMessage
 import id.waspadai.app.feature.verification.presentation.component.VerificationComposer
+import id.waspadai.app.feature.verification.presentation.component.VerificationChatHeader
 import id.waspadai.app.feature.verification.presentation.component.WaspadAiHeader
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
-import id.waspadai.app.core.ui.WaspadAIBottomNavigationHeight
 import id.waspadai.app.ui.theme.WaspadAITheme
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun VerificationRoute(
     viewModel: VerificationViewModel,
+    isChatScreen: Boolean = false,
+    onStartConversation: () -> Unit = {},
+    onOpenConversation: (String) -> Unit = {},
+    onBackToConversations: () -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
     onCommunityPublished: (String) -> Unit = {},
 ) {
@@ -97,6 +113,10 @@ fun VerificationRoute(
     VerificationScreen(
         state = state,
         onAction = viewModel::onAction,
+        isChatScreen = isChatScreen,
+        onStartConversation = onStartConversation,
+        onOpenConversation = onOpenConversation,
+        onBackToConversations = onBackToConversations,
         onDestinationSelected = onDestinationSelected,
     )
 }
@@ -105,12 +125,48 @@ fun VerificationRoute(
 fun VerificationScreen(
     state: VerificationUiState,
     onAction: (VerificationAction) -> Unit,
+    isChatScreen: Boolean = false,
+    onStartConversation: () -> Unit = {},
+    onOpenConversation: (String) -> Unit = {},
+    onBackToConversations: () -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
+    var isBottomNavigationVisible by rememberSaveable { mutableStateOf(true) }
     val context = LocalContext.current
     val pickerScope = rememberCoroutineScope()
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
+
+    BackHandler(enabled = isChatScreen, onBack = onBackToConversations)
+
+    LaunchedEffect(listState) {
+        var previousIndex = listState.firstVisibleItemIndex
+        var previousOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow {
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                listState.isScrollInProgress,
+            )
+        }
+            .distinctUntilChanged()
+            .collect { (index, offset, isScrolling) ->
+                if (index == 0 && offset <= 8) {
+                    isBottomNavigationVisible = true
+                } else if (isScrolling) {
+                    val scrollingDown = index > previousIndex ||
+                        (index == previousIndex && offset > previousOffset)
+                    val scrollingUp = index < previousIndex ||
+                        (index == previousIndex && offset < previousOffset)
+                    when {
+                        scrollingDown -> isBottomNavigationVisible = false
+                        scrollingUp -> isBottomNavigationVisible = true
+                    }
+                }
+                previousIndex = index
+                previousOffset = offset
+            }
+    }
     val mediaProjectionManager = context.getSystemService(MediaProjectionManager::class.java)
     val mediaProjectionConsent = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -318,8 +374,8 @@ fun VerificationScreen(
         }
     }
 
-    LaunchedEffect(state.conversation.size, state.phase) {
-        if (state.conversation.isNotEmpty()) {
+    LaunchedEffect(state.conversation.size, state.phase, isChatScreen) {
+        if (isChatScreen && state.conversation.isNotEmpty()) {
             listState.animateScrollToItem(state.conversation.lastIndex)
         }
     }
@@ -327,26 +383,8 @@ fun VerificationScreen(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val keyboardBottom = WindowInsets.ime.getBottom(density)
-    val navigationBottom = WindowInsets.navigationBars.getBottom(density)
+    val shouldShowBottomNavigation = isBottomNavigationVisible && keyboardBottom == 0
     val contentGutter = if (configuration.screenWidthDp < 360) 16.dp else 20.dp
-    val restingGap = if (configuration.screenHeightDp < 700) 8.dp else 12.dp
-    val restingBottomPadding = with(density) {
-        WaspadAIBottomNavigationHeight + navigationBottom.toDp() + restingGap
-    }
-    // Follow the IME directly, then ease its last 36 dp into the resting position.
-    // This keeps the keyboard's speed while avoiding an abrupt stop or navbar overlap.
-    val composerBottomPadding = with(density) {
-        val remainingTravel = (keyboardBottom.toDp() + 12.dp - restingBottomPadding)
-            .coerceAtLeast(0.dp)
-        val settleDistance = 36.dp
-        val easedTravel = if (remainingTravel < settleDistance) {
-            val fraction = remainingTravel.value / settleDistance.value
-            settleDistance * (2f * fraction * fraction - fraction * fraction * fraction)
-        } else {
-            remainingTravel
-        }
-        restingBottomPadding + easedTravel
-    }
     val verificationComposer: @Composable (Modifier) -> Unit = { composerModifier ->
         VerificationComposer(
             value = state.draft,
@@ -354,6 +392,10 @@ fun VerificationScreen(
             modifier = composerModifier,
             onValueChange = { onAction(VerificationAction.InputChanged(it)) },
             onSubmit = {
+                if (!isChatScreen) {
+                    onAction(VerificationAction.PrepareNewConversation)
+                    onStartConversation()
+                }
                 onAction(
                     if (state.pendingAttachments.isNotEmpty()) {
                         VerificationAction.SubmitPendingImage
@@ -382,6 +424,70 @@ fun VerificationScreen(
             .fillMaxSize()
             .background(Color.White)
     ) {
+        if (isChatScreen) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                VerificationChatHeader(
+                    title = state.activeConversationTitle,
+                    onBack = onBackToConversations,
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(
+                        start = contentGutter,
+                        end = contentGutter,
+                        top = 16.dp,
+                        bottom = 16.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    if (state.isConversationLoading) {
+                        item { ThinkingBubble("Memuat percakapan…") }
+                    }
+                    items(state.conversation) { item ->
+                        when (item) {
+                            is VerificationConversationItem.UserMessage -> UserMessage(
+                                text = item.text,
+                                hasAttachment = item.hasAttachment,
+                                attachmentName = item.attachmentName,
+                                attachmentBytes = item.attachmentBytes,
+                                attachmentContentType = item.attachmentContentType,
+                                attachmentGroup = item.attachmentGroup,
+                            )
+                            is VerificationConversationItem.Analysis -> AnalysisCard(
+                                result = item.result,
+                                isSample = item.isSample,
+                                onShareToCommunity = {
+                                    onAction(VerificationAction.RequestCommunityPreview)
+                                },
+                            )
+                        }
+                    }
+                    when (val phase = state.phase) {
+                        VerificationPhase.Validating -> item {
+                            ThinkingBubble("Menyiapkan pemeriksaan…")
+                        }
+                        VerificationPhase.Submitting -> item {
+                            ThinkingBubble("WaspadAI sedang memeriksa…")
+                        }
+                        is VerificationPhase.Failure -> item {
+                            FailureNotice(phase.message) {
+                                onAction(VerificationAction.DismissFailure)
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+                verificationComposer(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = contentGutter, vertical = 10.dp)
+                        .navigationBarsPadding()
+                        .imePadding(),
+                )
+            }
+        } else {
         Column(modifier = Modifier.fillMaxSize()) {
             WaspadAiHeader(
                 overlayModeEnabled = state.isOverlayModeEnabled,
@@ -393,14 +499,24 @@ fun VerificationScreen(
                     onAction(VerificationAction.RequestOverlayMode)
                 },
             )
+            verificationComposer(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = contentGutter,
+                        end = contentGutter,
+                        top = 12.dp,
+                        bottom = 10.dp,
+                    ),
+            )
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(
                     start = contentGutter,
                     end = contentGutter,
-                    top = 8.dp,
-                    bottom = WaspadAIBottomNavigationHeight + restingGap + 12.dp,
+                    top = 6.dp,
+                    bottom = 24.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -410,10 +526,15 @@ fun VerificationScreen(
                         items = state.history,
                         isLoading = state.isHistoryLoading,
                         onRefresh = { onAction(VerificationAction.RefreshHistory) },
-                        onOpen = { onAction(VerificationAction.OpenHistory(it)) }
+                        onNewChat = {
+                            onAction(VerificationAction.NewConversation)
+                            onStartConversation()
+                        },
+                        onOpen = onOpenConversation,
                     )
                 }
             }
+            if (isChatScreen) {
             items(state.conversation) { item ->
                 when (item) {
                     is VerificationConversationItem.UserMessage -> {
@@ -445,21 +566,26 @@ fun VerificationScreen(
             }
             item { Spacer(Modifier.padding(bottom = 1.dp)) }
             }
-            WaspadAIBottomNavigation(
-                selectedDestination = "Periksa",
-                onDestinationSelected = onDestinationSelected,
-                modifier = Modifier.navigationBarsPadding(),
-            )
+            }
+            AnimatedVisibility(
+                visible = shouldShowBottomNavigation,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(220),
+                ) + fadeIn(animationSpec = tween(160)),
+                exit = slideOutVertically(
+                    targetOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(220),
+                ) + fadeOut(animationSpec = tween(140)),
+            ) {
+                WaspadAIBottomNavigation(
+                    selectedDestination = "Periksa",
+                    onDestinationSelected = onDestinationSelected,
+                    modifier = Modifier.navigationBarsPadding(),
+                )
+            }
         }
-        verificationComposer(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .padding(
-                    start = contentGutter,
-                    end = contentGutter,
-                    bottom = composerBottomPadding,
-                ),
-        )
+        }
     }
 }
 

@@ -9,6 +9,7 @@ data class TextVerificationRequestDto(
     @SerialName("sender_context") val senderContext: String = "UNKNOWN",
     @SerialName("source_url") val sourceUrl: String? = null,
     val question: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
 )
 
 @Serializable
@@ -16,7 +17,8 @@ data class VerificationResponseDto(
     @SerialName("risk_level") val riskLevel: String? = null,
     val why: List<String> = emptyList(),
     @SerialName("recommended_actions") val recommendedActions: List<RecommendedActionDto> = emptyList(),
-    val presentation: PresentationDto? = null
+    val presentation: PresentationDto? = null,
+    val headline: String? = null,
 )
 
 @Serializable
@@ -39,6 +41,7 @@ data class NarrativeDto(
 data class HistoryMetaDto(
     val saved: Boolean = false,
     @SerialName("case_id") val caseId: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("save_reason") val saveReason: String = "",
     @SerialName("community_eligible") val communityEligible: Boolean = false,
     @SerialName("community_state") val communityState: String = "",
@@ -69,6 +72,43 @@ data class HistoryItemDto(
 data class HistoryPageDto(
     val items: List<HistoryItemDto> = emptyList(),
     @SerialName("next_cursor") val nextCursor: String? = null,
+)
+
+@Serializable
+data class ConversationItemDto(
+    @SerialName("conversation_id") val conversationId: String,
+    val title: String,
+    @SerialName("latest_message_preview") val latestMessagePreview: String,
+    @SerialName("latest_message_role") val latestMessageRole: String,
+    @SerialName("last_verdict") val lastVerdict: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String,
+)
+
+@Serializable
+data class ConversationPageDto(
+    val items: List<ConversationItemDto> = emptyList(),
+    @SerialName("next_cursor") val nextCursor: String? = null,
+)
+
+@Serializable
+data class ConversationTurnDto(
+    @SerialName("case_id") val caseId: String,
+    @SerialName("input_type") val inputType: String,
+    @SerialName("input_text") val inputText: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("execution_mode") val executionMode: String,
+    val history: HistoryMetaDto,
+    val result: VerificationResponseDto,
+)
+
+@Serializable
+data class ConversationDetailDto(
+    @SerialName("conversation_id") val conversationId: String,
+    val title: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String,
+    val turns: List<ConversationTurnDto> = emptyList(),
 )
 
 @Serializable

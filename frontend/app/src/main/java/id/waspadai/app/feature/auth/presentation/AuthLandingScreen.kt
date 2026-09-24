@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
@@ -54,6 +55,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -75,7 +77,7 @@ private enum class AuthStep {
 
 @Composable
 fun AuthLandingScreen(
-    onAuthenticate: suspend (email: String, password: String, isSignUp: Boolean) -> Result<Unit>,
+    onAuthenticate: suspend (email: String, password: String, fullName: String?, isSignUp: Boolean) -> Result<Unit>,
     onAuthenticated: () -> Unit,
     rememberedCredentials: RememberedCredentials? = null,
     onRememberCredentials: (email: String, password: String) -> Unit = { _, _ -> },
@@ -85,6 +87,7 @@ fun AuthLandingScreen(
     onUpdatePassword: suspend (newPassword: String) -> Result<Unit> = { Result.success(Unit) },
 ) {
     var step by rememberSaveable { mutableStateOf(AuthStep.Login) }
+    var fullName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
@@ -118,8 +121,11 @@ fun AuthLandingScreen(
     fun submit() {
         if (isSubmitting) return
         val normalizedEmail = email.trim()
+        val normalizedFullName = fullName.trim().replace(Regex("\\s+"), " ")
         error = when (step) {
             AuthStep.Login, AuthStep.Register, AuthStep.ForgotEmail -> when {
+                step == AuthStep.Register && normalizedFullName.length !in 2..80 ->
+                    "Masukkan nama lengkap antara 2 sampai 80 karakter."
                 !Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches() -> "Masukkan alamat email yang valid."
                 step != AuthStep.ForgotEmail && password.length < 8 -> "Kata sandi minimal terdiri dari 8 karakter."
                 step == AuthStep.Register && password != confirmation -> "Konfirmasi kata sandi belum sama."
@@ -138,8 +144,8 @@ fun AuthLandingScreen(
             isSubmitting = true
             notice = null
             val result = when (step) {
-                AuthStep.Login -> onAuthenticate(normalizedEmail, password, false)
-                AuthStep.Register -> onAuthenticate(normalizedEmail, password, true)
+                AuthStep.Login -> onAuthenticate(normalizedEmail, password, null, false)
+                AuthStep.Register -> onAuthenticate(normalizedEmail, password, normalizedFullName, true)
                 AuthStep.ForgotEmail -> onRequestPasswordReset(normalizedEmail)
                 AuthStep.RecoveryCode -> onVerifyPasswordResetCode(normalizedEmail, recoveryCode.trim())
                 AuthStep.NewPassword -> onUpdatePassword(newPassword)
@@ -200,6 +206,10 @@ fun AuthLandingScreen(
                 ) {
                     AuthForm(
                         step = step,
+                        fullName = fullName,
+                        onFullNameChange = {
+                            if (!isSubmitting && it.length <= 80) fullName = it
+                        },
                         email = email,
                         onEmailChange = { if (!isSubmitting) email = it },
                         password = password,
@@ -259,6 +269,8 @@ private fun AuthHero(step: AuthStep) {
 @Composable
 private fun AuthForm(
     step: AuthStep,
+    fullName: String,
+    onFullNameChange: (String) -> Unit,
     email: String,
     onEmailChange: (String) -> Unit,
     password: String,
@@ -331,6 +343,18 @@ private fun AuthForm(
                 Modifier
             },
         )
+
+        if (step == AuthStep.Register) {
+            AuthField(
+                value = fullName,
+                onValueChange = onFullNameChange,
+                placeholder = "Nama lengkap",
+                keyboardType = KeyboardType.Text,
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Next,
+                leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
+            )
+        }
 
         if (step == AuthStep.Login || step == AuthStep.Register || step == AuthStep.ForgotEmail) {
             AuthField(
@@ -484,6 +508,7 @@ private fun AuthField(
     placeholder: String,
     imeAction: ImeAction,
     keyboardType: KeyboardType = KeyboardType.Text,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.Unspecified,
     isPassword: Boolean = false,
     leadingIcon: @Composable (() -> Unit)? = null,
 ) {
@@ -511,7 +536,11 @@ private fun AuthField(
         } else null,
         singleLine = true,
         visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        keyboardOptions = KeyboardOptions(
+            capitalization = capitalization,
+            keyboardType = keyboardType,
+            imeAction = imeAction,
+        ),
         shape = shape,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.White,

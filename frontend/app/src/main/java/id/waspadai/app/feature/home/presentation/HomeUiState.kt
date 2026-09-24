@@ -2,16 +2,24 @@ package id.waspadai.app.feature.home.presentation
 
 enum class HomeCaseTone {
     Hoax,
-    Caution,
     Valid,
+}
+
+enum class HomeCaseFilter(val label: String) {
+    All("Semua"),
+    Hoax("Hoaks"),
+    Valid("Fakta"),
 }
 
 data class HomeCaseUiModel(
     val communityId: String,
+    val creatorName: String,
+    val timestamp: String,
     val title: String,
     val description: String,
     val status: String,
     val tone: HomeCaseTone,
+    val imageUrl: String?,
 )
 
 data class HomeLearningUiModel(
@@ -25,7 +33,8 @@ data class HomeLearningUiModel(
 data class HomeUiState(
     val displayName: String = "Pengguna WaspadAI",
     val searchQuery: String = "",
-    val cautionOnly: Boolean = false,
+    val selectedFilter: HomeCaseFilter = HomeCaseFilter.All,
+    val isFilterMenuVisible: Boolean = false,
     val cases: List<HomeCaseUiModel> = emptyList(),
     val learningRecommendations: List<HomeLearningUiModel> = emptyList(),
     val accessToken: String = "",
@@ -41,7 +50,12 @@ data class HomeUiState(
                     item.description,
                     item.status,
                 ).any { it.contains(query, ignoreCase = true) }
-                matchesQuery && (!cautionOnly || item.tone == HomeCaseTone.Caution)
+                val matchesFilter = when (selectedFilter) {
+                    HomeCaseFilter.All -> true
+                    HomeCaseFilter.Hoax -> item.tone == HomeCaseTone.Hoax
+                    HomeCaseFilter.Valid -> item.tone == HomeCaseTone.Valid
+                }
+                matchesQuery && matchesFilter
             }
         }
 

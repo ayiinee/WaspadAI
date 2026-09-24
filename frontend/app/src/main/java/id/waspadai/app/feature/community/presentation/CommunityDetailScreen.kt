@@ -148,7 +148,7 @@ fun CommunityDetailScreen(
                     }
                     CommunityInsight(displayPost)
                     Spacer(Modifier.height(8.dp))
-                    if (!displayPost.isOwner) {
+                    if (!displayPost.isOwner && displayPost.canReceiveAssessment) {
                         CommunityAssessmentPanel(
                             post = displayPost,
                             expanded = assessmentExpanded,
@@ -159,7 +159,7 @@ fun CommunityDetailScreen(
                             isSubmitting = isResponseSubmitting,
                             submitError = detailError,
                         )
-                    } else {
+                    } else if (displayPost.isOwner) {
                         Text(
                             text = "Anda tidak dapat memberi penilaian pada kasus milik sendiri.",
                             color = Color.Black.copy(alpha = .4f),
@@ -280,11 +280,13 @@ private fun CommunityInsight(post: CommunityPost) {
                 color = Color.Black,
                 fontSize = 12.sp,
             )
-            Text(
-                text = "Pilih penilaian Anda untuk ikut memperbarui hasil polling.",
-                color = Color.Black,
-                fontSize = 11.sp,
-            )
+            if (post.canReceiveAssessment) {
+                Text(
+                    text = "Pilih penilaian Anda untuk ikut memperbarui hasil polling.",
+                    color = Color.Black,
+                    fontSize = 11.sp,
+                )
+            }
         }
     }
 }

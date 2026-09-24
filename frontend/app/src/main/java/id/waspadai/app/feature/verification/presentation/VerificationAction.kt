@@ -61,7 +61,13 @@ sealed interface VerificationAction {
 
     data object RefreshHistory : VerificationAction
 
+    data object NewConversation : VerificationAction
+
+    data object PrepareNewConversation : VerificationAction
+
     data class OpenHistory(val caseId: String) : VerificationAction
+
+    data class OpenConversation(val conversationId: String) : VerificationAction
 
     data object RequestCommunityPreview : VerificationAction
 

@@ -23,6 +23,7 @@ import android.os.IBinder
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -72,6 +73,8 @@ class FloatingVerifyService : Service() {
 
     private var bubbleView: View? = null
     private var trashView: View? = null
+    private var trashCircleView: View? = null
+    private var trashHighlighted = false
     private var cropView: View? = null
     private var panelView: View? = null
     private var transitionView: View? = null
@@ -141,19 +144,13 @@ class FloatingVerifyService : Service() {
     private fun showBubble() {
         if (bubbleView != null) return
         removePanel()
-        val view = TextView(this).apply {
-            text = "?"
-            setTextColor(Color.WHITE)
-            textSize = 28f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            background = rounded(BRAND_BLUE, 40, Color.WHITE, 2)
-            width = dp(62)
-            height = dp(62)
-            minWidth = dp(62)
-            minHeight = dp(62)
-            elevation = dp(8).toFloat()
-            contentDescription = "Buka Tanya Area"
+        val view = ImageView(this).apply {
+            setImageResource(R.drawable.waspadai_logo)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = rounded(Color.WHITE, 40, Color.WHITE, 2)
+            clipToOutline = true
+            setElevation(dp(8).toFloat())
+            setContentDescription("Buka Tanya Area")
         }
         val params = overlayParams(dp(62), dp(62), focusable = false).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -171,6 +168,7 @@ class FloatingVerifyService : Service() {
         var touchX = 0f
         var touchY = 0f
         var moved = false
+        var overTrash = false
         view.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -179,6 +177,7 @@ class FloatingVerifyService : Service() {
                     touchX = event.rawX
                     touchY = event.rawY
                     moved = false
+                    overTrash = false
                     showTrashTarget()
                     true
                 }
@@ -187,24 +186,44 @@ class FloatingVerifyService : Service() {
                     val deltaY = event.rawY - touchY
                     moved = moved || abs(deltaX) > dp(6) || abs(deltaY) > dp(6)
                     val (screenWidth, screenHeight) = screenSize()
-                    params.x = (initialX + deltaX.toInt()).coerceIn(0, screenWidth - dp(62))
-                    params.y = (initialY + deltaY.toInt()).coerceIn(0, screenHeight - dp(62))
+                    val naturalX = (initialX + deltaX.toInt()).coerceIn(0, screenWidth - dp(BUBBLE_SIZE_DP))
+                    val naturalY = (initialY + deltaY.toInt()).coerceIn(0, screenHeight - dp(BUBBLE_SIZE_DP))
+                    val bubbleCenterX = naturalX + dp(BUBBLE_SIZE_DP) / 2f
+                    val bubbleCenterY = naturalY + dp(BUBBLE_SIZE_DP) / 2f
+                    val (targetX, targetY) = trashCenterOnScreen()
+                    val distance = distanceBetween(bubbleCenterX, bubbleCenterY, targetX, targetY)
+                    val magnetRadius = dp(TRASH_MAGNET_RADIUS_DP).toFloat()
+                    val magnetStrength = if (distance < magnetRadius) {
+                        val proximity = 1f - distance / magnetRadius
+                        (.16f + proximity * .84f).coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
+                    params.x = lerp(naturalX.toFloat(), targetX - dp(BUBBLE_SIZE_DP) / 2f, magnetStrength)
+                        .toInt()
+                        .coerceIn(0, screenWidth - dp(BUBBLE_SIZE_DP))
+                    params.y = lerp(naturalY.toFloat(), targetY - dp(BUBBLE_SIZE_DP) / 2f, magnetStrength)
+                        .toInt()
+                        .coerceIn(0, screenHeight - dp(BUBBLE_SIZE_DP))
                     bubbleView?.let { windowManager.updateViewLayout(it, params) }
-                    setTrashHighlighted(isOverTrash(event.rawX, event.rawY))
+                    overTrash = distance <= dp(TRASH_DROP_RADIUS_DP)
+                    setTrashHighlighted(overTrash)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    val shouldClose = moved && isOverTrash(event.rawX, event.rawY)
-                    removeTrashTarget()
+                    val shouldClose = moved && overTrash
                     when {
-                        shouldClose -> {
-                            closeOverlay()
-                        }
+                        shouldClose -> animateBubbleDismiss(view)
                         !moved && selectedImageBytes != null -> {
+                            removeTrashTarget()
                             isPanelMinimized = false
                             showChatPanel()
                         }
-                        !moved -> showCropSelector()
+                        !moved -> {
+                            removeTrashTarget()
+                            showCropSelector()
+                        }
+                        else -> removeTrashTarget()
                     }
                     true
                 }
@@ -228,25 +247,78 @@ class FloatingVerifyService : Service() {
             background = rounded(ERROR_RED, 48, Color.WHITE, 2)
             contentDescription = "Geser ke sini untuk menutup Tanya Area"
         }
-        val params = overlayParams(dp(76), dp(76), focusable = false).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = dp(32)
+        val root = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(
+                target,
+                FrameLayout.LayoutParams(dp(TRASH_CIRCLE_SIZE_DP), dp(TRASH_CIRCLE_SIZE_DP), Gravity.CENTER),
+            )
         }
-        trashView = target
-        windowManager.addView(target, params)
+        val params = overlayParams(dp(TRASH_WINDOW_SIZE_DP), dp(TRASH_WINDOW_SIZE_DP), focusable = false).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = dp(TRASH_BOTTOM_MARGIN_DP)
+        }
+        trashHighlighted = false
+        trashCircleView = target
+        trashView = root
+        windowManager.addView(root, params)
     }
 
     private fun setTrashHighlighted(highlighted: Boolean) {
-        trashView?.apply {
-            scaleX = if (highlighted) 1.18f else 1f
-            scaleY = if (highlighted) 1.18f else 1f
-            alpha = if (highlighted) 1f else .78f
-        }
+        if (trashHighlighted == highlighted) return
+        trashHighlighted = highlighted
+        if (highlighted) trashCircleView?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        trashCircleView?.animate()
+            ?.scaleX(if (highlighted) 1.2f else 1f)
+            ?.scaleY(if (highlighted) 1.2f else 1f)
+            ?.alpha(if (highlighted) 1f else .78f)
+            ?.setDuration(140L)
+            ?.setInterpolator(DecelerateInterpolator())
+            ?.start()
     }
 
-    private fun isOverTrash(rawX: Float, rawY: Float): Boolean {
+    private fun trashCenterOnScreen(): Pair<Float, Float> {
+        trashCircleView?.takeIf { it.width > 0 && it.height > 0 }?.let { circle ->
+            val location = IntArray(2)
+            circle.getLocationOnScreen(location)
+            return location[0] + circle.width / 2f to location[1] + circle.height / 2f
+        }
         val (width, height) = screenSize()
-        return abs(rawX - width / 2f) <= dp(70) && rawY >= height - dp(150)
+        return width / 2f to height - dp(TRASH_BOTTOM_MARGIN_DP) - dp(TRASH_WINDOW_SIZE_DP) / 2f
+    }
+
+    private fun animateBubbleDismiss(view: View) {
+        val (effectX, effectY) = trashCenterOnScreen()
+        setTrashHighlighted(true)
+        view.animate()
+            .scaleX(0f)
+            .scaleY(0f)
+            .alpha(0f)
+            .setDuration(210L)
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                removeBubble()
+                removeTrashTarget()
+                showDismissEffect(effectX, effectY)
+            }
+            .start()
+    }
+
+    private fun showDismissEffect(originX: Float, originY: Float) {
+        removeTransitionEffect()
+        val effect = TanyaAreaDismissEffectView(this, originX, originY) { completedView ->
+            if (transitionView === completedView) {
+                removeTransitionEffect()
+                closeOverlay()
+            }
+        }
+        val params = overlayParams(-1, -1, focusable = false).apply {
+            gravity = Gravity.TOP or Gravity.START
+            flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+        transitionView = effect
+        windowManager.addView(effect, params)
     }
 
     private fun showCropSelector() {
@@ -877,6 +949,8 @@ class FloatingVerifyService : Service() {
     private fun removeTrashTarget() {
         trashView?.let { runCatching { windowManager.removeView(it) } }
         trashView = null
+        trashCircleView = null
+        trashHighlighted = false
     }
 
     private fun removeCropSelector() {
@@ -941,6 +1015,12 @@ class FloatingVerifyService : Service() {
 
     private fun timestamp(): String = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun lerp(start: Float, end: Float, amount: Float): Float = start + (end - start) * amount
+    private fun distanceBetween(x1: Float, y1: Float, x2: Float, y2: Float): Float {
+        val dx = x1 - x2
+        val dy = y1 - y2
+        return kotlin.math.sqrt(dx * dx + dy * dy)
+    }
     private fun Int?.orZero(): Int = this ?: 0
 
     private inline fun <reified T> Intent.getParcelableExtraCompat(key: String): T? =
@@ -960,6 +1040,12 @@ class FloatingVerifyService : Service() {
         private const val NOTIFICATION_ID = 401
         private const val CAPTURE_START_DELAY_MS = 350L
         private const val MIN_SELECTION_DP = 80
+        private const val BUBBLE_SIZE_DP = 62
+        private const val TRASH_CIRCLE_SIZE_DP = 76
+        private const val TRASH_WINDOW_SIZE_DP = 116
+        private const val TRASH_BOTTOM_MARGIN_DP = 16
+        private const val TRASH_MAGNET_RADIUS_DP = 132
+        private const val TRASH_DROP_RADIUS_DP = 62
         private const val ACTION_STOP = "id.waspadai.app.overlay.STOP"
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_DATA = "extra_data"
@@ -1097,6 +1183,80 @@ private class TanyaAreaEntranceEffectView(
                 startX + sway,
                 height - dp(13f + index % 4) - rise,
                 dp(2.2f + index % 3),
+                paint,
+            )
+        }
+    }
+
+    private fun dp(value: Float): Float = value * resources.displayMetrics.density
+}
+
+private class TanyaAreaDismissEffectView(
+    context: Context,
+    private val originX: Float,
+    private val originY: Float,
+    private val onFinished: (TanyaAreaDismissEffectView) -> Unit,
+) : View(context) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(165, 34, 25)
+        style = Paint.Style.STROKE
+        strokeWidth = dp(3f)
+    }
+    private val colors = intArrayOf(
+        Color.rgb(165, 34, 25),
+        Color.rgb(232, 73, 63),
+        Color.rgb(255, 220, 107),
+        Color.rgb(0, 92, 158),
+    )
+    private var progress = 0f
+    private var suppressFinish = false
+    private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 560L
+        interpolator = DecelerateInterpolator()
+        addUpdateListener {
+            progress = it.animatedValue as Float
+            invalidate()
+        }
+        addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (!suppressFinish) onFinished(this@TanyaAreaDismissEffectView)
+            }
+        })
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        animator.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        if (animator.isRunning) {
+            suppressFinish = true
+            animator.cancel()
+        }
+        super.onDetachedFromWindow()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val centerX = originX
+        val centerY = originY
+        val fade = (1f - progress).coerceIn(0f, 1f)
+
+        ringPaint.alpha = (210 * fade).toInt()
+        canvas.drawCircle(centerX, centerY, dp(12f + progress * 52f), ringPaint)
+
+        repeat(18) { index ->
+            val angle = (Math.PI * 2.0 * index / 18.0 + (index % 3) * .13).toFloat()
+            val travel = dp(24f + (index % 5) * 9f) * progress
+            val lift = dp(13f) * progress * progress
+            val particleFade = (1f - progress * progress).coerceIn(0f, 1f)
+            paint.color = colors[index % colors.size]
+            paint.alpha = (245 * particleFade).toInt()
+            canvas.drawCircle(
+                centerX + cos(angle) * travel,
+                centerY + sin(angle) * travel - lift,
+                dp(2.4f + index % 3),
                 paint,
             )
         }

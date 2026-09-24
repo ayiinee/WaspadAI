@@ -12,11 +12,13 @@ class SubmitImageVerificationUseCase(
         fileName: String,
         question: String?,
         overlayModeEnabled: Boolean,
+        conversationId: String? = null,
     ): AppResult<VerificationResult> = repository.submitImage(
         imageBytes = imageBytes,
         contentType = contentType,
         fileName = fileName,
         question = question,
         overlayModeEnabled = overlayModeEnabled,
+        conversationId = conversationId,
     )
 }

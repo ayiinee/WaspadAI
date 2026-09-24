@@ -2,7 +2,10 @@
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +41,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Image
@@ -49,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,8 +95,14 @@ import id.waspadai.app.core.ui.DeepBlue
 import id.waspadai.app.core.ui.Ink
 import id.waspadai.app.core.ui.RiskRed
 import id.waspadai.app.core.ui.SoftBlue
-import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.feature.verification.presentation.ImageVerificationPreview
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun WaspadAiHeader(
@@ -117,14 +128,15 @@ fun WaspadAiHeader(
                 .statusBarsPadding()
                 .height(64.dp)
         ) {
-            Text(
-                text = "WaspadAI",
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 25.sp,
+            Image(
+                painter = painterResource(id = R.drawable.waspadai_logo),
+                contentDescription = "Logo WaspadAI",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 32.dp)
+                    .padding(start = 20.dp)
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(13.dp)),
             )
             val thumbOffset by animateDpAsState(
                 targetValue = if (overlayModeEnabled) 27.dp else 3.dp,
@@ -133,6 +145,13 @@ fun WaspadAiHeader(
             val trackColor by animateColorAsState(
                 targetValue = if (overlayModeEnabled) WaspadAICaution else WaspadAIDarkBlue,
                 label = "tanyainTrack",
+            )
+            TanyainActivationParticles(
+                active = overlayModeEnabled,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(140.dp)
+                    .height(64.dp),
             )
             Box(
                 modifier = Modifier
@@ -172,10 +191,105 @@ fun WaspadAiHeader(
 }
 
 @Composable
+fun VerificationChatHeader(
+    title: String,
+    onBack: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(WaspadAIBlue)
+            .statusBarsPadding()
+            .height(64.dp)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.Rounded.ArrowBack,
+                contentDescription = "Kembali ke daftar percakapan",
+                tint = Color.White,
+            )
+        }
+        Text(
+            text = title,
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun TanyainActivationParticles(
+    active: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(active) {
+        if (active) {
+            progress.snapTo(0f)
+            progress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = 900,
+                    easing = FastOutSlowInEasing,
+                ),
+            )
+        } else {
+            progress.snapTo(1f)
+        }
+    }
+    Canvas(modifier = modifier) {
+        val animation = progress.value
+        if (animation >= 1f) return@Canvas
+        val origin = Offset(
+            x = size.width - 66.dp.toPx(),
+            y = size.height / 2f,
+        )
+        val particleColors = listOf(
+            WaspadAICaution,
+            Color.White,
+            WaspadAILightBlue,
+            Color(0xFFFFD76A),
+        )
+        repeat(18) { index ->
+            val angle = (Math.PI * 2.0 * index / 18.0).toFloat()
+            val stagger = (index % 4) * .035f
+            val localProgress = ((animation - stagger) / (1f - stagger)).coerceIn(0f, 1f)
+            val distance = 13.dp.toPx() + 38.dp.toPx() * localProgress
+            val alpha = (1f - localProgress).coerceIn(0f, 1f)
+            val radius = (if (index % 3 == 0) 2.7.dp else 1.9.dp).toPx() * (1f - localProgress * .35f)
+            drawCircle(
+                color = particleColors[index % particleColors.size],
+                radius = radius,
+                center = Offset(
+                    x = origin.x + cos(angle) * distance,
+                    y = origin.y + sin(angle) * distance,
+                ),
+                alpha = alpha,
+            )
+        }
+        drawCircle(
+            color = WaspadAICaution,
+            radius = (20.dp + 7.dp * (1f - animation)).toPx(),
+            center = origin,
+            alpha = .22f * (1f - animation),
+        )
+    }
+}
+
+@Composable
 fun HistoryPanel(
-    items: List<VerificationHistoryItem>,
+    items: List<VerificationConversationSummary>,
     isLoading: Boolean,
     onRefresh: () -> Unit,
+    onNewChat: () -> Unit,
     onOpen: (String) -> Unit,
 ) {
     Card(
@@ -186,12 +300,22 @@ fun HistoryPanel(
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "History Verifikasi",
+                    "Ruang chat tersimpan",
                     color = Ink,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     modifier = Modifier.weight(1f)
                 )
+                TextButton(onClick = onNewChat) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        tint = BrandBlue,
+                        modifier = Modifier.size(17.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Chat baru", color = BrandBlue, fontSize = 12.sp)
+                }
                 IconButton(onClick = onRefresh, enabled = !isLoading) {
                     Icon(
                         imageVector = Icons.Filled.Refresh,
@@ -201,10 +325,18 @@ fun HistoryPanel(
                 }
             }
             when {
-                isLoading -> Text("Memuat history...", color = Color(0xFF557383), fontSize = 13.sp)
-                items.isEmpty() -> Text("Belum ada history tersimpan.", color = Color(0xFF557383), fontSize = 13.sp)
-                else -> items.forEach { item ->
-                    HistoryRow(item = item, onOpen = onOpen)
+                isLoading -> Text("Memuat ruang chat...", color = Color(0xFF557383), fontSize = 13.sp)
+                items.isEmpty() -> Text(
+                    "Belum ada percakapan. Tulis pesan di atas untuk memulai.",
+                    color = Color(0xFF557383),
+                    fontSize = 13.sp,
+                )
+                else -> Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items.forEach { item ->
+                        HistoryRow(item = item, onOpen = onOpen)
+                    }
                 }
             }
         }
@@ -212,25 +344,49 @@ fun HistoryPanel(
 }
 
 @Composable
-private fun HistoryRow(item: VerificationHistoryItem, onOpen: (String) -> Unit) {
+private fun HistoryRow(item: VerificationConversationSummary, onOpen: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
-            .clickable { onOpen(item.caseId) }
+            .clickable { onOpen(item.conversationId) }
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Text(
-            "${item.verdict} • ${item.createdAt}",
-            color = Color(0xFF557383),
+            text = item.title,
+            color = Ink,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text = item.latestMessagePreview,
+            color = Color(0xFF355263),
             fontSize = 12.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${item.lastVerdict} • ${item.updatedAt.asChatTimestamp()}",
+            color = Color(0xFF557383),
+            fontSize = 11.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
+
+private fun String.asChatTimestamp(): String = runCatching {
+    DateTimeFormatter
+        .ofPattern("d MMM, HH.mm", Locale.forLanguageTag("id-ID"))
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.parse(this))
+}.getOrDefault(this)
 
 @Composable
 fun ModeNotice(isRemoteEnabled: Boolean) {

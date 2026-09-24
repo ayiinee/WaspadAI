@@ -116,6 +116,19 @@ class CommunityViewModelTest {
         assertEquals(CommunityBackendPhase.Failure, viewModel.uiState.value.backendPhase)
     }
 
+    @Test
+    fun `verified feed post disables further assessment`() = runTest {
+        val viewModel = viewModel(
+            FakeCommunityRepository(status = CommunityPostStatus.VerifiedEvidence),
+            token = "valid-token",
+        )
+
+        viewModel.onAction(CommunityAction.InitScreen)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.posts.single().canReceiveAssessment)
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // RefreshBackend – Manual refresh melalui panel debug
     // ──────────────────────────────────────────────────────────────────────────
@@ -334,6 +347,7 @@ class CommunityViewModelTest {
 
     private class FakeCommunityRepository(
         private val failLoad: Boolean = false,
+        private val status: CommunityPostStatus = CommunityPostStatus.PublishedUnverified,
     ) : CommunityRepository {
         var loadCommunityCallCount = 0
         var likeCalls = 0
@@ -352,7 +366,7 @@ class CommunityViewModelTest {
                 isOwner = true,
                 title = "Hoaks Beredar Tentang Presiden",
                 redactedText = "Beredar informasi palsu yang mengatasnamakan presiden...",
-                status = CommunityPostStatus.PublishedUnverified,
+                status = status,
                 publishedAt = "2026-09-18T07:30:00Z",
                 counts = CommunityVoteCounts(hoaks = 3, waspada = 5, valid = 1),
                 userVote = null,

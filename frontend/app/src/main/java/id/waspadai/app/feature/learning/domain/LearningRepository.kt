@@ -34,6 +34,8 @@ interface LearningRepository {
         idempotencyKey: String,
         answers: Map<String, String>,
         moduleVersion: Int,
+        readingDurationSeconds: Long,
+        quizDurationSeconds: Long,
     ): AppResult<QuizAttemptResult>
 
     suspend fun loadProgress(
@@ -60,6 +62,8 @@ data class LearningModuleItem(
     val progressUpdatedAt: String? = null,
     val latestCorrectAnswers: Int? = null,
     val latestTotalQuestions: Int? = null,
+    val readingDurationSeconds: Long? = null,
+    val quizDurationSeconds: Long? = null,
 )
 
 data class LearningLesson(
@@ -142,6 +146,8 @@ data class QuizAttemptResult(
     val correctAnswers: Int,
     val totalQuestions: Int,
     val feedback: List<QuizQuestionFeedback>,
+    val readingDurationSeconds: Long = 0,
+    val quizDurationSeconds: Long = 0,
 )
 
 data class LearningProgressItem(
@@ -154,6 +160,8 @@ data class LearningProgressItem(
     val updatedAt: String,
     val latestCorrectAnswers: Int? = null,
     val latestTotalQuestions: Int? = null,
+    val readingDurationSeconds: Long? = null,
+    val quizDurationSeconds: Long? = null,
     val firstOpenedAt: String? = null,
     val lastOpenedAt: String? = null,
 )

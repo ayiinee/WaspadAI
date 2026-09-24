@@ -19,6 +19,37 @@ import org.junit.Test
 
 class SupabaseAuthRepositoryTest {
     @Test
+    fun `signup sends normalized full name as Supabase user metadata`() = runTest {
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Post, request.method)
+            assertEquals("https://project.supabase.co/auth/v1/signup", request.url.toString())
+            val payload = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+            assertEquals("user@example.com", payload["email"]?.jsonPrimitive?.content)
+            assertEquals(
+                "Putu Alvin Mahendra Putra",
+                payload["data"]?.jsonObject?.get("full_name")?.jsonPrimitive?.content,
+            )
+            respond(
+                """{"access_token":"signup-access","refresh_token":"signup-refresh"}""",
+                headers = jsonHeaders(),
+            )
+        }
+        val repository = SupabaseAuthRepository(
+            client = httpClient(engine),
+            supabaseUrl = "https://project.supabase.co",
+            publishableKey = "publishable-key",
+        )
+
+        repository.signUp(
+            email = " user@example.com ",
+            password = "secure-password",
+            fullName = "  Putu   Alvin Mahendra Putra  ",
+        )
+
+        assertEquals("signup-access", repository.currentAccessToken())
+    }
+
+    @Test
     fun `password recovery sends email verifies code and updates password with recovery session`() = runTest {
         var requestIndex = 0
         val engine = MockEngine { request ->

@@ -15,12 +15,14 @@ data class HomeDashboard(
 data class HomeCase(
     val communityId: String,
     val caseId: String,
+    val creatorName: String,
     val title: String,
     val summary: String,
     val verdict: String,
     val riskLevel: String,
     val requiresHumanReview: Boolean,
     val createdAt: String,
+    val imageUrl: String?,
 )
 
 data class HomeLearningRecommendation(

@@ -5,11 +5,16 @@ import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.domain.VerificationConversationDetail
+import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import kotlinx.coroutines.delay
 
 class MockVerificationRepository : VerificationRepository {
-    override suspend fun submitText(text: String): AppResult<VerificationResult> {
+    override suspend fun submitText(
+        text: String,
+        conversationId: String?,
+    ): AppResult<VerificationResult> {
         delay(700)
         val lowerText = text.lowercase()
         val result = when {
@@ -56,7 +61,13 @@ class MockVerificationRepository : VerificationRepository {
                 )
             }
         }
-        return AppResult.Success(result)
+        return AppResult.Success(
+            result.copy(
+                headline = result.narrative.take(80),
+                caseId = "mock-case",
+                conversationId = conversationId ?: "mock-conversation",
+            )
+        )
     }
 
     override suspend fun submitImage(
@@ -65,6 +76,7 @@ class MockVerificationRepository : VerificationRepository {
         fileName: String,
         question: String?,
         overlayModeEnabled: Boolean,
+        conversationId: String?,
     ): AppResult<VerificationResult> {
         delay(700)
         val modeText = if (overlayModeEnabled) {
@@ -83,7 +95,10 @@ class MockVerificationRepository : VerificationRepository {
                 recommendedActions = listOf(
                     "Pastikan gambar berasal dari sumber tepercaya.",
                     "Jangan memindai QR atau membuka tautan dari gambar yang belum diverifikasi."
-                )
+                ),
+                headline = "Pemeriksaan gambar $fileName",
+                caseId = "mock-image-case",
+                conversationId = conversationId ?: "mock-conversation",
             )
         )
     }
@@ -93,5 +108,13 @@ class MockVerificationRepository : VerificationRepository {
 
     override suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail> =
         AppResult.Failure("History hanya tersedia saat backend aktif.")
+
+    override suspend fun listConversations(): AppResult<List<VerificationConversationSummary>> =
+        AppResult.Success(emptyList())
+
+    override suspend fun getConversationDetail(
+        conversationId: String,
+    ): AppResult<VerificationConversationDetail> =
+        AppResult.Failure("Percakapan hanya tersedia saat backend aktif.")
 
 }

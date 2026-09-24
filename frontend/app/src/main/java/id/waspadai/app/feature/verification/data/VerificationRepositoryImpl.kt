@@ -6,6 +6,9 @@ import id.waspadai.app.feature.verification.data.mapper.MissingNarrativeExceptio
 import id.waspadai.app.feature.verification.data.mapper.VerificationMapper
 import id.waspadai.app.feature.verification.domain.VerificationHistoryDetail
 import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.domain.VerificationConversationDetail
+import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
+import id.waspadai.app.feature.verification.domain.VerificationConversationTurn
 import id.waspadai.app.feature.verification.domain.VerificationRepository
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.utils.io.errors.IOException
@@ -15,8 +18,11 @@ class VerificationRepositoryImpl(
     private val remoteDataSource: VerificationRemoteDataSource,
     private val mapper: VerificationMapper
 ) : VerificationRepository {
-    override suspend fun submitText(text: String): AppResult<VerificationResult> = try {
-        val envelope = remoteDataSource.submitText(text)
+    override suspend fun submitText(
+        text: String,
+        conversationId: String?,
+    ): AppResult<VerificationResult> = try {
+        val envelope = remoteDataSource.submitText(text, conversationId)
         AppResult.Success(mapper.map(envelope.result, envelope.history))
     } catch (error: CancellationException) {
         throw error
@@ -40,6 +46,7 @@ class VerificationRepositoryImpl(
         fileName: String,
         question: String?,
         overlayModeEnabled: Boolean,
+        conversationId: String?,
     ): AppResult<VerificationResult> = try {
         val enrichedQuestion = buildImageQuestion(question, overlayModeEnabled)
         val envelope = remoteDataSource.submitImage(
@@ -47,6 +54,7 @@ class VerificationRepositoryImpl(
             contentType = contentType,
             fileName = fileName,
             question = enrichedQuestion,
+            conversationId = conversationId,
         )
         AppResult.Success(mapper.map(envelope.result, envelope.history))
     } catch (error: CancellationException) {
@@ -113,6 +121,71 @@ class VerificationRepositoryImpl(
         AppResult.Failure("History belum dapat ditampilkan dengan aman. Coba lagi.")
     } catch (error: Exception) {
         AppResult.Failure("Detail history belum dapat dimuat. Coba lagi nanti.")
+    }
+
+    override suspend fun listConversations(): AppResult<List<VerificationConversationSummary>> = try {
+        AppResult.Success(
+            remoteDataSource.listConversations().items.map { item ->
+                VerificationConversationSummary(
+                    conversationId = item.conversationId,
+                    title = item.title,
+                    latestMessagePreview = item.latestMessagePreview,
+                    latestMessageRole = item.latestMessageRole,
+                    lastVerdict = item.lastVerdict,
+                    createdAt = item.createdAt,
+                    updatedAt = item.updatedAt,
+                )
+            }
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: MissingAccessTokenException) {
+        AppResult.Failure("Sesi Supabase belum tersedia. Login terlebih dahulu.")
+    } catch (error: VerificationApiException) {
+        AppResult.Failure(error.toSafeMessage())
+    } catch (error: HttpRequestTimeoutException) {
+        AppResult.Failure("Memuat percakapan terlalu lama. Coba lagi nanti.")
+    } catch (error: IOException) {
+        AppResult.Failure("Koneksi belum tersedia. Periksa internet lalu coba lagi.")
+    } catch (error: Exception) {
+        AppResult.Failure("Percakapan belum dapat dimuat. Coba lagi nanti.")
+    }
+
+    override suspend fun getConversationDetail(
+        conversationId: String,
+    ): AppResult<VerificationConversationDetail> = try {
+        val detail = remoteDataSource.getConversationDetail(conversationId)
+        AppResult.Success(
+            VerificationConversationDetail(
+                conversationId = detail.conversationId,
+                title = detail.title,
+                createdAt = detail.createdAt,
+                updatedAt = detail.updatedAt,
+                turns = detail.turns.map { turn ->
+                    VerificationConversationTurn(
+                        caseId = turn.caseId,
+                        inputType = turn.inputType,
+                        inputText = turn.inputText,
+                        createdAt = turn.createdAt,
+                        result = mapper.map(turn.result, turn.history),
+                    )
+                },
+            )
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: MissingAccessTokenException) {
+        AppResult.Failure("Sesi Supabase belum tersedia. Login terlebih dahulu.")
+    } catch (error: VerificationApiException) {
+        AppResult.Failure(error.toSafeMessage())
+    } catch (error: HttpRequestTimeoutException) {
+        AppResult.Failure("Memuat percakapan terlalu lama. Coba lagi nanti.")
+    } catch (error: IOException) {
+        AppResult.Failure("Koneksi belum tersedia. Periksa internet lalu coba lagi.")
+    } catch (error: MissingNarrativeException) {
+        AppResult.Failure("Percakapan belum dapat ditampilkan dengan aman.")
+    } catch (error: Exception) {
+        AppResult.Failure("Detail percakapan belum dapat dimuat. Coba lagi nanti.")
     }
 }
 

@@ -15,12 +15,14 @@ class VerificationMapper {
             ?: throw MissingNarrativeException()
         return VerificationResult(
             narrative = narrative,
+            headline = response.headline?.trim().orEmpty(),
             riskLevel = RiskLevel.fromWire(response.riskLevel),
             reasons = response.why.filter(String::isNotBlank),
             recommendedActions = response.recommendedActions.mapNotNull { action ->
                 action.title?.takeIf(String::isNotBlank) ?: action.detail?.takeIf(String::isNotBlank)
             },
             caseId = history.caseId,
+            conversationId = history.conversationId,
             communityEligible = history.communityEligible,
             communityState = history.communityState,
         )

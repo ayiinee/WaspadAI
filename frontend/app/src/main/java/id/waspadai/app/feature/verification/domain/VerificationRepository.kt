@@ -4,7 +4,10 @@ import id.waspadai.app.core.common.AppResult
 import id.waspadai.app.core.model.VerificationResult
 
 interface VerificationRepository {
-    suspend fun submitText(text: String): AppResult<VerificationResult>
+    suspend fun submitText(
+        text: String,
+        conversationId: String? = null,
+    ): AppResult<VerificationResult>
 
     suspend fun submitImage(
         imageBytes: ByteArray,
@@ -12,9 +15,16 @@ interface VerificationRepository {
         fileName: String,
         question: String?,
         overlayModeEnabled: Boolean,
+        conversationId: String? = null,
     ): AppResult<VerificationResult>
 
     suspend fun listHistory(): AppResult<List<VerificationHistoryItem>>
 
     suspend fun getHistoryDetail(caseId: String): AppResult<VerificationHistoryDetail>
+
+    suspend fun listConversations(): AppResult<List<VerificationConversationSummary>>
+
+    suspend fun getConversationDetail(
+        conversationId: String,
+    ): AppResult<VerificationConversationDetail>
 }

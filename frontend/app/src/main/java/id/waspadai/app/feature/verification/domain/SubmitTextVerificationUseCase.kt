@@ -6,5 +6,8 @@ import id.waspadai.app.core.model.VerificationResult
 class SubmitTextVerificationUseCase(
     private val repository: VerificationRepository
 ) {
-    suspend operator fun invoke(text: String): AppResult<VerificationResult> = repository.submitText(text)
+    suspend operator fun invoke(
+        text: String,
+        conversationId: String? = null,
+    ): AppResult<VerificationResult> = repository.submitText(text, conversationId)
 }

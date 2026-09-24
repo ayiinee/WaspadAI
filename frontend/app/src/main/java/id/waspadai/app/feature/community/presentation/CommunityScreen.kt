@@ -1004,7 +1004,7 @@ private fun CommunityPostCard(
                 Spacer(Modifier.height(7.dp))
                 CommunityEvidenceImage(imageUrl, accessToken, post.author)
             }
-            if (!post.isOwner) {
+            if (!post.isOwner && post.canReceiveAssessment) {
                 Spacer(Modifier.height(10.dp))
                 Box(
                     modifier = Modifier

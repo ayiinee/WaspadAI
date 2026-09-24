@@ -44,10 +44,18 @@ class SupabaseAuthRepository(
         saveSession(session)
     }
 
-    suspend fun signUp(email: String, password: String) {
+    suspend fun signUp(email: String, password: String, fullName: String) {
+        val normalizedFullName = fullName.trim().replace(Regex("\\s+"), " ")
+        if (normalizedFullName.length !in 2..80) {
+            throw SupabaseAuthException("Nama lengkap harus terdiri dari 2 sampai 80 karakter.")
+        }
         val session = requestSession(
             path = "signup",
-            body = EmailPasswordRequestDto(email = email.trim(), password = password),
+            body = SignUpRequestDto(
+                email = email.trim(),
+                password = password,
+                data = UserMetadataDto(fullName = normalizedFullName),
+            ),
         )
         saveSession(session)
     }
@@ -157,6 +165,18 @@ class SupabaseAuthException(message: String) : RuntimeException(message)
 private data class EmailPasswordRequestDto(
     val email: String,
     val password: String,
+)
+
+@Serializable
+private data class SignUpRequestDto(
+    val email: String,
+    val password: String,
+    val data: UserMetadataDto,
+)
+
+@Serializable
+private data class UserMetadataDto(
+    @SerialName("full_name") val fullName: String,
 )
 
 @Serializable

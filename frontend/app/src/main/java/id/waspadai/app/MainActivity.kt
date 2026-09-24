@@ -29,13 +29,15 @@ import id.waspadai.app.feature.home.domain.LoadHomeUseCase
 import id.waspadai.app.feature.learning.presentation.LearningScreen
 import id.waspadai.app.feature.learning.presentation.LearningViewModel
 import id.waspadai.app.feature.learning.presentation.LearningAction
-import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
-import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
+import id.waspadai.app.feature.verification.domain.LoadVerificationConversationDetailUseCase
+import id.waspadai.app.feature.verification.domain.LoadVerificationConversationsUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.presentation.VerificationRoute
+import id.waspadai.app.feature.verification.presentation.VerificationAction
+import id.waspadai.app.feature.verification.presentation.VerificationPhase
 import id.waspadai.app.feature.verification.presentation.VerificationViewModel
 import id.waspadai.app.ui.theme.WaspadAITheme
 import id.waspadai.app.feature.community.presentation.CommunityAction
@@ -44,7 +46,9 @@ import id.waspadai.app.core.ui.LocalCommunityNotification
 import id.waspadai.app.core.overlay.FloatingVerifyService
 import kotlinx.coroutines.flow.MutableStateFlow
 
-private const val VerificationRouteName = "verification"
+private const val VerificationRouteName = "verification/list"
+private const val VerificationChatNewRouteName = "verification/chat/new"
+private const val VerificationChatRouteName = "verification/chat/{conversationId}"
 private const val HomeRouteName = "home"
 private const val CommunityRouteName = "community"
 private const val LearningRouteName = "learning"
@@ -100,6 +104,22 @@ private fun WaspadAiApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     var showCommunityBadge by rememberSaveable { mutableStateOf(false) }
+    val verificationViewModel: VerificationViewModel = viewModel(
+        factory = VerificationViewModel.Factory(
+            submitTextVerification = SubmitTextVerificationUseCase(app.verificationRepository),
+            submitImageVerification = SubmitImageVerificationUseCase(app.verificationRepository),
+            loadHistory = LoadVerificationConversationsUseCase(app.verificationRepository),
+            loadHistoryDetail = LoadVerificationConversationDetailUseCase(
+                app.verificationRepository,
+            ),
+            requestCommunityPreview = RequestCommunityPreviewUseCase(app.communityRepository),
+            publishCommunityCase = PublishCommunityCaseUseCase(app.communityRepository),
+            communityRepository = app.communityRepository,
+            communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+            accessTokenProvider = app.authRepository,
+            isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED,
+        ),
+    )
     val communityViewModel: CommunityViewModel = viewModel(
         factory = CommunityViewModel.Factory(
             repository = app.communityRepository,
@@ -162,7 +182,10 @@ private fun WaspadAiApp(
     }
     LaunchedEffect(currentRoute) {
         when (currentRoute) {
-            VerificationRouteName -> communityViewModel.onAction(CommunityAction.PrefetchBackend)
+            VerificationRouteName -> {
+                communityViewModel.onAction(CommunityAction.PrefetchBackend)
+                verificationViewModel.onAction(VerificationAction.RefreshHistory)
+            }
             CommunityRouteName -> communityViewModel.onAction(CommunityAction.InitScreen)
         }
     }
@@ -179,10 +202,14 @@ private fun WaspadAiApp(
                 rememberedCredentials = app.rememberedCredentialsStore.load(),
                 onRememberCredentials = app.rememberedCredentialsStore::save,
                 onForgetCredentials = app.rememberedCredentialsStore::clear,
-                onAuthenticate = { email, password, isSignUp ->
+                onAuthenticate = { email, password, fullName, isSignUp ->
                     runCatching {
                         if (isSignUp) {
-                            app.authRepository.signUp(email, password)
+                            app.authRepository.signUp(
+                                email = email,
+                                password = password,
+                                fullName = requireNotNull(fullName),
+                            )
                         } else {
                             app.authRepository.signIn(email, password)
                         }
@@ -224,23 +251,68 @@ private fun WaspadAiApp(
             )
         }
         composable(VerificationRouteName) {
-            val viewModel: VerificationViewModel = viewModel(
-                factory = VerificationViewModel.Factory(
-                    submitTextVerification = SubmitTextVerificationUseCase(app.verificationRepository),
-                    submitImageVerification = SubmitImageVerificationUseCase(app.verificationRepository),
-                    loadHistory = LoadVerificationHistoryUseCase(app.verificationRepository),
-                    loadHistoryDetail = LoadVerificationHistoryDetailUseCase(app.verificationRepository),
-                    requestCommunityPreview = RequestCommunityPreviewUseCase(app.communityRepository),
-                    publishCommunityCase = PublishCommunityCaseUseCase(app.communityRepository),
-                    communityRepository = app.communityRepository,
-                    communityBaseUrl = BuildConfig.WASPADAI_API_BASE_URL,
-                    accessTokenProvider = app.authRepository,
-                    isRemoteEnabled = BuildConfig.WASPADAI_REMOTE_ENABLED,
-                ),
-            )
             VerificationRoute(
-                viewModel = viewModel,
+                viewModel = verificationViewModel,
                 onDestinationSelected = navigateToTopLevel,
+                onStartConversation = {
+                    navController.navigate(VerificationChatNewRouteName) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenConversation = { conversationId ->
+                    navController.navigate("verification/chat/$conversationId")
+                },
+                onCommunityPublished = { communityId ->
+                    showCommunityBadge = true
+                    communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
+                    navigateToTopLevel("Koneksi")
+                },
+            )
+        }
+        composable(VerificationChatNewRouteName) {
+            val verificationState by verificationViewModel.state.collectAsStateWithLifecycle()
+            LaunchedEffect(
+                verificationState.activeConversationId,
+                verificationState.phase,
+            ) {
+                val conversationId = verificationState.activeConversationId
+                if (conversationId != null && verificationState.phase is VerificationPhase.Success) {
+                    navController.navigate("verification/chat/$conversationId") {
+                        popUpTo(VerificationChatNewRouteName) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
+            VerificationRoute(
+                viewModel = verificationViewModel,
+                isChatScreen = true,
+                onBackToConversations = {
+                    navController.popBackStack(VerificationRouteName, inclusive = false)
+                    verificationViewModel.onAction(VerificationAction.RefreshHistory)
+                },
+                onCommunityPublished = { communityId ->
+                    showCommunityBadge = true
+                    communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
+                    navigateToTopLevel("Koneksi")
+                },
+            )
+        }
+        composable(VerificationChatRouteName) { entry ->
+            val conversationId = entry.arguments?.getString("conversationId").orEmpty()
+            LaunchedEffect(conversationId) {
+                if (conversationId.isNotBlank()) {
+                    verificationViewModel.onAction(
+                        VerificationAction.OpenConversation(conversationId),
+                    )
+                }
+            }
+            VerificationRoute(
+                viewModel = verificationViewModel,
+                isChatScreen = true,
+                onBackToConversations = {
+                    navController.popBackStack(VerificationRouteName, inclusive = false)
+                    verificationViewModel.onAction(VerificationAction.RefreshHistory)
+                },
                 onCommunityPublished = { communityId ->
                     showCommunityBadge = true
                     communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))

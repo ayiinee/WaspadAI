@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import id.waspadai.app.R
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAILightBlue
@@ -75,8 +75,8 @@ fun WaspadAIBottomNavigation(
                 .height(BottomNavigationBarHeight)
                 .align(Alignment.BottomCenter),
             color = Color.White,
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            shadowElevation = 0.dp,
+            shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+            shadowElevation = 4.dp,
         ) {
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -120,7 +120,7 @@ fun WaspadAIBottomNavigation(
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = 8.dp)
+                .zIndex(1f)
                 .size(CenterCtaDiameter)
                 .shadow(8.dp, CircleShape)
                 .background(

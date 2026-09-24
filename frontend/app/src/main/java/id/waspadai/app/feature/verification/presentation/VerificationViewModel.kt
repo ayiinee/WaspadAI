@@ -8,8 +8,8 @@ import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.PublishCommunityCaseUseCase
 import id.waspadai.app.feature.community.domain.RequestCommunityPreviewUseCase
 import id.waspadai.app.feature.verification.data.AccessTokenProvider
-import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
-import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
+import id.waspadai.app.feature.verification.domain.LoadVerificationConversationDetailUseCase
+import id.waspadai.app.feature.verification.domain.LoadVerificationConversationsUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
 import id.waspadai.app.feature.verification.domain.SubmitTextVerificationUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +21,8 @@ import kotlinx.coroutines.launch
 class VerificationViewModel(
     private val submitTextVerification: SubmitTextVerificationUseCase,
     private val submitImageVerification: SubmitImageVerificationUseCase,
-    private val loadHistory: LoadVerificationHistoryUseCase,
-    private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
+    private val loadHistory: LoadVerificationConversationsUseCase,
+    private val loadHistoryDetail: LoadVerificationConversationDetailUseCase,
     private val requestCommunityPreview: RequestCommunityPreviewUseCase,
     private val publishCommunityCase: PublishCommunityCaseUseCase,
     private val communityRepository: CommunityRepository? = null,
@@ -32,6 +32,10 @@ class VerificationViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(VerificationUiState.initial(isRemoteEnabled))
     val state: StateFlow<VerificationUiState> = _state.asStateFlow()
+
+    init {
+        refreshHistory()
+    }
 
     fun onAction(action: VerificationAction) {
         when (action) {
@@ -69,7 +73,10 @@ class VerificationViewModel(
             VerificationAction.DismissFailure -> dismissFailure()
             VerificationAction.ToggleHistory -> toggleHistory()
             VerificationAction.RefreshHistory -> refreshHistory()
-            is VerificationAction.OpenHistory -> openHistory(action.caseId)
+            VerificationAction.NewConversation -> newConversation()
+            VerificationAction.PrepareNewConversation -> prepareNewConversation()
+            is VerificationAction.OpenHistory -> openConversation(action.caseId)
+            is VerificationAction.OpenConversation -> openConversation(action.conversationId)
             VerificationAction.RequestCommunityPreview -> requestCommunityPreview()
             is VerificationAction.CommunityRagConsentChanged -> _state.update {
                 it.copy(communityShare = it.communityShare.copy(ragReuseConsent = action.granted))
@@ -121,10 +128,12 @@ class VerificationViewModel(
                 phase = latestResult?.let(VerificationPhase::Success) ?: VerificationPhase.Idle,
             )
         }
+        refreshHistory()
     }
 
     private fun submitText() {
         val text = state.value.draft.trim()
+        val conversationId = state.value.activeConversationId
         if (text.length < MINIMUM_TEXT_LENGTH) {
             _state.update { current ->
                 current.copy(phase = VerificationPhase.Failure("Masukkan minimal 10 karakter untuk diperiksa."))
@@ -139,15 +148,19 @@ class VerificationViewModel(
                     phase = VerificationPhase.Submitting
                 )
             }
-            when (val result = submitTextVerification(text)) {
+            when (val result = submitTextVerification(text, conversationId)) {
                 is AppResult.Success -> _state.update { current ->
                     communityRepository?.invalidateCommunityCache()
                     current.copy(
                         draft = "",
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
-                        phase = VerificationPhase.Success(result.value)
+                        phase = VerificationPhase.Success(result.value),
+                        activeConversationId = result.value.conversationId ?: current.activeConversationId,
+                        activeConversationTitle = current.activeConversationTitle
+                            .takeUnless { it == "Percakapan baru" }
+                            ?: result.value.headline.ifBlank { "Percakapan baru" },
                     )
-                }
+                }.also { refreshHistory() }
                 is AppResult.Failure -> _state.update { current ->
                     current.copy(phase = VerificationPhase.Failure(result.message))
                 }
@@ -160,6 +173,7 @@ class VerificationViewModel(
         forceOverlayModeEnabled: Boolean? = null,
     ) {
         val question = state.value.draft.trim().takeIf(String::isNotBlank)
+        val conversationId = state.value.activeConversationId
         val overlayModeEnabled = forceOverlayModeEnabled ?: state.value.isOverlayModeEnabled
         val userMessage = question ?: "Gambar dikirim untuk diperiksa."
         _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
@@ -191,6 +205,7 @@ class VerificationViewModel(
                     fileName = action.fileName,
                     question = question,
                     overlayModeEnabled = overlayModeEnabled,
+                    conversationId = conversationId,
                 )
             ) {
                 is AppResult.Success -> _state.update { current ->
@@ -198,9 +213,13 @@ class VerificationViewModel(
                     current.copy(
                         draft = "",
                         conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
-                        phase = VerificationPhase.Success(result.value)
+                        phase = VerificationPhase.Success(result.value),
+                        activeConversationId = result.value.conversationId ?: current.activeConversationId,
+                        activeConversationTitle = current.activeConversationTitle
+                            .takeUnless { it == "Percakapan baru" }
+                            ?: result.value.headline.ifBlank { "Percakapan baru" },
                     )
-                }
+                }.also { refreshHistory() }
                 is AppResult.Failure -> _state.update { current ->
                     current.copy(phase = VerificationPhase.Failure(result.message))
                 }
@@ -327,18 +346,28 @@ class VerificationViewModel(
                     phase = VerificationPhase.Submitting,
                 )
             }
-            attachments.forEach { attachment ->
+            attachments.forEachIndexed { index, attachment ->
                 when (val result = submitImageVerification(
                     imageBytes = attachment.imageBytes,
                     contentType = attachment.contentType,
                     fileName = attachment.fileName,
                     question = question,
                     overlayModeEnabled = attachment.overlayModeEnabled,
+                    conversationId = state.value.activeConversationId,
                 )) {
                     is AppResult.Success -> _state.update { current ->
                         current.copy(
                             conversation = current.conversation + VerificationConversationItem.Analysis(result.value),
-                            phase = VerificationPhase.Success(result.value),
+                            phase = if (index == attachments.lastIndex) {
+                                VerificationPhase.Success(result.value)
+                            } else {
+                                VerificationPhase.Submitting
+                            },
+                            activeConversationId = result.value.conversationId
+                                ?: current.activeConversationId,
+                            activeConversationTitle = current.activeConversationTitle
+                                .takeUnless { it == "Percakapan baru" }
+                                ?: result.value.headline.ifBlank { "Percakapan baru" },
                         )
                     }
                     is AppResult.Failure -> {
@@ -348,6 +377,7 @@ class VerificationViewModel(
                 }
             }
             _state.update { current -> current.copy(draft = "") }
+            refreshHistory()
         }
     }
 
@@ -398,26 +428,83 @@ class VerificationViewModel(
         }
     }
 
-    private fun openHistory(caseId: String) {
-        _state.update { current -> current.copy(phase = VerificationPhase.Validating) }
+    private fun newConversation() {
+        _state.update { current ->
+            current.copy(
+                draft = "",
+                conversation = emptyList(),
+                pendingAttachments = emptyList(),
+                phase = VerificationPhase.Idle,
+                communityShare = CommunityShareState(),
+                isHistoryVisible = true,
+                activeConversationId = null,
+                activeConversationTitle = "Percakapan baru",
+                isConversationLoading = false,
+            )
+        }
+    }
+
+    private fun prepareNewConversation() {
+        _state.update { current ->
+            current.copy(
+                conversation = emptyList(),
+                phase = VerificationPhase.Idle,
+                communityShare = CommunityShareState(),
+                activeConversationId = null,
+                activeConversationTitle = "Percakapan baru",
+                isConversationLoading = false,
+            )
+        }
+    }
+
+    private fun openConversation(conversationId: String) {
+        _state.update { current ->
+            current.copy(
+                conversation = emptyList(),
+                draft = "",
+                pendingAttachments = emptyList(),
+                activeConversationId = conversationId,
+                activeConversationTitle = current.history
+                    .firstOrNull { it.conversationId == conversationId }
+                    ?.title
+                    ?: "Percakapan",
+                isConversationLoading = true,
+                phase = VerificationPhase.Idle,
+            )
+        }
         viewModelScope.launch {
-            when (val result = loadHistoryDetail(caseId)) {
+            when (val result = loadHistoryDetail(conversationId)) {
                 is AppResult.Success -> _state.update { current ->
-                    val restored = buildList {
-                        result.value.inputText?.takeIf(String::isNotBlank)?.let { text ->
-                            add(VerificationConversationItem.UserMessage(text))
+                    val restored = buildList<VerificationConversationItem> {
+                        result.value.turns.forEach { turn ->
+                            add(
+                                VerificationConversationItem.UserMessage(
+                                    text = turn.inputText,
+                                    hasAttachment = turn.inputType == "IMAGE",
+                                    attachmentName = if (turn.inputType == "IMAGE") {
+                                        "Lampiran gambar"
+                                    } else {
+                                        null
+                                    },
+                                )
+                            )
+                            add(VerificationConversationItem.Analysis(turn.result))
                         }
-                        add(VerificationConversationItem.Analysis(result.value.result))
                     }
                     current.copy(
                         conversation = restored,
                         draft = "",
-                        isHistoryVisible = false,
-                        phase = VerificationPhase.Idle
+                        activeConversationId = result.value.conversationId,
+                        activeConversationTitle = result.value.title,
+                        isConversationLoading = false,
+                        phase = VerificationPhase.Idle,
                     )
                 }
                 is AppResult.Failure -> _state.update { current ->
-                    current.copy(phase = VerificationPhase.Failure(result.message))
+                    current.copy(
+                        isConversationLoading = false,
+                        phase = VerificationPhase.Failure(result.message),
+                    )
                 }
             }
         }
@@ -568,8 +655,8 @@ class VerificationViewModel(
     class Factory(
         private val submitTextVerification: SubmitTextVerificationUseCase,
         private val submitImageVerification: SubmitImageVerificationUseCase,
-        private val loadHistory: LoadVerificationHistoryUseCase,
-        private val loadHistoryDetail: LoadVerificationHistoryDetailUseCase,
+        private val loadHistory: LoadVerificationConversationsUseCase,
+        private val loadHistoryDetail: LoadVerificationConversationDetailUseCase,
         private val requestCommunityPreview: RequestCommunityPreviewUseCase,
         private val publishCommunityCase: PublishCommunityCaseUseCase,
         private val communityRepository: CommunityRepository? = null,

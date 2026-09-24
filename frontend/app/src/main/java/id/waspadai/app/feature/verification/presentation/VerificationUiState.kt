@@ -3,13 +3,13 @@ package id.waspadai.app.feature.verification.presentation
 import id.waspadai.app.core.model.VerificationResult
 import id.waspadai.app.feature.community.domain.CommunityPreview
 import id.waspadai.app.feature.community.domain.CommunityFeedPost
-import id.waspadai.app.feature.verification.domain.VerificationHistoryItem
+import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 
 data class VerificationUiState(
     val draft: String = "",
     val conversation: List<VerificationConversationItem> = emptyList(),
-    val history: List<VerificationHistoryItem> = emptyList(),
-    val isHistoryVisible: Boolean = false,
+    val history: List<VerificationConversationSummary> = emptyList(),
+    val isHistoryVisible: Boolean = true,
     val isHistoryLoading: Boolean = false,
     val phase: VerificationPhase = VerificationPhase.Idle,
     val isOverlayModeEnabled: Boolean = false,
@@ -17,6 +17,9 @@ data class VerificationUiState(
     val pendingAttachments: List<ImageVerificationPreview> = emptyList(),
     val isRemoteEnabled: Boolean = false,
     val communityShare: CommunityShareState = CommunityShareState(),
+    val activeConversationId: String? = null,
+    val activeConversationTitle: String = "Percakapan baru",
+    val isConversationLoading: Boolean = false,
 ) {
     val pendingImagePreview: ImageVerificationPreview?
         get() = pendingAttachments.firstOrNull()

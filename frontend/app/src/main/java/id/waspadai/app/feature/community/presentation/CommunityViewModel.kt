@@ -118,7 +118,9 @@ class CommunityViewModel(
             CommunityAction.ShareLinkConsumed -> _uiState.update { it.copy(shareLink = null) }
 
             is CommunityAction.VerdictSelected -> updatePost(action.postId) { post ->
-                if (uiState.value.backendPhase == CommunityBackendPhase.Connected) {
+                if (!post.canReceiveAssessment) {
+                    post
+                } else if (uiState.value.backendPhase == CommunityBackendPhase.Connected) {
                     submitBackendVote(post, action.verdict)
                     post
                 } else {
@@ -353,6 +355,16 @@ class CommunityViewModel(
     private fun submitCommunityResponse(action: CommunityAction.SubmitCommunityResponse) {
         val communityRepository = repository ?: return
         val current = uiState.value
+        val post = current.posts.firstOrNull { it.id == action.postId } ?: return
+        if (!post.canReceiveAssessment) {
+            _uiState.update {
+                it.copy(
+                    detailError = "Kasus sudah terverifikasi dan tidak menerima penilaian baru.",
+                    backendMessage = "Penilaian ditutup karena kasus sudah terverifikasi.",
+                )
+            }
+            return
+        }
         val baseUrl = current.baseUrlDraft.trim()
         val accessToken = current.accessTokenDraft.trim()
         _uiState.update {
@@ -817,7 +829,13 @@ private fun CommunityFeedPost.toPresentation(baseUrl: String): CommunityPost = C
         CommunityPostStatus.VerifiedEvidence -> "Evidence terverifikasi"
         CommunityPostStatus.Unknown -> "Status belum dikenali"
     },
-    avatarRes = R.drawable.community_avatar_putu,
+    canReceiveAssessment = status == CommunityPostStatus.PublishedUnverified,
+    avatarRes = when {
+        creatorName.contains("Alya", ignoreCase = true) -> R.drawable.community_avatar_alya
+        creatorName.contains("Dimas", ignoreCase = true) -> R.drawable.community_avatar_dimas
+        creatorName.contains("Rifqi", ignoreCase = true) -> R.drawable.community_avatar_rifqi
+        else -> R.drawable.community_avatar_putu
+    },
     imageUrl = media.firstOrNull()?.url ?: if (hasImage) {
         "${baseUrl.trimEnd('/')}/api/v1/community/$caseId/image"
     } else {
