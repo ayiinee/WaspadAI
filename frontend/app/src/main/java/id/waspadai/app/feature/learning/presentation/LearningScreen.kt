@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.WaspadAIPageHeader
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
@@ -390,44 +391,10 @@ private fun LearningListScreen(
 
 @Composable
 private fun LearningPageHeader(title: String, onBack: () -> Unit, showBack: Boolean = true) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WaspadAIBlue),
-    ) {
-        Image(
-            painter = painterResource(id = id.waspadai.app.R.drawable.community_header_background),
-            contentDescription = null,
-            modifier = Modifier.matchParentSize(),
-            contentScale = ContentScale.Crop,
-            alpha = .6f,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(64.dp),
-        ) {
-            if (showBack) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
-                ) {
-                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-                }
-            }
-            Text(
-                text = title,
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 64.dp),
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    WaspadAIPageHeader(
+        title = title,
+        onBack = onBack.takeIf { showBack },
+    )
 }
 
 @Composable

@@ -40,7 +40,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,7 +52,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -138,6 +136,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.WaspadAIPageHeader
 import id.waspadai.app.feature.community.domain.CommunityRepository
 import id.waspadai.app.feature.community.domain.CommunityResponseItem
 import id.waspadai.app.feature.verification.data.StaticAccessTokenProvider
@@ -457,55 +456,19 @@ internal fun CommunityPageHeader(
     isSearchVisible: Boolean = false,
     onSearchClick: (() -> Unit)? = null,
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(WaspadAIBlue),
+    WaspadAIPageHeader(
+        title = title,
+        modifier = modifier,
+        onBack = onBack.takeIf { showBack },
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.community_header_background),
-            contentDescription = null,
-            modifier = Modifier.matchParentSize(),
-            contentScale = ContentScale.Crop,
-            alpha = .6f,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(64.dp),
-        ) {
-            if (showBack) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 16.dp),
-                ) {
-                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-                }
-            }
-            Text(
-                text = title,
-                modifier = Modifier.align(Alignment.Center),
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            if (onSearchClick != null) {
-                IconButton(
-                    onClick = onSearchClick,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 16.dp),
-                ) {
-                    Icon(
-                        imageVector = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
-                        contentDescription = if (isSearchVisible) "Tutup pencarian" else "Buka pencarian",
-                        tint = Color.White,
-                        modifier = Modifier.size(25.dp),
-                    )
-                }
+        if (onSearchClick != null) {
+            IconButton(onClick = onSearchClick) {
+                Icon(
+                    imageVector = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                    contentDescription = if (isSearchVisible) "Tutup pencarian" else "Buka pencarian",
+                    tint = Color.White,
+                    modifier = Modifier.size(25.dp),
+                )
             }
         }
     }

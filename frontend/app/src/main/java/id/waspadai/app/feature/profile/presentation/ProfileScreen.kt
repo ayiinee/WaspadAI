@@ -5,39 +5,63 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.automirrored.rounded.FactCheck
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.People
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import coil3.network.NetworkHeaders
-import coil3.network.httpHeaders
-import coil3.request.ImageRequest
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
-import id.waspadai.app.feature.profile.domain.*
+import id.waspadai.app.core.ui.WaspadAIPageHeader
+import id.waspadai.app.feature.profile.domain.ProfileActivityItem
+import id.waspadai.app.feature.profile.domain.ProfileLearningItem
+import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
+import id.waspadai.app.ui.theme.WaspadAIDarkBlue
+import id.waspadai.app.ui.theme.WaspadAILightBlue
+import id.waspadai.app.ui.theme.WaspadAIMuted
 import kotlinx.coroutines.launch
-
-private val PageBackground = Color(0xFFF5F8FA)
 
 @Composable
 fun ProfileRoute(
@@ -51,118 +75,351 @@ fun ProfileRoute(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    var passwordDialog by remember { mutableStateOf(false) }
+    var passwordDialogVisible by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.message) {
-        state.message?.let {
-            snackbarHostState.showSnackbar(it)
+        state.message?.let { message ->
+            snackbarHostState.showSnackbar(message)
             onAction(ProfileAction.DismissMessage)
         }
     }
-    BackHandler(state.page != ProfilePage.Dashboard) { onAction(ProfileAction.Back) }
+
+    BackHandler(state.page != ProfilePage.Dashboard) {
+        onAction(ProfileAction.Back)
+    }
+
     Scaffold(
-        containerColor = PageBackground,
-        bottomBar = { WaspadAIBottomNavigation("Profil", onDestinationSelected) },
+        containerColor = WaspadAIBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            WaspadAIBottomNavigation(
+                selectedDestination = "Profil",
+                onDestinationSelected = onDestinationSelected,
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = WaspadAIBlue)
-                state.page == ProfilePage.Dashboard -> Dashboard(state, accessToken, onAction)
-                state.page == ProfilePage.Edit -> EditProfile(state, accessToken, onAction)
-                state.page == ProfilePage.Settings -> SettingsPage(
-                    onBack = { onAction(ProfileAction.Back) },
-                    onPassword = { passwordDialog = true },
-                    onLogout = { scope.launch { onLogout() } },
-                )
-                state.page == ProfilePage.ItemDetail -> ItemDetailPage(state) { onAction(ProfileAction.Back) }
-                else -> DetailPage(state, onAction, onCommunityPostSelected)
-            }
-        }
-    }
-    if (passwordDialog) PasswordDialog(onDismiss = { passwordDialog = false }, onSubmit = { password -> scope.launch {
-        onChangePassword(password).fold(
-            onSuccess = { snackbarHostState.showSnackbar("Kata sandi berhasil diperbarui.") },
-            onFailure = { snackbarHostState.showSnackbar(it.message ?: "Kata sandi belum dapat diperbarui.") },
-        )
-        passwordDialog = false
-    } })
-}
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            WaspadAIPageHeader(
+                title = state.page.title(),
+                modifier = Modifier.testTag("profile-header"),
+                onBack = if (state.page == ProfilePage.Dashboard) null else {
+                    { onAction(ProfileAction.Back) }
+                },
+            )
 
-@Composable private fun Dashboard(state: ProfileUiState, token: String, onAction: (ProfileAction) -> Unit) {
-    val profile = state.profile
-    val overview = state.overview
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Text("Profil", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF183B4E)) }
-        if (profile != null) item {
-            Surface(shape = RoundedCornerShape(22.dp), color = Color.White) {
-                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ProfileAvatar(profile, token, 72)
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(profile.displayName, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        Text(profile.email.orEmpty(), color = Color(0xFF607D8B), fontSize = 13.sp)
-                        profile.bio?.let { Text(it, color = Color(0xFF455A64), maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                    }
-                    IconButton(onClick = { onAction(ProfileAction.OpenPage(ProfilePage.Edit)) }) { Icon(Icons.Rounded.Edit, "Edit profil", tint = WaspadAIBlue) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                when {
+                    state.loading -> ProfileLoadingState()
+                    state.page == ProfilePage.Dashboard -> ProfileDashboard(
+                        state = state,
+                        accessToken = accessToken,
+                        onAction = onAction,
+                    )
+                    state.page == ProfilePage.Edit -> EditProfilePage(
+                        state = state,
+                        accessToken = accessToken,
+                        onAction = onAction,
+                    )
+                    state.page == ProfilePage.Settings -> SettingsPage(
+                        onPassword = { passwordDialogVisible = true },
+                        onLogout = { scope.launch { onLogout() } },
+                    )
+                    state.page == ProfilePage.ItemDetail -> ItemDetailPage(state)
+                    else -> ActivityDetailPage(
+                        state = state,
+                        onAction = onAction,
+                        onCommunityPostSelected = onCommunityPostSelected,
+                    )
                 }
             }
         }
-        state.error?.let { item { ErrorCard(it) { onAction(ProfileAction.Refresh) } } }
-        if (overview != null) {
-            item { DashboardCard("Pemeriksaan Saya", "${overview.verificationTotal} kasus", "${overview.verificationPrivate} privat • ${overview.verificationPublished + overview.verificationVerified} dipublikasikan", Icons.Rounded.FactCheck) { onAction(ProfileAction.OpenPage(ProfilePage.Verifications)) } }
-            item { DashboardCard("Publikasi Koneksi", "${overview.publicationTotal} postingan", "${overview.publicationUnverified} menunggu • ${overview.publicationVerified} terverifikasi", Icons.Rounded.People) { onAction(ProfileAction.OpenPage(ProfilePage.Publications)) } }
-            item { DashboardCard("Aktivitas Komunitas", "${overview.assessments} penilaian", "${overview.evidenceAdded} bukti • ${overview.resolvedCases} terselesaikan", Icons.Rounded.Groups) { onAction(ProfileAction.OpenPage(ProfilePage.Community)) } }
-            item { DashboardCard("Progres Pembelajaran", "${overview.completedModules}/${overview.totalModules} modul selesai", "${overview.progressPercent.toInt()}% keseluruhan • Skor terbaik ${overview.bestScore?.toInt() ?: 0}", Icons.Rounded.School) { onAction(ProfileAction.OpenPage(ProfilePage.Learning)) } }
-        }
-        item { DashboardCard("Pengaturan Akun", "Keamanan dan sesi", "Ubah kata sandi atau keluar dari akun", Icons.Rounded.Settings) { onAction(ProfileAction.OpenPage(ProfilePage.Settings)) } }
+    }
+
+    if (passwordDialogVisible) {
+        ProfilePasswordDialog(
+            onDismiss = { passwordDialogVisible = false },
+            onSubmit = { password ->
+                scope.launch {
+                    onChangePassword(password).fold(
+                        onSuccess = {
+                            snackbarHostState.showSnackbar("Kata sandi berhasil diperbarui.")
+                        },
+                        onFailure = {
+                            snackbarHostState.showSnackbar(
+                                it.message ?: "Kata sandi belum dapat diperbarui.",
+                            )
+                        },
+                    )
+                    passwordDialogVisible = false
+                }
+            },
+        )
     }
 }
 
-@Composable private fun DashboardCard(title: String, value: String, detail: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(18.dp), color = Color.White) {
-        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).background(Color(0xFFE7F3F8), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, tint = WaspadAIBlue) }
-            Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.SemiBold); Text(value, color = WaspadAIBlue, fontWeight = FontWeight.Bold); Text(detail, color = Color(0xFF607D8B), fontSize = 12.sp) }
-            Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFF90A4AE))
+@Composable
+private fun ProfileDashboard(
+    state: ProfileUiState,
+    accessToken: String,
+    onAction: (ProfileAction) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        state.profile?.let { profile ->
+            item(key = "profile-identity") {
+                ProfileIdentityCard(
+                    profile = profile,
+                    accessToken = accessToken,
+                    onEdit = { onAction(ProfileAction.OpenPage(ProfilePage.Edit)) },
+                )
+            }
+        }
+
+        state.error?.let { message ->
+            item(key = "profile-error") {
+                ProfileErrorState(
+                    message = message,
+                    onRetry = { onAction(ProfileAction.Refresh) },
+                )
+            }
+        }
+
+        item(key = "activity-heading") {
+            ProfileSectionTitle(
+                title = "Aktivitas Saya",
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+        item(key = "activity-menu") {
+            Column {
+                ProfileNavigationRow(
+                    title = "Pemeriksaan Saya",
+                    subtitle = "Riwayat pemeriksaan informasi",
+                    icon = Icons.AutoMirrored.Rounded.FactCheck,
+                    testTag = "profile-action-Verifications",
+                    onClick = { onAction(ProfileAction.OpenPage(ProfilePage.Verifications)) },
+                )
+                ProfileNavigationRow(
+                    title = "Publikasi Koneksi",
+                    subtitle = "Kelola publikasi yang dibagikan",
+                    icon = Icons.Rounded.People,
+                    testTag = "profile-action-Publications",
+                    onClick = { onAction(ProfileAction.OpenPage(ProfilePage.Publications)) },
+                )
+                ProfileNavigationRow(
+                    title = "Aktivitas Komunitas",
+                    subtitle = "Penilaian, bukti, dan kontribusi",
+                    icon = Icons.Rounded.Groups,
+                    testTag = "profile-action-Community",
+                    onClick = { onAction(ProfileAction.OpenPage(ProfilePage.Community)) },
+                )
+                ProfileNavigationRow(
+                    title = "Progres Pembelajaran",
+                    subtitle = "Materi, progres, dan hasil latihan",
+                    icon = Icons.Rounded.School,
+                    testTag = "profile-action-Learning",
+                    onClick = { onAction(ProfileAction.OpenPage(ProfilePage.Learning)) },
+                )
+            }
+        }
+
+        item(key = "account-heading") {
+            ProfileSectionTitle(
+                title = "Akun",
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+        item(key = "settings") {
+            ProfileNavigationRow(
+                title = "Pengaturan Akun",
+                subtitle = "Kata sandi dan sesi akun",
+                icon = Icons.Rounded.Settings,
+                testTag = "profile-action-Settings",
+                onClick = { onAction(ProfileAction.OpenPage(ProfilePage.Settings)) },
+            )
         }
     }
 }
 
-@Composable private fun EditProfile(state: ProfileUiState, token: String, onAction: (ProfileAction) -> Unit) {
+@Composable
+private fun EditProfilePage(
+    state: ProfileUiState,
+    accessToken: String,
+    onAction: (ProfileAction) -> Unit,
+) {
     val profile = state.profile ?: return
     var name by remember(profile.displayName) { mutableStateOf(profile.displayName) }
     var bio by remember(profile.bio) { mutableStateOf(profile.bio.orEmpty()) }
     val context = LocalContext.current
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { readAvatar(context, it)?.let { data -> onAction(ProfileAction.UploadAvatar(data.first, data.second)) } } }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { PageHeader("Edit Profil") { onAction(ProfileAction.Back) } }
-        item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { ProfileAvatar(profile, token, 96); TextButton(onClick = { picker.launch("image/*") }) { Text("Ganti foto") }; if (profile.avatarUrl != null) TextButton(onClick = { onAction(ProfileAction.DeleteAvatar) }) { Text("Hapus foto", color = Color(0xFFD32F2F)) } } } }
-        item { OutlinedTextField(name, { if (it.length <= 80) name = it }, Modifier.fillMaxWidth(), label = { Text("Nama tampilan") }, singleLine = true) }
-        item { OutlinedTextField(bio, { if (it.length <= 500) bio = it }, Modifier.fillMaxWidth(), label = { Text("Bio") }, minLines = 3) }
-        state.error?.let { item { ErrorCard(it) {} } }
-        item { Button(onClick = { onAction(ProfileAction.SaveProfile(name.trim(), bio.trim().ifBlank { null })) }, enabled = name.isNotBlank() && !state.saving, modifier = Modifier.fillMaxWidth()) { if (state.saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Simpan perubahan") } }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { selectedUri ->
+            readAvatar(context, selectedUri)?.let { (bytes, type) ->
+                onAction(ProfileAction.UploadAvatar(bytes, type))
+            }
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            ProfileAvatarEditor(
+                profile = profile,
+                accessToken = accessToken,
+                enabled = !state.saving,
+                onPickAvatar = { picker.launch("image/*") },
+                onDeleteAvatar = if (profile.avatarUrl != null) {
+                    { onAction(ProfileAction.DeleteAvatar) }
+                } else null,
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { if (it.length <= 80) name = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Nama tampilan") },
+                supportingText = { Text("${name.length}/80") },
+                singleLine = true,
+                enabled = !state.saving,
+                colors = profileTextFieldColors(),
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = bio,
+                onValueChange = { if (it.length <= 500) bio = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Bio") },
+                supportingText = { Text("${bio.length}/500") },
+                minLines = 3,
+                enabled = !state.saving,
+                colors = profileTextFieldColors(),
+            )
+        }
+        state.error?.let { message ->
+            item {
+                ProfileErrorState(message = message)
+            }
+        }
+        item {
+            Button(
+                onClick = {
+                    onAction(
+                        ProfileAction.SaveProfile(
+                            name = name.trim(),
+                            bio = bio.trim().ifBlank { null },
+                        ),
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("profile-save"),
+                enabled = name.isNotBlank() && !state.saving,
+                colors = ButtonDefaults.buttonColors(containerColor = WaspadAIBlue),
+            ) {
+                if (state.saving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Simpan perubahan", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 
-@Composable private fun DetailPage(
+@Composable
+private fun ActivityDetailPage(
     state: ProfileUiState,
     onAction: (ProfileAction) -> Unit,
     onCommunityPostSelected: (String) -> Unit,
 ) {
-    val title = when (state.page) { ProfilePage.Verifications -> "Pemeriksaan Saya"; ProfilePage.Publications -> "Publikasi Koneksi"; ProfilePage.Community -> "Aktivitas Komunitas"; ProfilePage.Learning -> "Progres Pembelajaran"; else -> "Profil" }
     var selectedStatus by remember(state.page) { mutableStateOf("Semua") }
     val statuses = listOf("Semua") + state.activities.map { it.status }.distinct()
-    val visibleActivities = if (selectedStatus == "Semua") state.activities else state.activities.filter { it.status == selectedStatus }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { PageHeader(title) { onAction(ProfileAction.Back) } }
-        if (state.page != ProfilePage.Learning && statuses.size > 1) item { Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { statuses.forEach { status -> FilterChip(selected = selectedStatus == status, onClick = { selectedStatus = status }, label = { Text(status) }) } } }
-        if (state.detailLoading) item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = WaspadAIBlue) } }
-        state.error?.let { item { ErrorCard(it) { onAction(ProfileAction.OpenPage(state.page)) } } }
-        if (!state.detailLoading && state.activities.isEmpty() && state.learning.isEmpty() && state.error == null) item { Text("Belum ada data untuk ditampilkan.", color = Color(0xFF607D8B)) }
+    val visibleActivities = if (selectedStatus == "Semua") {
+        state.activities
+    } else {
+        state.activities.filter { it.status == selectedStatus }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (state.page != ProfilePage.Learning && statuses.size > 1) {
+            item(key = "status-filters") {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    statuses.forEach { status ->
+                        FilterChip(
+                            selected = selectedStatus == status,
+                            onClick = { selectedStatus = status },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                            label = { Text(status) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = WaspadAILightBlue,
+                                selectedLabelColor = WaspadAIDarkBlue,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        if (state.detailLoading && state.activities.isEmpty() && state.learning.isEmpty()) {
+            item(key = "detail-loading") { ProfileInlineLoadingState() }
+        }
+
+        state.error?.let { message ->
+            item(key = "detail-error") {
+                ProfileErrorState(
+                    message = message,
+                    onRetry = { onAction(ProfileAction.OpenPage(state.page)) },
+                )
+            }
+        }
+
+        if (
+            !state.detailLoading &&
+            visibleActivities.isEmpty() &&
+            state.learning.isEmpty() &&
+            state.error == null
+        ) {
+            item(key = "detail-empty") {
+                ProfileEmptyState(
+                    title = "Belum ada aktivitas",
+                    description = state.page.emptyDescription(),
+                )
+            }
+        }
+
         items(visibleActivities, key = { it.id }) { item ->
-            ActivityRow(item) {
+            ProfileActivityCard(item = item) {
                 if (
-                    item.communityId != null && item.status != "Ditarik" &&
+                    item.communityId != null &&
+                    item.status != "Ditarik" &&
                     state.page in listOf(ProfilePage.Verifications, ProfilePage.Publications)
                 ) {
                     onCommunityPostSelected(item.communityId)
@@ -171,23 +428,128 @@ fun ProfileRoute(
                 }
             }
         }
-        items(state.learning, key = { it.id }) { LearningRow(it) { onAction(ProfileAction.OpenLearning(it)) } }
-        if (state.hasMore) item { OutlinedButton(onClick = { onAction(ProfileAction.LoadMore) }, enabled = !state.detailLoading, modifier = Modifier.fillMaxWidth()) { Text("Muat lebih banyak") } }
+
+        items(state.learning, key = { it.id }) { item ->
+            ProfileLearningCard(item = item) {
+                onAction(ProfileAction.OpenLearning(item))
+            }
+        }
+
+        if (state.hasMore) {
+            item(key = "load-more") {
+                OutlinedButton(
+                    onClick = { onAction(ProfileAction.LoadMore) },
+                    enabled = !state.detailLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) {
+                    if (state.detailLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = WaspadAIBlue,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text("Muat lebih banyak", color = WaspadAIBlue)
+                    }
+                }
+            }
+        }
     }
 }
 
-@Composable private fun ActivityRow(item: ProfileActivityItem, onClick: () -> Unit) { Surface(Modifier.clickable(onClick = onClick), shape = RoundedCornerShape(14.dp), color = Color.White) { Column(Modifier.fillMaxWidth().padding(16.dp)) { Row { Text(item.title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold); StatusPill(item.status) }; Text(item.subtitle, color = Color(0xFF607D8B), fontSize = 13.sp); Text(item.createdAt.take(10), color = Color(0xFF90A4AE), fontSize = 11.sp) } } }
-@Composable private fun LearningRow(item: ProfileLearningItem, onClick: () -> Unit) { Surface(Modifier.clickable(onClick = onClick), shape = RoundedCornerShape(14.dp), color = Color.White) { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(item.title, fontWeight = FontWeight.SemiBold); Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ (item.progressPercent / 100).toFloat() }, Modifier.fillMaxWidth()); Text("${item.completedLessons}/${item.totalLessons} pelajaran • ${item.progressPercent.toInt()}%", fontSize = 12.sp, color = Color(0xFF607D8B)); Text("Skor terakhir ${item.latestScore?.toInt() ?: 0} • terbaik ${item.bestScore?.toInt() ?: 0}", fontSize = 12.sp, color = Color(0xFF607D8B)) } } }
+@Composable
+private fun ItemDetailPage(state: ProfileUiState) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        state.selectedActivity?.let { item ->
+            item { ActivityItemDetail(item) }
+        }
+        state.selectedLearning?.let { item ->
+            item { LearningItemDetail(item) }
+        }
+        if (state.selectedActivity == null && state.selectedLearning == null) {
+            item {
+                ProfileEmptyState(
+                    title = "Detail tidak tersedia",
+                    description = "Kembali dan pilih aktivitas yang ingin dilihat.",
+                )
+            }
+        }
+    }
+}
 
-@Composable private fun ItemDetailPage(state: ProfileUiState, onBack: () -> Unit) { Column(Modifier.fillMaxSize().padding(20.dp)) { PageHeader("Detail", onBack); Spacer(Modifier.height(16.dp)); Surface(shape = RoundedCornerShape(18.dp), color = Color.White) { Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { state.selectedActivity?.let { Text(it.title, fontSize = 20.sp, fontWeight = FontWeight.Bold); StatusPill(it.status); Text(it.subtitle, color = Color(0xFF455A64)); Text("Dibuat ${it.createdAt}", color = Color(0xFF607D8B), fontSize = 13.sp); Text("ID ${it.id}", color = Color(0xFF90A4AE), fontSize = 11.sp) }; state.selectedLearning?.let { Text(it.title, fontSize = 20.sp, fontWeight = FontWeight.Bold); LinearProgressIndicator({ (it.progressPercent / 100).toFloat() }, Modifier.fillMaxWidth()); Text("${it.completedLessons} dari ${it.totalLessons} pelajaran selesai"); Text("Progres ${it.progressPercent.toInt()}%"); Text("Skor terakhir: ${it.latestScore?.toInt()?.toString() ?: "Belum ada"}"); Text("Skor terbaik: ${it.bestScore?.toInt()?.toString() ?: "Belum ada"}") } } } } }
+@Composable
+private fun ActivityItemDetail(item: ProfileActivityItem) {
+    ProfileDetailSurface {
+        Text(text = item.title, color = WaspadAIDarkBlue, fontWeight = FontWeight.Bold)
+        ProfileStatusPill(item.status)
+        Text(item.subtitle, color = Color(0xFF455A64))
+        Text("Dibuat ${item.createdAt}", color = WaspadAIMuted)
+        Text("ID ${item.id}", color = WaspadAIMuted)
+    }
+}
 
-@Composable private fun SettingsPage(onBack: () -> Unit, onPassword: () -> Unit, onLogout: () -> Unit) { Column(Modifier.fillMaxSize().padding(20.dp)) { PageHeader("Pengaturan Akun", onBack); Spacer(Modifier.height(18.dp)); ListItem(headlineContent = { Text("Ubah kata sandi") }, leadingContent = { Icon(Icons.Rounded.Lock, null) }, trailingContent = { Icon(Icons.Rounded.ChevronRight, null) }, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color.White).clickable(onClick = onPassword)); Spacer(Modifier.height(12.dp)); ListItem(headlineContent = { Text("Keluar", color = Color(0xFFD32F2F)) }, leadingContent = { Icon(Icons.Rounded.Logout, null, tint = Color(0xFFD32F2F)) }, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color.White).clickable(onClick = onLogout)) } }
-@Composable private fun PageHeader(title: String, back: () -> Unit) { Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Kembali") }; Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold) } }
-@Composable private fun StatusPill(status: String) { Text(status, Modifier.background(Color(0xFFE7F3F8), RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 4.dp), color = WaspadAIBlue, fontSize = 11.sp) }
-@Composable private fun ErrorCard(message: String, retry: () -> Unit) { Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFFEBEE)) { Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(message, Modifier.weight(1f), color = Color(0xFFB71C1C)); TextButton(onClick = retry) { Text("Coba lagi") } } } }
+@Composable
+private fun LearningItemDetail(item: ProfileLearningItem) {
+    ProfileDetailSurface {
+        Text(text = item.title, color = WaspadAIDarkBlue, fontWeight = FontWeight.Bold)
+        ProfileLearningProgress(item)
+        Text("${item.completedLessons} dari ${item.totalLessons} pelajaran selesai")
+        Text("Progres ${item.progressPercent.toInt()}%")
+        Text("Skor terakhir: ${item.latestScore?.toInt()?.toString() ?: "Belum ada"}")
+        Text("Skor terbaik: ${item.bestScore?.toInt()?.toString() ?: "Belum ada"}")
+    }
+}
 
-@Composable private fun ProfileAvatar(profile: UserProfile, token: String, size: Int) { val initials = profile.displayName.split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.first().uppercase() }; Box(Modifier.size(size.dp).clip(CircleShape).background(Color(0xFFD9EEF6)), contentAlignment = Alignment.Center) { Text(initials, color = WaspadAIBlue, fontWeight = FontWeight.Bold, fontSize = (size / 3).sp); profile.avatarUrl?.let { url -> AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(url).httpHeaders(NetworkHeaders.Builder().set("Authorization", "Bearer $token").build()).build(), contentDescription = "Foto profil", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) } } }
+@Composable
+private fun SettingsPage(
+    onPassword: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+    ) {
+        item {
+            ProfileSettingsGroup(onPassword = onPassword, onLogout = onLogout)
+        }
+    }
+}
 
-@Composable private fun PasswordDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) { var password by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = onDismiss, title = { Text("Ubah kata sandi") }, text = { OutlinedTextField(password, { password = it }, label = { Text("Kata sandi baru") }, singleLine = true) }, confirmButton = { TextButton(onClick = { onSubmit(password) }, enabled = password.length >= 8) { Text("Simpan") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }) }
+@Composable
+private fun profileTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = WaspadAIBlue,
+    focusedLabelColor = WaspadAIBlue,
+    cursorColor = WaspadAIBlue,
+    unfocusedBorderColor = WaspadAILightBlue,
+    disabledBorderColor = WaspadAILightBlue,
+)
 
-private fun readAvatar(context: Context, uri: Uri): Pair<ByteArray, String>? = runCatching { val type = context.contentResolver.getType(uri) ?: "image/jpeg"; context.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.let { it to type } }.getOrNull()
+private fun ProfilePage.title(): String = when (this) {
+    ProfilePage.Dashboard -> "Profil"
+    ProfilePage.Verifications -> "Pemeriksaan Saya"
+    ProfilePage.Publications -> "Publikasi Koneksi"
+    ProfilePage.Community -> "Aktivitas Komunitas"
+    ProfilePage.Learning -> "Progres Pembelajaran"
+    ProfilePage.Edit -> "Edit Profil"
+    ProfilePage.Settings -> "Pengaturan Akun"
+    ProfilePage.ItemDetail -> "Detail"
+}
+
+private fun ProfilePage.emptyDescription(): String = when (this) {
+    ProfilePage.Verifications -> "Pemeriksaan yang kamu lakukan akan muncul di sini."
+    ProfilePage.Publications -> "Publikasi yang kamu kirim ke Koneksi akan muncul di sini."
+    ProfilePage.Community -> "Penilaian dan kontribusimu akan muncul di sini."
+    ProfilePage.Learning -> "Mulai materi untuk melihat progres pembelajaranmu."
+    else -> "Belum ada data untuk ditampilkan."
+}
+
+private fun readAvatar(context: Context, uri: Uri): Pair<ByteArray, String>? = runCatching {
+    val type = context.contentResolver.getType(uri) ?: "image/jpeg"
+    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.let { it to type }
+}.getOrNull()
