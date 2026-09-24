@@ -36,6 +36,24 @@ class AssistantVerificationControllerTest {
     }
 
     @Test
+    fun `selected image is reviewed before it is submitted`() = runTest {
+        val repository = FakeRepository()
+        val controller = AssistantVerificationController(repository, this)
+
+        controller.selectImageArea(byteArrayOf(1, 2, 3, 4))
+        advanceUntilIdle()
+
+        assertEquals(0, repository.imageRequests)
+        assertTrue(controller.state.value.phase is AssistantSessionPhase.ReviewImage)
+
+        controller.confirmImage()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.imageRequests)
+        assertTrue(controller.state.value.phase is AssistantSessionPhase.Result)
+    }
+
+    @Test
     fun `clear closes session and removes conversation`() = runTest {
         val controller = AssistantVerificationController(FakeRepository(), this)
         controller.offerText(ExtractedAssistContext("Pesan transfer mencurigakan", null))
@@ -50,6 +68,7 @@ class AssistantVerificationControllerTest {
 
     private class FakeRepository : VerificationRepository {
         var textRequests = 0
+        var imageRequests = 0
         private val result = VerificationResult(
             narrative = "Jangan transfer sebelum mengonfirmasi.",
             riskLevel = RiskLevel.HIGH,
@@ -62,8 +81,10 @@ class AssistantVerificationControllerTest {
             return AppResult.Success(result)
         }
 
-        override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> =
-            AppResult.Success(result)
+        override suspend fun submitImage(input: ImageVerificationInput): AppResult<VerificationResult> {
+            imageRequests += 1
+            return AppResult.Success(result)
+        }
 
         override suspend fun listHistory(): AppResult<List<VerificationHistoryItem>> =
             AppResult.Success(emptyList())

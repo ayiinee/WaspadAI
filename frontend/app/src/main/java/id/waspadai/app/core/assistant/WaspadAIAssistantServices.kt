@@ -3,6 +3,8 @@ package id.waspadai.app.core.assistant
 import android.app.assist.AssistContent
 import android.app.assist.AssistStructure
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
@@ -12,14 +14,9 @@ import android.service.voice.VoiceInteractionSessionService
 import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
 import android.view.View
-import android.widget.FrameLayout
-import androidx.compose.ui.platform.ComposeView
+import android.view.WindowManager
 import androidx.annotation.RequiresApi
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import id.waspadai.app.WaspadAIApplication
-import id.waspadai.app.ui.theme.WaspadAITheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,7 +40,6 @@ class WaspadAIRecognitionService : RecognitionService() {
 
 class WaspadAIVoiceSession(context: android.content.Context) : VoiceInteractionSession(context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val owners = AssistantViewTreeOwners()
     private val controller = AssistantVerificationController(
         repository = (context.applicationContext as WaspadAIApplication).verificationRepository,
         scope = scope,
@@ -51,37 +47,24 @@ class WaspadAIVoiceSession(context: android.content.Context) : VoiceInteractionS
 
     override fun onCreate() {
         super.onCreate()
-        setTheme(id.waspadai.app.R.style.Theme_Frontend)
+        setTheme(id.waspadai.app.R.style.Theme_WaspadAI_Transparent)
+        window?.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            decorView.setBackgroundColor(Color.TRANSPARENT)
+        }
     }
 
-    override fun onCreateContentView(): View {
-        val root = FrameLayout(context)
-        root.setViewTreeLifecycleOwner(owners)
-        root.setViewTreeViewModelStoreOwner(owners)
-        root.setViewTreeSavedStateRegistryOwner(owners)
-        root.addView(
-            ComposeView(context).apply {
-                setContent {
-                    WaspadAITheme {
-                        AssistantPanel(
-                            controller = controller,
-                            onOpenApp = ::openFullApp,
-                            onClose = ::finish,
-                        )
-                    }
-                }
-            },
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
-        return root
-    }
+    override fun onCreateContentView(): View = AssistantPanelView(
+        context = context,
+        controller = controller,
+        scope = scope,
+        onOpenApp = ::openFullApp,
+        onClose = ::finish,
+    )
 
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
-        owners.start()
     }
 
     override fun onHandleScreenshot(screenshot: Bitmap?) {
@@ -108,14 +91,12 @@ class WaspadAIVoiceSession(context: android.content.Context) : VoiceInteractionS
     }
 
     override fun onHide() {
-        owners.stop()
         controller.clear()
         super.onHide()
     }
 
     override fun onDestroy() {
         controller.clear()
-        owners.destroy()
         scope.cancel()
         super.onDestroy()
     }

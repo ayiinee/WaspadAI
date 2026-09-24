@@ -1,8 +1,5 @@
 package id.waspadai.app.core.overlay
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -15,23 +12,17 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
-import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
-import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
-import android.view.inputmethod.EditorInfo
 import android.widget.Button
-import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -54,9 +45,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.min
-import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +57,7 @@ import kotlinx.coroutines.withContext
 /** Overlay Tanya Area. Gambar hanya disimpan di memori selama service aktif. */
 class FloatingVerifyService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val ui by lazy { TanyaAreaUiFactory(this) }
     private lateinit var windowManager: WindowManager
     private lateinit var submitImage: SubmitImageVerificationUseCase
 
@@ -255,7 +245,7 @@ class FloatingVerifyService : Service() {
         removeBubble()
         removePanel()
         // Saat memilih ulang, gunakan frame yang sama agar tidak mengambil layar diam-diam lagi.
-        val selector = CropSelectionView(this, fullCaptureBytes)
+        val selector = TanyaAreaCropSelectionView(this, fullCaptureBytes)
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.TRANSPARENT)
             addView(selector, FrameLayout.LayoutParams(-1, -1))
@@ -268,38 +258,15 @@ class FloatingVerifyService : Service() {
         windowManager.addView(root, params)
     }
 
-    private fun buildCropControls(selector: CropSelectionView): View =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = rounded(Color.WHITE, 18, BORDER_BLUE, 1)
-            elevation = dp(8).toFloat()
-            addView(label("Pilih area yang ingin ditanyakan", 17f, DEEP_BLUE, bold = true))
-            addView(label("Geser bingkai atau tarik titik sudutnya.", 13f, MUTED).apply {
-                setPadding(0, dp(5), 0, dp(12))
-            })
-            addView(LinearLayout(this@FloatingVerifyService).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                addView(
-                    actionButton("Batal", secondary = true) {
-                        removeCropSelector()
-                        showBubble()
-                    }.apply {
-                        textSize = 15f
-                        typeface = Typeface.DEFAULT_BOLD
-                    },
-                    balancedButtonParams(endMargin = 8),
-                )
-                addView(
-                    actionButton("Kirim area") { preparePreview(selector.selectedRect()) }.apply {
-                        textSize = 15f
-                        typeface = Typeface.DEFAULT_BOLD
-                    },
-                    balancedButtonParams(startMargin = 8),
-                )
-            })
-        }
+    private fun buildCropControls(selector: TanyaAreaCropSelectionView): View =
+        ui.cropControls(
+            selector = selector,
+            onCancel = {
+                removeCropSelector()
+                showBubble()
+            },
+            onContinue = ::preparePreview,
+        )
 
     private fun preparePreview(cropRect: Rect) {
         if (isCapturing) return
@@ -403,7 +370,7 @@ class FloatingVerifyService : Service() {
                 is AppResult.Success -> {
                     conversation += ChatEntry(
                         isUser = false,
-                        text = result.value.toChatAnswer(),
+                        text = result.value.toTanyaAreaChatAnswer(),
                         result = result.value,
                     )
                     errorMessage = null
@@ -500,69 +467,15 @@ class FloatingVerifyService : Service() {
             setPadding(dp(10), 0, dp(10), 0)
         }
 
-    private fun buildChatComposer(): View {
-        val input = EditText(this).apply {
-            hint = "Tanyakan lebih lanjut…"
-            textSize = 15f
-            setTextColor(DEEP_BLUE)
-            setHintTextColor(MUTED)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            imeOptions = EditorInfo.IME_ACTION_SEND
-            isSingleLine = true
-            setPadding(dp(10), 0, dp(6), 0)
-            setBackgroundColor(Color.TRANSPARENT)
-        }
-        val send = ImageButton(this).apply {
-            setImageResource(R.drawable.ic_tanya_area_send)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(dp(9), dp(9), dp(9), dp(9))
-            background = oval(if (isProcessing) DISABLED_BLUE else BRAND_BLUE)
-            backgroundTintList = null
-            isEnabled = !isProcessing
-            contentDescription = "Kirim pertanyaan lanjutan"
-            setOnClickListener {
-                val text = input.text.toString()
-                input.setText("")
-                analyze(text, appendQuestion = true)
-            }
-        }
-        input.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEND && send.isEnabled) {
-                send.performClick()
-                true
-            } else false
-        }
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(58)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            background = rounded(Color.WHITE, 29, LIGHT_BLUE, 2)
-            addView(input, LinearLayout.LayoutParams(0, dp(46), 1f))
-            addView(send, LinearLayout.LayoutParams(dp(46), dp(46)))
-        }
-    }
+    private fun buildChatComposer(): View =
+        ui.chatComposer(enabled = !isProcessing) { analyze(it, appendQuestion = true) }
 
     private fun balancedButtonParams(
         startMargin: Int = 0,
         endMargin: Int = 0,
-    ) = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-        marginStart = dp(startMargin)
-        marginEnd = dp(endMargin)
-    }
+    ) = ui.balancedButtonParams(startMargin, endMargin)
 
-    private fun chatBubble(entry: ChatEntry): TextView = label(
-        text = if (entry.isUser) "Kamu\n${entry.text}" else "Tanya Area\n${entry.text}",
-        size = 13f,
-        color = if (entry.isUser) Color.WHITE else DEEP_BLUE,
-    ).apply {
-        setPadding(dp(11), dp(9), dp(11), dp(9))
-        background = rounded(if (entry.isUser) BRAND_BLUE else SOFT_BLUE, 12)
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-            bottomMargin = dp(7)
-            if (entry.isUser) leftMargin = dp(34) else rightMargin = dp(18)
-        }
-    }
+    private fun chatBubble(entry: ChatEntry): TextView = ui.chatBubble(entry.isUser, entry.text)
 
     private fun showStatusPanel(title: String, subtitle: String) {
         val content = panelShell("Tanya Area") { body ->
@@ -614,51 +527,23 @@ class FloatingVerifyService : Service() {
         title: String,
         showWindowControls: Boolean = false,
         buildBody: (LinearLayout) -> Unit,
-    ): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = rounded(Color.WHITE, 20, BORDER_BLUE, 1)
-        clipToOutline = true
-        elevation = dp(12).toFloat()
-        val header = FrameLayout(this@FloatingVerifyService).apply {
-            setBackgroundColor(BRAND_BLUE)
-            addView(ImageView(this@FloatingVerifyService).apply {
-                setImageResource(R.drawable.community_header_background)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                alpha = .58f
-                contentDescription = null
-            }, FrameLayout.LayoutParams(-1, -1))
-            addView(LinearLayout(this@FloatingVerifyService).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), 0, dp(8), 0)
-                addView(
-                    label(title, 17f, Color.WHITE, bold = true),
-                    LinearLayout.LayoutParams(0, -2, 1f),
-                )
-                if (showWindowControls) {
-                    addView(windowControlButton(WindowControl.Minimize, "Kecilkan panel") {
-                        isPanelMinimized = true
-                        removePanel()
-                        showBubble()
-                    })
-                    addView(windowControlButton(WindowControl.Maximize, "Buka dalam aplikasi") { openFullApp() })
-                }
-                addView(windowControlButton(WindowControl.Close, "Tutup Tanya Area") { closeOverlay() })
-            }, FrameLayout.LayoutParams(-1, -1))
-        }
-        addView(header, LinearLayout.LayoutParams(-1, dp(58)))
-        makePanelDraggable(header)
-        val body = LinearLayout(this@FloatingVerifyService).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(14))
-        }
-        addView(
-            body,
-            if (showWindowControls) LinearLayout.LayoutParams(-1, 0, 1f)
-            else LinearLayout.LayoutParams(-1, -2)
-        )
-        buildBody(body)
-    }
+    ): View = ui.panelShell(
+        title = title,
+        fillBody = showWindowControls,
+        onHeaderCreated = ::makePanelDraggable,
+        buildHeaderActions = {
+            if (showWindowControls) {
+                addView(windowControlButton(TanyaAreaWindowControl.Minimize, "Kecilkan panel") {
+                    isPanelMinimized = true
+                    removePanel()
+                    showBubble()
+                })
+                addView(windowControlButton(TanyaAreaWindowControl.Maximize, "Buka dalam aplikasi") { openFullApp() })
+            }
+            addView(windowControlButton(TanyaAreaWindowControl.Close, "Tutup Tanya Area") { closeOverlay() })
+        },
+        buildBody = buildBody,
+    )
 
     private fun showPanel(view: View, height: Int) {
         removePanel()
@@ -753,64 +638,24 @@ class FloatingVerifyService : Service() {
         })
     }
 
-    private fun previewImage(bytes: ByteArray, imageHeight: Int): ImageView = ImageView(this).apply {
-        setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
-        scaleType = ImageView.ScaleType.CENTER_CROP
-        background = rounded(SOFT_BLUE, 12)
-        clipToOutline = true
-        layoutParams = LinearLayout.LayoutParams(-1, imageHeight)
-        contentDescription = "Pratinjau area layar yang dipilih"
-    }
+    private fun previewImage(bytes: ByteArray, imageHeight: Int): ImageView =
+        ui.previewImage(bytes, imageHeight)
 
     private fun actionButton(text: String, secondary: Boolean = false, onClick: () -> Unit): Button =
-        Button(this).apply {
-            this.text = text
-            textSize = 13f
-            isAllCaps = false
-            setTextColor(if (secondary) BRAND_BLUE else Color.WHITE)
-            background = rounded(if (secondary) Color.WHITE else BRAND_BLUE, 12, BRAND_BLUE, 1)
-            backgroundTintList = null
-            stateListAnimator = null
-            elevation = 0f
-            setPadding(dp(10), 0, dp(10), 0)
-            minWidth = 0
-            minimumWidth = 0
-            minHeight = dp(40)
-            minimumHeight = dp(40)
-            setOnClickListener { onClick() }
-        }
+        ui.actionButton(text, secondary, onClick)
 
     private fun windowControlButton(
-        control: WindowControl,
+        control: TanyaAreaWindowControl,
         description: String,
         onClick: () -> Unit,
     ): View =
-        WindowControlView(this, control).apply {
-            contentDescription = description
-            layoutParams = LinearLayout.LayoutParams(dp(38), dp(42))
-            setOnClickListener { onClick() }
-        }
+        ui.windowControlButton(control, description, onClick)
 
     private fun label(text: String, size: Float, color: Int, bold: Boolean = false): TextView =
-        TextView(this).apply {
-            this.text = text
-            textSize = size
-            setTextColor(color)
-            if (bold) typeface = Typeface.DEFAULT_BOLD
-        }
+        ui.label(text, size, color, bold)
 
     private fun rounded(color: Int, radiusDp: Int, strokeColor: Int? = null, strokeDp: Int = 0) =
-        GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(radiusDp).toFloat()
-            setColor(color)
-            if (strokeColor != null && strokeDp > 0) setStroke(dp(strokeDp), strokeColor)
-        }
-
-    private fun oval(color: Int) = GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
-        setColor(color)
-    }
+        ui.rounded(color, radiusDp, strokeColor, strokeDp)
 
     private fun cropPng(bytes: ByteArray, rect: Rect): ByteArray {
         val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
@@ -825,19 +670,6 @@ class FloatingVerifyService : Service() {
         if (cropped !== source) cropped.recycle()
         source.recycle()
         return output.toByteArray()
-    }
-
-    private fun VerificationResult.toChatAnswer(): String = buildString {
-        append(narrative.ifBlank { "Analisis selesai." })
-        append("\n\nTingkat risiko: ").append(riskLevel.label)
-        if (reasons.isNotEmpty()) {
-            append("\n\nYang perlu diperhatikan:\n")
-            append(reasons.joinToString("\n") { "• $it" })
-        }
-        if (recommendedActions.isNotEmpty()) {
-            append("\n\nLangkah aman:\n")
-            append(recommendedActions.joinToString("\n") { "• $it" })
-        }
     }
 
     private fun clearSession() {
@@ -964,16 +796,14 @@ class FloatingVerifyService : Service() {
         private const val ACTION_STOP = "id.waspadai.app.overlay.STOP"
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_DATA = "extra_data"
-        private const val BRAND_BLUE = 0xFF005C9E.toInt()
+        private val BRAND_BLUE = TanyaAreaStyle.BRAND_BLUE
         private const val SELECTED_BLUE = 0xFF003F70.toInt()
-        private const val DEEP_BLUE = 0xFF153A52.toInt()
-        private const val BORDER_BLUE = 0xFFB6D7EB.toInt()
-        private const val LIGHT_BLUE = 0xFFC8DAE8.toInt()
-        private const val DISABLED_BLUE = 0xFF9FC8DD.toInt()
-        private const val SOFT_BLUE = 0xFFF0F7FB.toInt()
-        private const val MUTED = 0xFF557383.toInt()
-        private const val ERROR_RED = 0xFFA52219.toInt()
-        private const val ERROR_SOFT = 0xFFFFEDEB.toInt()
+        private val DEEP_BLUE = TanyaAreaStyle.DEEP_BLUE
+        private val BORDER_BLUE = TanyaAreaStyle.BORDER_BLUE
+        private val SOFT_BLUE = TanyaAreaStyle.SOFT_BLUE
+        private val MUTED = TanyaAreaStyle.MUTED
+        private val ERROR_RED = TanyaAreaStyle.ERROR_RED
+        private val ERROR_SOFT = TanyaAreaStyle.ERROR_SOFT
 
         fun start(context: Context, resultCode: Int, data: Intent) {
             val intent = Intent(context, FloatingVerifyService::class.java).apply {
@@ -988,303 +818,4 @@ class FloatingVerifyService : Service() {
             context.startService(Intent(context, FloatingVerifyService::class.java).apply { action = ACTION_STOP })
         }
     }
-}
-
-private enum class WindowControl { Minimize, Maximize, Close }
-
-private class WindowControlView(
-    context: Context,
-    private val control: WindowControl,
-) : View(context) {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = dp(2.6f)
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
-    init {
-        isClickable = true
-        isFocusable = true
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val cx = width / 2f
-        val cy = height / 2f
-        val half = dp(6.5f)
-        when (control) {
-            WindowControl.Minimize -> canvas.drawLine(cx - half, cy + dp(4f), cx + half, cy + dp(4f), paint)
-            WindowControl.Maximize -> canvas.drawRoundRect(
-                cx - half,
-                cy - half,
-                cx + half,
-                cy + half,
-                dp(1.5f),
-                dp(1.5f),
-                paint,
-            )
-            WindowControl.Close -> {
-                canvas.drawLine(cx - half, cy - half, cx + half, cy + half, paint)
-                canvas.drawLine(cx + half, cy - half, cx - half, cy + half, paint)
-            }
-        }
-    }
-
-    private fun dp(value: Float): Float = value * resources.displayMetrics.density
-}
-
-private class TanyaAreaEntranceEffectView(
-    context: Context,
-    private val onFinished: (TanyaAreaEntranceEffectView) -> Unit,
-) : View(context) {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val colors = intArrayOf(
-        Color.rgb(0, 92, 158),
-        Color.rgb(37, 150, 190),
-        Color.rgb(245, 158, 11),
-        Color.rgb(255, 196, 64),
-    )
-    private var progress = 0f
-    private var suppressFinish = false
-    private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-        duration = 1_050L
-        interpolator = DecelerateInterpolator()
-        addUpdateListener {
-            progress = it.animatedValue as Float
-            invalidate()
-        }
-        addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                if (!suppressFinish) onFinished(this@TanyaAreaEntranceEffectView)
-            }
-        })
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        animator.start()
-    }
-
-    override fun onDetachedFromWindow() {
-        if (animator.isRunning) {
-            suppressFinish = true
-            animator.cancel()
-        }
-        super.onDetachedFromWindow()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val fade = (1f - progress).coerceIn(0f, 1f)
-        paint.color = Color.rgb(0, 92, 158)
-        paint.alpha = (58 * fade).toInt()
-        canvas.drawOval(
-            RectF(-width * .15f, height - dp(74f), width * 1.15f, height + dp(26f)),
-            paint,
-        )
-
-        repeat(26) { index ->
-            val delay = (index % 7) * .035f
-            val local = ((progress - delay) / (1f - delay)).coerceIn(0f, 1f)
-            if (local <= 0f) return@repeat
-            val seed = ((index * 47) % 101) / 101f
-            val startX = width * (.06f + seed * .88f)
-            val sway = sin((local * 2.4f + index) * Math.PI).toFloat() * dp(15f + index % 4)
-            val rise = dp(48f + (index % 6) * 13f) * local
-            val alpha = (sin(local * Math.PI).toFloat().coerceAtLeast(0f) * 230).toInt()
-            paint.color = colors[index % colors.size]
-            paint.alpha = alpha
-            canvas.drawCircle(
-                startX + sway,
-                height - dp(13f + index % 4) - rise,
-                dp(2.2f + index % 3),
-                paint,
-            )
-        }
-    }
-
-    private fun dp(value: Float): Float = value * resources.displayMetrics.density
-}
-
-private class TanyaAreaLoadingView(context: Context) : View(context) {
-    private val bluePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 92, 158) }
-    private val yellowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(245, 158, 11) }
-    private var phase = 0f
-    private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-        duration = 1_150L
-        repeatCount = ValueAnimator.INFINITE
-        addUpdateListener {
-            phase = it.animatedValue as Float
-            invalidate()
-        }
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        animator.start()
-    }
-
-    override fun onDetachedFromWindow() {
-        animator.cancel()
-        super.onDetachedFromWindow()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val centerX = width / 2f
-        val centerY = height / 2f
-        val orbit = min(width, height) * .29f
-        repeat(6) { index ->
-            val step = index / 6f
-            val angle = ((phase + step) * Math.PI * 2).toFloat()
-            val pulse = ((phase + step) % 1f)
-            val radius = min(width, height) * (.055f + .035f * (1f - abs(.5f - pulse) * 2f))
-            val paint = if (index % 3 == 0) yellowPaint else bluePaint
-            paint.alpha = (125 + 130 * (1f - pulse)).toInt()
-            canvas.drawCircle(
-                centerX + cos(angle) * orbit,
-                centerY + sin(angle) * orbit,
-                radius,
-                paint,
-            )
-        }
-        bluePaint.alpha = 255
-        canvas.drawCircle(centerX, centerY, min(width, height) * .09f, bluePaint)
-    }
-}
-
-private class CropSelectionView(context: Context, backgroundBytes: ByteArray? = null) : View(context) {
-    private val backgroundBitmap = backgroundBytes?.let {
-        BitmapFactory.decodeByteArray(it, 0, it.size)
-    }
-    private val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(118, 0, 0, 0) }
-    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(0, 118, 191)
-        style = Paint.Style.STROKE
-        strokeWidth = dp(3).toFloat()
-    }
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(42, 0, 118, 191)
-        style = Paint.Style.FILL
-    }
-    private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-    private val selection = RectF()
-    private var mode = DragMode.None
-    private var lastX = 0f
-    private var lastY = 0f
-
-    override fun onSizeChanged(width: Int, height: Int, oldw: Int, oldh: Int) {
-        if (selection.isEmpty) resetSelection()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        backgroundBitmap?.let { bitmap ->
-            canvas.drawBitmap(
-                bitmap,
-                null,
-                RectF(0f, 0f, width.toFloat(), height.toFloat()),
-                null,
-            )
-        }
-        canvas.drawRect(0f, 0f, width.toFloat(), selection.top, dimPaint)
-        canvas.drawRect(0f, selection.bottom, width.toFloat(), height.toFloat(), dimPaint)
-        canvas.drawRect(0f, selection.top, selection.left, selection.bottom, dimPaint)
-        canvas.drawRect(selection.right, selection.top, width.toFloat(), selection.bottom, dimPaint)
-        canvas.drawRect(selection, fillPaint)
-        canvas.drawRect(selection, borderPaint)
-        drawHandle(canvas, selection.left, selection.top)
-        drawHandle(canvas, selection.right, selection.top)
-        drawHandle(canvas, selection.left, selection.bottom)
-        drawHandle(canvas, selection.right, selection.bottom)
-    }
-
-    override fun onDetachedFromWindow() {
-        backgroundBitmap?.recycle()
-        super.onDetachedFromWindow()
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                parent.requestDisallowInterceptTouchEvent(true)
-                lastX = event.x
-                lastY = event.y
-                mode = dragModeFor(event.x, event.y)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val dx = event.x - lastX
-                val dy = event.y - lastY
-                when (mode) {
-                    DragMode.Move -> selection.offset(dx, dy)
-                    DragMode.TopLeft -> { selection.left += dx; selection.top += dy }
-                    DragMode.TopRight -> { selection.right += dx; selection.top += dy }
-                    DragMode.BottomLeft -> { selection.left += dx; selection.bottom += dy }
-                    DragMode.BottomRight -> { selection.right += dx; selection.bottom += dy }
-                    DragMode.None -> Unit
-                }
-                normalizeSelection()
-                lastX = event.x
-                lastY = event.y
-                invalidate()
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> mode = DragMode.None
-        }
-        return true
-    }
-
-    fun selectedRect(): Rect {
-        normalizeSelection()
-        return Rect(selection.left.toInt(), selection.top.toInt(), selection.right.toInt(), selection.bottom.toInt())
-    }
-
-    fun resetSelection() {
-        if (width <= 0 || height <= 0) return
-        val inset = width * .12f
-        val top = height * .22f
-        selection.set(inset, top, width - inset, top + height * .32f)
-        invalidate()
-    }
-
-    private fun dragModeFor(x: Float, y: Float): DragMode {
-        val handle = dp(32).toFloat()
-        return when {
-            distanceTo(x, y, selection.left, selection.top) <= handle -> DragMode.TopLeft
-            distanceTo(x, y, selection.right, selection.top) <= handle -> DragMode.TopRight
-            distanceTo(x, y, selection.left, selection.bottom) <= handle -> DragMode.BottomLeft
-            distanceTo(x, y, selection.right, selection.bottom) <= handle -> DragMode.BottomRight
-            selection.contains(x, y) -> DragMode.Move
-            else -> {
-                selection.set(x, y, x + dp(160), y + dp(120))
-                normalizeSelection()
-                DragMode.BottomRight
-            }
-        }
-    }
-
-    private fun normalizeSelection() {
-        val minSize = dp(80).toFloat()
-        if (selection.width() < minSize) selection.right = selection.left + minSize
-        if (selection.height() < minSize) selection.bottom = selection.top + minSize
-        if (selection.left < 0f) selection.offset(-selection.left, 0f)
-        if (selection.top < 0f) selection.offset(0f, -selection.top)
-        if (selection.right > width) selection.offset(width - selection.right, 0f)
-        if (selection.bottom > height) selection.offset(0f, height - selection.bottom)
-        selection.left = selection.left.coerceIn(0f, (width - minSize).coerceAtLeast(0f))
-        selection.top = selection.top.coerceIn(0f, (height - minSize).coerceAtLeast(0f))
-        selection.right = selection.right.coerceIn(selection.left + minSize, width.toFloat())
-        selection.bottom = selection.bottom.coerceIn(selection.top + minSize, height.toFloat())
-    }
-
-    private fun drawHandle(canvas: Canvas, x: Float, y: Float) {
-        canvas.drawCircle(x, y, dp(7).toFloat(), handlePaint)
-        canvas.drawCircle(x, y, dp(7).toFloat(), borderPaint)
-    }
-
-    private fun distanceTo(x1: Float, y1: Float, x2: Float, y2: Float): Float {
-        val dx = x1 - x2
-        val dy = y1 - y2
-        return kotlin.math.sqrt(dx * dx + dy * dy)
-    }
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-    private enum class DragMode { None, Move, TopLeft, TopRight, BottomLeft, BottomRight }
 }

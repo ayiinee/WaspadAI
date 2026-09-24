@@ -22,6 +22,7 @@ data class AssistantConversationTurn(
 sealed interface AssistantSessionPhase {
     data object WaitingForContext : AssistantSessionPhase
     data class PreviewImage(val bitmap: Bitmap) : AssistantSessionPhase
+    data class ReviewImage(val imageBytes: ByteArray) : AssistantSessionPhase
     data class PreviewText(val text: String, val pageContext: VerificationPageContext?) : AssistantSessionPhase
     data object Submitting : AssistantSessionPhase
     data class Result(val value: VerificationResult) : AssistantSessionPhase
@@ -32,6 +33,7 @@ sealed interface AssistantSessionPhase {
 data class AssistantSessionState(
     val phase: AssistantSessionPhase = AssistantSessionPhase.WaitingForContext,
     val conversation: List<AssistantConversationTurn> = emptyList(),
+    val selectedImagePreview: ByteArray? = null,
 )
 
 class AssistantVerificationController(
@@ -48,6 +50,7 @@ class AssistantVerificationController(
     private var selectedText: String? = null
     private var pageContext: VerificationPageContext? = null
     private var sourceUrl: String? = null
+    private var lastSubmittedQuestion: String? = null
 
     fun offerScreenshot(bitmap: Bitmap?) {
         if (bitmap == null || mutableState.value.phase is AssistantSessionPhase.Closed) return
@@ -75,11 +78,41 @@ class AssistantVerificationController(
         }
     }
 
-    fun confirmImage(imageBytes: ByteArray) {
+    fun selectImageArea(imageBytes: ByteArray) {
+        if (imageBytes.isEmpty()) {
+            mutableState.update { it.copy(phase = AssistantSessionPhase.Failure("Area gambar kosong. Pilih area lain.")) }
+            return
+        }
         selectedImageBytes?.fill(0)
         selectedImageBytes = imageBytes
-        submit(question = null)
+        mutableState.update {
+            it.copy(
+                phase = AssistantSessionPhase.ReviewImage(imageBytes),
+                selectedImagePreview = imageBytes,
+            )
+        }
     }
+
+    fun reselectImageArea() {
+        selectedImageBytes?.fill(0)
+        selectedImageBytes = null
+        mutableState.update { current ->
+            val bitmap = screenshot
+            if (bitmap != null) {
+                current.copy(
+                    phase = AssistantSessionPhase.PreviewImage(bitmap),
+                    selectedImagePreview = null,
+                )
+            } else {
+                current.copy(
+                    phase = AssistantSessionPhase.Failure("Screenshot sudah tidak tersedia. Panggil assistant kembali."),
+                    selectedImagePreview = null,
+                )
+            }
+        }
+    }
+
+    fun confirmImage() = submit(question = null)
 
     fun confirmText() = submit(question = null)
 
@@ -87,6 +120,8 @@ class AssistantVerificationController(
         val clean = question.trim().take(MAX_QUESTION_LENGTH)
         if (clean.isNotEmpty()) submit(clean)
     }
+
+    fun retryLastSubmission() = submit(lastSubmittedQuestion)
 
     private fun submit(question: String?) {
         if (mutableState.value.phase is AssistantSessionPhase.Submitting) return
@@ -96,6 +131,7 @@ class AssistantVerificationController(
             mutableState.update { it.copy(phase = AssistantSessionPhase.Failure("Konteks layar belum tersedia.")) }
             return
         }
+        lastSubmittedQuestion = question
         mutableState.update { it.copy(phase = AssistantSessionPhase.Submitting) }
         scope.launch {
             val result = if (imageBytes != null) {
@@ -135,6 +171,7 @@ class AssistantVerificationController(
         selectedText = null
         pageContext = null
         sourceUrl = null
+        lastSubmittedQuestion = null
         screenshot?.recycle()
         screenshot = null
         mutableState.value = AssistantSessionState(AssistantSessionPhase.Closed)
