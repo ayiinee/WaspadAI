@@ -57,6 +57,14 @@ class VerificationViewModel(
                     overlayModeEnabled = true,
                 )
             )
+            is VerificationAction.OverlayConversationReady -> importOverlayConversation(action)
+            is VerificationAction.OverlayPermissionExpired -> _state.update { current ->
+                current.copy(
+                    isOverlayModeEnabled = false,
+                    isOverlayPrivacyDialogVisible = true,
+                    phase = VerificationPhase.Failure(action.message),
+                )
+            }
             VerificationAction.OverlayStopped -> stopOverlayMode()
             VerificationAction.DismissFailure -> dismissFailure()
             VerificationAction.ToggleHistory -> toggleHistory()
@@ -76,6 +84,43 @@ class VerificationViewModel(
 
     private fun updateInput(value: String) {
         _state.update { current -> current.copy(draft = value, phase = VerificationPhase.Idle) }
+    }
+
+    private fun importOverlayConversation(action: VerificationAction.OverlayConversationReady) {
+        val attachment = ImageVerificationPreview(
+            imageBytes = action.imageBytes,
+            contentType = action.contentType,
+            fileName = action.fileName,
+            overlayModeEnabled = true,
+        )
+        val imported = buildList<VerificationConversationItem> {
+            add(
+                VerificationConversationItem.UserMessage(
+                    text = "Area layar dikirim melalui Tanya Area.",
+                    hasAttachment = true,
+                    attachmentName = action.fileName,
+                    attachmentBytes = action.imageBytes,
+                    attachmentContentType = action.contentType,
+                    attachmentGroup = listOf(attachment),
+                )
+            )
+            action.turns.forEach { turn ->
+                if (turn.isUser) {
+                    add(VerificationConversationItem.UserMessage(turn.text))
+                } else {
+                    turn.result?.let { add(VerificationConversationItem.Analysis(it)) }
+                }
+            }
+        }
+        val latestResult = action.turns.lastOrNull { !it.isUser }?.result
+        _state.update { current ->
+            current.copy(
+                conversation = current.conversation + imported,
+                pendingAttachments = emptyList(),
+                draft = "",
+                phase = latestResult?.let(VerificationPhase::Success) ?: VerificationPhase.Idle,
+            )
+        }
     }
 
     private fun submitText() {

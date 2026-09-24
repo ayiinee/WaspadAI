@@ -1,6 +1,7 @@
 ﻿package id.waspadai.app
 
 import android.graphics.Color
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -40,6 +41,8 @@ import id.waspadai.app.ui.theme.WaspadAITheme
 import id.waspadai.app.feature.community.presentation.CommunityAction
 import id.waspadai.app.core.ui.CommunityNotificationState
 import id.waspadai.app.core.ui.LocalCommunityNotification
+import id.waspadai.app.core.overlay.FloatingVerifyService
+import kotlinx.coroutines.flow.MutableStateFlow
 
 private const val VerificationRouteName = "verification"
 private const val HomeRouteName = "home"
@@ -48,6 +51,8 @@ private const val LearningRouteName = "learning"
 private const val WelcomeRouteName = "welcome"
 
 class MainActivity : ComponentActivity() {
+    private val openTanyaAreaFull = MutableStateFlow(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -58,16 +63,39 @@ class MainActivity : ComponentActivity() {
         val sharedCaseId = intent?.data
             ?.takeIf { it.scheme == "waspadai" && it.host == "community" }
             ?.lastPathSegment
+        openTanyaAreaFull.value = intent?.getBooleanExtra(
+            FloatingVerifyService.EXTRA_OPEN_FULL,
+            false,
+        ) == true
         setContent {
             WaspadAITheme {
-                WaspadAiApp(app, sharedCaseId)
+                val shouldOpenTanyaArea by openTanyaAreaFull.collectAsStateWithLifecycle()
+                WaspadAiApp(
+                    app = app,
+                    sharedCaseId = sharedCaseId,
+                    openTanyaAreaFull = shouldOpenTanyaArea,
+                    onTanyaAreaOpened = { openTanyaAreaFull.value = false },
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(FloatingVerifyService.EXTRA_OPEN_FULL, false)) {
+            openTanyaAreaFull.value = true
         }
     }
 }
 
 @Composable
-private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) {
+private fun WaspadAiApp(
+    app: WaspadAIApplication,
+    sharedCaseId: String? = null,
+    openTanyaAreaFull: Boolean = false,
+    onTanyaAreaOpened: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -91,6 +119,18 @@ private fun WaspadAiApp(app: WaspadAIApplication, sharedCaseId: String? = null) 
     val learningUiState by learningViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(currentRoute) {
         if (currentRoute == LearningRouteName) learningViewModel.onAction(LearningAction.Refresh)
+    }
+    LaunchedEffect(openTanyaAreaFull, currentRoute) {
+        if (openTanyaAreaFull && currentRoute != null && currentRoute != WelcomeRouteName) {
+            if (currentRoute != VerificationRouteName) {
+                navController.navigate(VerificationRouteName) {
+                    popUpTo(HomeRouteName) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+            onTanyaAreaOpened()
+        }
     }
     val navigateToTopLevel: (String) -> Unit = { destination ->
         val targetRoute = when (destination) {

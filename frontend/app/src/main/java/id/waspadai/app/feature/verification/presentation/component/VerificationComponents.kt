@@ -2,9 +2,11 @@
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,8 +46,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -124,22 +126,47 @@ fun WaspadAiHeader(
                     .align(Alignment.CenterStart)
                     .padding(start = 32.dp)
             )
-            Switch(
-                checked = overlayModeEnabled,
-                onCheckedChange = { onToggleOverlayMode() },
-                enabled = enabled,
+            val thumbOffset by animateDpAsState(
+                targetValue = if (overlayModeEnabled) 27.dp else 3.dp,
+                label = "tanyainThumb",
+            )
+            val trackColor by animateColorAsState(
+                targetValue = if (overlayModeEnabled) WaspadAICaution else WaspadAIDarkBlue,
+                label = "tanyainTrack",
+            )
+            Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 20.dp),
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = WaspadAICaution,
-                    checkedBorderColor = WaspadAICaution,
-                    uncheckedThumbColor = Color.White,
-                    uncheckedTrackColor = WaspadAIDarkBlue.copy(alpha = .72f),
-                    uncheckedBorderColor = Color.White.copy(alpha = .75f),
-                ),
-            )
+                    .padding(end = 20.dp)
+                    .width(92.dp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(trackColor)
+                    .border(1.5.dp, Color.White, RoundedCornerShape(18.dp))
+                    .toggleable(
+                        value = overlayModeEnabled,
+                        enabled = enabled,
+                        role = Role.Switch,
+                        onValueChange = { onToggleOverlayMode() },
+                    ),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = thumbOffset)
+                        .align(Alignment.CenterStart)
+                        .width(62.dp)
+                        .height(26.dp)
+                        .background(Color.White, RoundedCornerShape(15.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Tanyain",
+                        color = WaspadAIBlue,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                }
+            }
         }
     }
 }
