@@ -32,6 +32,7 @@ data class LearningUiState(
 )
 
 sealed interface LearningAction {
+    data object ResetPrivateState : LearningAction
     data object Refresh : LearningAction
     data class OpenModule(val moduleId: String) : LearningAction
     data object CloseModule : LearningAction
@@ -53,6 +54,7 @@ class LearningViewModel(
 
     fun onAction(action: LearningAction) {
         when (action) {
+            LearningAction.ResetPrivateState -> _uiState.value = LearningUiState(loading = false)
             LearningAction.Refresh -> loadModules()
             is LearningAction.OpenModule -> openModule(action.moduleId)
             LearningAction.CloseModule -> _uiState.update {

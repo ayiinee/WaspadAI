@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.People
@@ -109,10 +109,10 @@ fun WaspadAIBottomNavigation(
                     showBadge = communityNotification.showBadge,
                 )
                 BottomDestination(
-                    label = "Progres",
-                    icon = Icons.Rounded.BarChart,
-                    selected = selectedDestination == "Progres",
-                    onClick = { onDestinationSelected("Progres") },
+                    label = "Profil",
+                    icon = Icons.Rounded.Person,
+                    selected = selectedDestination == "Profil",
+                    onClick = { onDestinationSelected("Profil") },
                     modifier = Modifier.weight(1f),
                 )
             }

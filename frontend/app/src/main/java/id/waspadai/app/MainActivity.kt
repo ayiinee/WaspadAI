@@ -25,10 +25,13 @@ import id.waspadai.app.feature.community.presentation.CommunityViewModel
 import id.waspadai.app.feature.auth.presentation.AuthLandingScreen
 import id.waspadai.app.feature.home.presentation.HomeRoute
 import id.waspadai.app.feature.home.presentation.HomeViewModel
+import id.waspadai.app.feature.home.presentation.HomeAction
 import id.waspadai.app.feature.home.domain.LoadHomeUseCase
 import id.waspadai.app.feature.learning.presentation.LearningScreen
 import id.waspadai.app.feature.learning.presentation.LearningViewModel
 import id.waspadai.app.feature.learning.presentation.LearningAction
+import id.waspadai.app.feature.profile.presentation.ProfileRoute
+import id.waspadai.app.feature.profile.presentation.ProfileViewModel
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationHistoryUseCase
 import id.waspadai.app.feature.verification.domain.SubmitImageVerificationUseCase
@@ -48,6 +51,7 @@ private const val VerificationRouteName = "verification"
 private const val HomeRouteName = "home"
 private const val CommunityRouteName = "community"
 private const val LearningRouteName = "learning"
+private const val ProfileRouteName = "profile"
 private const val WelcomeRouteName = "welcome"
 
 class MainActivity : ComponentActivity() {
@@ -138,6 +142,7 @@ private fun WaspadAiApp(
             "Periksa" -> VerificationRouteName
             "Koneksi" -> CommunityRouteName
             "Pelajari" -> LearningRouteName
+            "Profil" -> ProfileRouteName
             else -> null
         }
         if (targetRoute != null && targetRoute != currentRoute) {
@@ -212,6 +217,7 @@ private fun WaspadAiApp(
                     baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
                 ),
             )
+            LaunchedEffect(Unit) { viewModel.onAction(HomeAction.Refresh) }
             HomeRoute(
                 onDestinationSelected = navigateToTopLevel,
                 onCommunityCaseSelected = { communityId ->
@@ -264,6 +270,40 @@ private fun WaspadAiApp(
                 uiState = learningUiState,
                 onAction = learningViewModel::onAction,
                 onDestinationSelected = navigateToTopLevel,
+            )
+        }
+        composable(ProfileRouteName) {
+            val profileViewModel: ProfileViewModel = viewModel(
+                factory = ProfileViewModel.Factory(
+                    repository = app.profileRepository,
+                    tokenProvider = app.authRepository,
+                    baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+                ),
+            )
+            val profileState by profileViewModel.uiState.collectAsStateWithLifecycle()
+            ProfileRoute(
+                state = profileState,
+                accessToken = profileState.accessToken,
+                onAction = profileViewModel::onAction,
+                onDestinationSelected = navigateToTopLevel,
+                onChangePassword = { password ->
+                    runCatching { app.authRepository.updatePassword(password) }
+                },
+                onLogout = {
+                    runCatching { app.authRepository.signOut() }
+                    communityViewModel.onAction(CommunityAction.ResetPrivateState)
+                    learningViewModel.onAction(LearningAction.ResetPrivateState)
+                    app.rememberedCredentialsStore.clear()
+                    FloatingVerifyService.stop(app)
+                    navController.navigate(WelcomeRouteName) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onCommunityPostSelected = { communityId ->
+                    communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
+                    navigateToTopLevel("Koneksi")
+                },
             )
         }
     }

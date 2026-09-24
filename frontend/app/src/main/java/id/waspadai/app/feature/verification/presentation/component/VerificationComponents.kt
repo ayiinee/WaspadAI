@@ -824,7 +824,7 @@ fun BottomNavigation(activeTab: String, onTabSelected: (String) -> Unit) {
             NavigationItem("Pelajari", "▤", activeTab) { onTabSelected("Pelajari") }
             Spacer(Modifier.weight(1f))
             NavigationItem("Koneksi", "♧", activeTab) { onTabSelected("Koneksi") }
-            NavigationItem("Progres", "▥", activeTab) { onTabSelected("Progres") }
+            NavigationItem("Profil", "●", activeTab) { onTabSelected("Profil") }
         }
         Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 0.dp).clickable { onTabSelected("Periksa") },

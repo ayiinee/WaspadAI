@@ -11,6 +11,8 @@ import id.waspadai.app.feature.learning.data.LearningRepositoryImpl
 import id.waspadai.app.feature.learning.domain.LearningRepository
 import id.waspadai.app.feature.home.data.HomeRepositoryImpl
 import id.waspadai.app.feature.home.domain.HomeRepository
+import id.waspadai.app.feature.profile.data.ProfileRepositoryImpl
+import id.waspadai.app.feature.profile.domain.ProfileRepository
 import id.waspadai.app.feature.verification.data.MockVerificationRepository
 import id.waspadai.app.feature.verification.data.VerificationRemoteDataSource
 import id.waspadai.app.feature.verification.data.VerificationRepositoryImpl
@@ -30,6 +32,10 @@ class WaspadAIApplication : Application() {
 
     val homeRepository: HomeRepository by lazy {
         HomeRepositoryImpl(apiClient)
+    }
+
+    val profileRepository: ProfileRepository by lazy {
+        ProfileRepositoryImpl(apiClient)
     }
 
     val authRepository by lazy {

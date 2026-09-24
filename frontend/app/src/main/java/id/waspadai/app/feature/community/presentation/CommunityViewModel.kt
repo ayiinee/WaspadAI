@@ -67,6 +67,14 @@ class CommunityViewModel(
 
     fun onAction(action: CommunityAction) {
         when (action) {
+            CommunityAction.ResetPrivateState -> {
+                realtimeJob?.cancel()
+                detailJobs.values.forEach { it.cancel() }
+                detailJobs.clear()
+                likeMutations.clear()
+                repository?.clearPrivateState()
+                _uiState.value = CommunityUiState(baseUrlDraft = communityBaseUrl)
+            }
             is CommunityAction.SearchChanged -> _uiState.update {
                 it.copy(searchQuery = action.query)
             }

@@ -91,6 +91,13 @@ class CommunityRepositoryImpl(
         cachedCommunity = null
     }
 
+    override fun clearPrivateState() {
+        cachedCommunity = null
+        inFlightCommunity = null
+        inFlightKey = null
+        _feedState.value = null
+    }
+
     override suspend fun loadCommunity(
         baseUrl: String,
         accessToken: String,

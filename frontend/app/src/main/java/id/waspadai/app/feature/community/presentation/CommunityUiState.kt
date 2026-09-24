@@ -115,6 +115,7 @@ data class CommunityUiState(
 }
 
 sealed interface CommunityAction {
+    data object ResetPrivateState : CommunityAction
     data class SearchChanged(val query: String) : CommunityAction
     data class BaseUrlChanged(val value: String) : CommunityAction
     data class AccessTokenChanged(val value: String) : CommunityAction

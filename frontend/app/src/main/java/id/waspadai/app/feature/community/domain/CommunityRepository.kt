@@ -14,6 +14,7 @@ interface CommunityRepository {
      * Implementasi yang tidak memiliki cache boleh membiarkan method ini kosong.
      */
     fun invalidateCommunityCache() = Unit
+    fun clearPrivateState() = Unit
 
     suspend fun loadCommunity(
         baseUrl: String,

@@ -88,6 +88,24 @@ class SupabaseAuthRepository(
         }
     }
 
+    suspend fun signOut() {
+        val sessionToken = accessToken
+        try {
+            if (sessionToken.isNotBlank() && supabaseUrl.isNotBlank() && publishableKey.isNotBlank()) {
+                client.post("${supabaseUrl.trimEnd('/')}/auth/v1/logout") {
+                    authHeaders(useSession = true, sessionToken = sessionToken)
+                }
+            }
+        } finally {
+            clearSession()
+        }
+    }
+
+    fun clearSession() {
+        accessToken = ""
+        refreshToken = ""
+    }
+
     private suspend inline fun <reified T> requestSession(path: String, body: T): SupabaseSessionDto {
         ensureConfigured()
         val response = client.post("${supabaseUrl.trimEnd('/')}/auth/v1/$path") {
