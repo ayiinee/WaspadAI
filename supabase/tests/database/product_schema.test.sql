@@ -1,7 +1,8 @@
 begin;
 
-select plan(35);
+select plan(42);
 
+select ok(to_regclass('public.verification_conversations') is not null, 'verification conversations table exists');
 select ok(to_regclass('public.verification_cases') is not null, 'verification cases table exists');
 select ok(to_regclass('public.verification_results') is not null, 'verification results table exists');
 select ok(to_regclass('public.verification_evidence') is not null, 'verification evidence table exists');
@@ -25,6 +26,24 @@ select ok(to_regclass('public.quiz_questions') is not null, 'quiz questions tabl
 select ok(to_regclass('public.quiz_options') is not null, 'quiz options table exists');
 select ok(to_regclass('public.lesson_progress') is not null, 'lesson progress table exists');
 select ok(to_regclass('public.quiz_attempts') is not null, 'quiz attempts table exists');
+select ok(
+    exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'quiz_attempts'
+          and column_name = 'reading_duration_seconds'
+    ),
+    'quiz attempts persist reading duration'
+);
+select ok(
+    exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'quiz_attempts'
+          and column_name = 'quiz_duration_seconds'
+    ),
+    'quiz attempts persist quiz duration'
+);
 select ok(to_regclass('public.quiz_answers') is not null, 'quiz answers table exists');
 select ok(to_regclass('public.published_quiz_options') is not null, 'safe quiz options view exists');
 select ok(
@@ -35,10 +54,42 @@ select ok(
     'safe quiz options view does not expose answer keys'
 );
 select ok((select relrowsecurity from pg_class where oid = 'public.verification_cases'::regclass), 'cases use RLS');
+select ok((select relrowsecurity from pg_class where oid = 'public.verification_conversations'::regclass), 'conversations use RLS');
+select ok(
+    exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'verification_cases'
+          and column_name = 'conversation_id'
+          and is_nullable = 'NO'
+    ),
+    'cases require a conversation id'
+);
+select ok(
+    exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'verification_cases'
+          and column_name = 'turn_index'
+          and is_nullable = 'NO'
+    ),
+    'cases require a turn index'
+);
 select ok((select relrowsecurity from pg_class where oid = 'private.stored_assets'::regclass), 'assets use RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.community_posts'::regclass), 'posts use RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.community_media'::regclass), 'community media uses RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.community_preview_media'::regclass), 'preview media uses RLS');
+select ok(
+    exists (
+        select 1
+          from pg_policies
+         where schemaname = 'private'
+           and tablename = 'stored_assets'
+           and policyname = 'stored_assets_published_community_read'
+           and qual like '%community_media%'
+    ),
+    'published multi-media assets are readable through the Product API'
+);
 select ok((select relrowsecurity from pg_class where oid = 'private.outbox_events'::regclass), 'outbox uses RLS');
 select ok((select relrowsecurity from pg_class where oid = 'public.quiz_attempts'::regclass), 'quiz attempts use RLS');
 select ok(not has_table_privilege('authenticated', 'public.verification_cases', 'SELECT'), 'clients cannot read raw history');

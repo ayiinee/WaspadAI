@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from json import loads
+from uuid import uuid4
 
 import anyio
 import httpx
@@ -9,7 +10,12 @@ import pytest
 from app.config import Settings
 from app.errors import ProductAPIError
 from app.models import ImageVerificationRequest, TextVerificationRequest
-from app.verification_service import DEFAULT_TEXT_QUESTION, verify_remote_image, verify_remote_text
+from app.verification_service import (
+    DEFAULT_TEXT_QUESTION,
+    remote_text_payload,
+    verify_remote_image,
+    verify_remote_text,
+)
 
 
 def _request() -> TextVerificationRequest:
@@ -137,6 +143,30 @@ def test_remote_text_forwards_community_evidence() -> None:
         assert result.request_id == "req-test"
 
     anyio.run(check)
+
+
+def test_remote_text_uses_supported_page_context_for_follow_up() -> None:
+    request = TextVerificationRequest.model_validate(
+        {
+            "text": "Apa sumber untuk kesimpulan pemeriksaan sebelumnya?",
+            "conversation_id": str(uuid4()),
+        }
+    )
+    payload = remote_text_payload(
+        request,
+        conversation_context={
+            "title": "Pesan meminta kode OTP",
+            "user_message": "Kirim OTP agar rekening tidak diblokir.",
+            "assistant_message": "Jangan membagikan OTP kepada siapa pun.",
+        },
+    )
+
+    assert "conversation_id" not in payload
+    assert payload["page_context"] == {
+        "title": "Pesan meminta kode OTP",
+        "before": "Kirim OTP agar rekening tidak diblokir.",
+        "after": "Jangan membagikan OTP kepada siapa pun.",
+    }
 
 
 def test_remote_image_sends_multipart_and_forces_both() -> None:

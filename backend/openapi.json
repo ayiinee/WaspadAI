@@ -2947,6 +2947,12 @@
             "format": "uuid",
             "title": "Case Id"
           },
+          "creator_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Creator Name"
+          },
           "title": {
             "type": "string",
             "maxLength": 1000,
@@ -2979,6 +2985,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
           }
         },
         "additionalProperties": false,
@@ -2986,6 +3003,7 @@
         "required": [
           "community_id",
           "case_id",
+          "creator_name",
           "title",
           "summary",
           "verdict",
@@ -3469,6 +3487,32 @@
             ],
             "title": "Latest Total Questions"
           },
+          "reading_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Duration Seconds"
+          },
+          "quiz_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiz Duration Seconds"
+          },
           "updated_at": {
             "type": "string",
             "title": "Updated At"
@@ -3670,6 +3714,20 @@
             "type": "array",
             "minItems": 1,
             "title": "Answers"
+          },
+          "reading_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Reading Duration Seconds",
+            "default": 0
+          },
+          "quiz_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Quiz Duration Seconds",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -3702,6 +3760,20 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "Total Questions"
+          },
+          "reading_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Reading Duration Seconds",
+            "default": 0
+          },
+          "quiz_duration_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Quiz Duration Seconds",
+            "default": 0
           },
           "feedback": {
             "items": {

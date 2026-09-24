@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from hashlib import sha256
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx
@@ -243,13 +244,6 @@ async def get_community_image(
     case_id: UUID,
     http_client: httpx.AsyncClient,
 ) -> tuple[bytes, str]:
-    if settings.supabase_url is None or settings.supabase_service_role_key is None:
-        raise ProductAPIError(
-            503,
-            "STORAGE_UNAVAILABLE",
-            "Gambar komunitas belum dapat dimuat.",
-            retryable=True,
-        )
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
             community_sql.SELECT_LEGACY_COMMUNITY_IMAGE,
@@ -259,34 +253,7 @@ async def get_community_image(
     if asset is None:
         raise ProductAPIError(404, "COMMUNITY_IMAGE_NOT_FOUND", "Gambar komunitas tidak ditemukan.")
 
-    service_role_key = settings.supabase_service_role_key.get_secret_value()
-    storage_url = (
-        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/"
-        f"{asset['bucket']}/{asset['object_path']}"
-    )
-    try:
-        response = await http_client.get(
-            storage_url,
-            headers={
-                "Authorization": f"Bearer {service_role_key}",
-                "apikey": service_role_key,
-            },
-        )
-    except httpx.RequestError as error:
-        raise ProductAPIError(
-            503,
-            "STORAGE_UNAVAILABLE",
-            "Gambar komunitas belum dapat dimuat.",
-            retryable=True,
-        ) from error
-    if response.is_error:
-        raise ProductAPIError(
-            503,
-            "STORAGE_UNAVAILABLE",
-            "Storage menolak pembacaan gambar komunitas.",
-            retryable=True,
-        )
-    return response.content, asset["mime_type"]
+    return await _download_asset(settings, asset, http_client, "gambar komunitas")
 
 
 async def get_community_preview_media(
@@ -328,13 +295,6 @@ async def get_community_media(
     media_id: UUID,
     http_client: httpx.AsyncClient,
 ) -> tuple[bytes, str]:
-    if settings.supabase_url is None or settings.supabase_service_role_key is None:
-        raise ProductAPIError(
-            503,
-            "STORAGE_UNAVAILABLE",
-            "Gambar komunitas belum dapat dimuat.",
-            True,
-        )
     async with user_transaction(
         pool,
         user_id,
@@ -357,6 +317,24 @@ async def _download_asset(
     http_client: httpx.AsyncClient,
     label: str,
 ) -> tuple[bytes, str]:
+    if asset["bucket"] == "seed-assets":
+        assets_directory = (Path(__file__).resolve().parents[1] / "assets" / "community").resolve()
+        asset_path = (assets_directory / asset["object_path"]).resolve()
+        if asset_path.parent != assets_directory or not asset_path.is_file():
+            raise ProductAPIError(
+                404,
+                "COMMUNITY_IMAGE_NOT_FOUND",
+                f"{label.capitalize()} tidak ditemukan.",
+            )
+        return asset_path.read_bytes(), asset["mime_type"]
+
+    if settings.supabase_url is None or settings.supabase_service_role_key is None:
+        raise ProductAPIError(
+            503,
+            "STORAGE_UNAVAILABLE",
+            f"{label.capitalize()} belum dapat dimuat.",
+            True,
+        )
     service_role_key = settings.supabase_service_role_key.get_secret_value()  # type: ignore[union-attr]
     storage_url = (
         f"{settings.supabase_url.rstrip('/')}/storage/v1/object/"  # type: ignore[union-attr]
@@ -792,6 +770,7 @@ async def _fetch_vote_result_row(
 def _require_vote_target(row: DictRow | None, user_id: UUID) -> None:
     if row is None:
         raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+    _require_assessment_open(row)
     if row["owner_id"] == user_id:
         raise ProductAPIError(
             403,
@@ -886,11 +865,22 @@ def _community_media(community_id: UUID, row: DictRow) -> list[CommunityMediaIte
 def _require_response_target(row: DictRow | None, user_id: UUID) -> None:
     if row is None:
         raise ProductAPIError(404, "COMMUNITY_NOT_FOUND", "Kasus komunitas tidak ditemukan.")
+    _require_assessment_open(row)
     if row["owner_id"] == user_id:
         raise ProductAPIError(
             403,
             "CANNOT_RESPOND_OWN_POST",
             "User cannot respond to their own community case",
+        )
+
+
+def _require_assessment_open(row: DictRow) -> None:
+    status = str(row["status"]).upper() if "status" in row else ""
+    if status == "VERIFIED_EVIDENCE":
+        raise ProductAPIError(
+            409,
+            "COMMUNITY_ASSESSMENT_CLOSED",
+            "Kasus sudah terverifikasi dan tidak menerima penilaian baru.",
         )
 
 

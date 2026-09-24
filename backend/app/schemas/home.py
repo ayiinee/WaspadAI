@@ -17,12 +17,14 @@ class HomeCaseResponse(BaseModel):
 
     community_id: UUID
     case_id: UUID
+    creator_name: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=1000)
     summary: str = Field(min_length=1, max_length=5000)
     verdict: str = Field(min_length=1, max_length=100)
     risk_level: str = Field(min_length=1, max_length=100)
     requires_human_review: bool
     created_at: datetime
+    image_url: str | None = None
 
 
 class HomeLearningRecommendationResponse(BaseModel):

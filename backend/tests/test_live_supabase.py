@@ -242,15 +242,25 @@ def test_verification_history_rls_is_owner_scoped(live_config: LiveConfig) -> No
                         (operation_id, live_config.user_a, uuid4(), "b" * 64),
                     )
                     await connection.execute(
+                        """insert into public.verification_conversations
+                               (id, user_id, title, latest_message_preview,
+                                latest_message_role, last_verdict, next_turn_index,
+                                retention_expires_at)
+                           values (%s, %s, 'Fixture history', 'Fixture history',
+                                   'ASSISTANT', 'UNVERIFIED', 2, now() + interval '1 day')""",
+                        (case_id, live_config.user_a),
+                    )
+                    await connection.execute(
                         """insert into public.verification_cases
-                               (id, user_id, operation_id, product_request_id, input_type,
+                               (id, user_id, operation_id, product_request_id,
+                                conversation_id, turn_index, input_type,
                                 input_source, input_hash, headline, verdict, risk_level,
                                 requires_human_review, save_reason, community_state,
                                 retention_expires_at)
-                           values (%s, %s, %s, %s, 'TEXT', 'MANUAL', %s, 'Fixture history',
+                           values (%s, %s, %s, %s, %s, 1, 'TEXT', 'MANUAL', %s, 'Fixture history',
                                    'UNVERIFIED', 'UNKNOWN', true, 'UNVERIFIED', 'PRIVATE',
                                    now() + interval '1 day')""",
-                        (case_id, live_config.user_a, operation_id, uuid4(), "c" * 64),
+                        (case_id, live_config.user_a, operation_id, uuid4(), case_id, "c" * 64),
                     )
                     await connection.execute(
                         """insert into public.verification_results
@@ -265,6 +275,11 @@ def test_verification_history_rls_is_owner_scoped(live_config: LiveConfig) -> No
                         "select id from public.verification_cases where id = %s", (case_id,)
                     )
                     assert await own_case.fetchone() == (case_id,)
+                    own_conversation = await connection.execute(
+                        "select id from public.verification_conversations where id = %s",
+                        (case_id,),
+                    )
+                    assert await own_conversation.fetchone() == (case_id,)
 
                     await set_test_claim(connection, live_config.user_b)
                     hidden_case = await connection.execute(
@@ -276,6 +291,11 @@ def test_verification_history_rls_is_owner_scoped(live_config: LiveConfig) -> No
                         (case_id,),
                     )
                     assert await hidden_result.fetchone() is None
+                    hidden_conversation = await connection.execute(
+                        "select id from public.verification_conversations where id = %s",
+                        (case_id,),
+                    )
+                    assert await hidden_conversation.fetchone() is None
         finally:
             await pool.close()
 
@@ -308,16 +328,26 @@ def test_withdrawn_community_post_is_hidden_and_consents_are_revoked(
                         (operation_id, live_config.user_a, uuid4(), "e" * 64),
                     )
                     await connection.execute(
+                        """insert into public.verification_conversations
+                               (id, user_id, title, latest_message_preview,
+                                latest_message_role, last_verdict, next_turn_index,
+                                retention_expires_at)
+                           values (%s, %s, 'Fixture community', 'Fixture community',
+                                   'ASSISTANT', 'UNVERIFIED', 2, now() + interval '1 day')""",
+                        (case_id, live_config.user_a),
+                    )
+                    await connection.execute(
                         """insert into public.verification_cases
-                               (id, user_id, operation_id, product_request_id, input_type,
+                               (id, user_id, operation_id, product_request_id,
+                                conversation_id, turn_index, input_type,
                                 input_source, sanitized_text, input_hash, headline, verdict,
                                 risk_level, requires_human_review, save_reason, community_state,
                                 retention_expires_at)
-                           values (%s, %s, %s, %s, 'TEXT', 'MANUAL', 'Konten sintetis aman',
+                           values (%s, %s, %s, %s, %s, 1, 'TEXT', 'MANUAL', 'Konten sintetis aman',
                                    %s, 'Fixture community', 'UNVERIFIED', 'UNKNOWN', true,
                                    'UNVERIFIED', 'PUBLISHED_UNVERIFIED',
                                    now() + interval '1 day')""",
-                        (case_id, live_config.user_a, operation_id, uuid4(), content_hash),
+                        (case_id, live_config.user_a, operation_id, uuid4(), case_id, content_hash),
                     )
                     await connection.execute(
                         """insert into public.verification_results
@@ -458,15 +488,25 @@ def test_published_community_is_shared_and_social_is_idempotent(
                         (operation_id, live_config.user_a, uuid4(), content_hash),
                     )
                     await connection.execute(
+                        """insert into public.verification_conversations
+                           (id, user_id, title, latest_message_preview,
+                            latest_message_role, last_verdict, next_turn_index,
+                            retention_expires_at)
+                           values (%s, %s, 'Shared case', 'Shared case',
+                                   'ASSISTANT', 'UNVERIFIED', 2, now() + interval '1 day')""",
+                        (case_id, live_config.user_a),
+                    )
+                    await connection.execute(
                         """insert into public.verification_cases
-                           (id, user_id, operation_id, product_request_id, input_type,
+                           (id, user_id, operation_id, product_request_id,
+                            conversation_id, turn_index, input_type,
                             input_source, sanitized_text, input_hash, headline, verdict,
                             risk_level, requires_human_review, save_reason, community_state,
                             retention_expires_at)
-                           values (%s, %s, %s, %s, 'TEXT', 'MANUAL', 'Shared case', %s,
+                           values (%s, %s, %s, %s, %s, 1, 'TEXT', 'MANUAL', 'Shared case', %s,
                                    'Shared case', 'UNVERIFIED', 'LOW', false, 'UNVERIFIED',
                                    'PUBLISHED_UNVERIFIED', now() + interval '1 day')""",
-                        (case_id, live_config.user_a, operation_id, uuid4(), content_hash, ),
+                        (case_id, live_config.user_a, operation_id, uuid4(), case_id, content_hash),
                     )
                     await connection.execute(
                         """insert into public.verification_results

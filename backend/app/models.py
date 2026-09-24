@@ -66,6 +66,7 @@ class TextVerificationRequest(BaseModel):
     source_url: str | None = Field(default=None, max_length=2048)
     sender_context: SenderContext = SenderContext.UNKNOWN
     page_context: PageContext | None = None
+    conversation_id: UUID | None = None
 
     @field_validator("text", mode="before")
     @classmethod
@@ -122,6 +123,7 @@ class ImageVerificationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     question: str | None = Field(default=None, max_length=500)
+    conversation_id: UUID | None = None
 
     @field_validator("question", mode="before")
     @classmethod
@@ -134,6 +136,7 @@ class ImageVerificationRequest(BaseModel):
 class HistoryMeta(BaseModel):
     saved: bool
     case_id: UUID | None
+    conversation_id: UUID | None = None
     save_reason: str
     community_eligible: bool
     community_state: str
@@ -161,6 +164,39 @@ class HistoryItem(BaseModel):
 class HistoryPage(BaseModel):
     items: list[HistoryItem]
     next_cursor: str | None
+
+
+class ConversationItem(BaseModel):
+    conversation_id: UUID
+    title: str
+    latest_message_preview: str
+    latest_message_role: Literal["USER", "ASSISTANT"]
+    last_verdict: str
+    created_at: str
+    updated_at: str
+
+
+class ConversationPage(BaseModel):
+    items: list[ConversationItem]
+    next_cursor: str | None
+
+
+class ConversationTurn(BaseModel):
+    case_id: UUID
+    input_type: Literal["TEXT", "IMAGE"]
+    input_text: str
+    created_at: str
+    execution_mode: Literal["MOCK", "REMOTE"]
+    history: HistoryMeta
+    result: AIResult
+
+
+class ConversationDetail(BaseModel):
+    conversation_id: UUID
+    title: str
+    created_at: str
+    updated_at: str
+    turns: list[ConversationTurn]
 
 
 class LearningModuleItem(BaseModel):
@@ -273,6 +309,8 @@ class QuizAttemptRequest(BaseModel):
 
     module_version: int = Field(ge=1)
     answers: list[QuizAttemptAnswer] = Field(min_length=1)
+    reading_duration_seconds: int = Field(default=0, ge=0, le=86400)
+    quiz_duration_seconds: int = Field(default=0, ge=0, le=86400)
 
     @model_validator(mode="after")
     def reject_duplicate_questions(self) -> QuizAttemptRequest:
@@ -299,6 +337,8 @@ class QuizAttemptResult(BaseModel):
     score: float = Field(ge=0, le=100)
     correct_answers: int = Field(ge=0)
     total_questions: int = Field(ge=1)
+    reading_duration_seconds: int = Field(default=0, ge=0, le=86400)
+    quiz_duration_seconds: int = Field(default=0, ge=0, le=86400)
     feedback: list[QuizQuestionFeedback]
 
 
@@ -313,6 +353,8 @@ class LearningProgressItem(BaseModel):
     best_score: float | None = Field(default=None, ge=0, le=100)
     latest_correct_answers: int | None = Field(default=None, ge=0)
     latest_total_questions: int | None = Field(default=None, ge=1)
+    reading_duration_seconds: int | None = Field(default=None, ge=0, le=86400)
+    quiz_duration_seconds: int | None = Field(default=None, ge=0, le=86400)
     updated_at: str
     first_opened_at: str | None = None
     last_opened_at: str | None = None

@@ -40,6 +40,8 @@ from app.learning_service import (
     submit_quiz_attempt,
 )
 from app.models import (
+    ConversationDetail,
+    ConversationPage,
     HistoryPage,
     ImageVerificationRequest,
     LearningCase,
@@ -58,7 +60,9 @@ from app.privacy.image_validation import (
     validate_image_dimensions,
 )
 from app.verification_service import (
+    get_conversation_detail,
     get_history_detail,
+    list_conversations,
     list_history,
     verify_image,
     verify_text,
@@ -198,6 +202,7 @@ def create_app() -> FastAPI:
     async def verify_image_endpoint(
         image: UploadFile = File(...),
         question: str | None = Form(default=None, max_length=500),
+        conversation_id: UUID | None = Form(default=None),
         idempotency_key: UUID = Header(alias="Idempotency-Key"),
         user: AuthenticatedUser = Depends(get_current_user),
     ) -> VerificationEnvelope:
@@ -223,7 +228,10 @@ def create_app() -> FastAPI:
             raise ProductAPIError(
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
-        payload = ImageVerificationRequest(question=question)
+        payload = ImageVerificationRequest(
+            question=question,
+            conversation_id=conversation_id,
+        )
         return await verify_image(
             pool,
             app.state.settings,
@@ -258,6 +266,44 @@ def create_app() -> FastAPI:
                 503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
             )
         return await get_history_detail(pool, app.state.settings, user.id, case_id)
+
+    @app.get(
+        "/api/v1/conversations",
+        tags=["Conversations"],
+        response_model=ConversationPage,
+    )
+    async def list_conversations_endpoint(
+        limit: int = Query(default=20, ge=1, le=100),
+        cursor: str | None = Query(default=None, max_length=2048),
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> ConversationPage:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await list_conversations(pool, app.state.settings, user.id, limit, cursor)
+
+    @app.get(
+        "/api/v1/conversations/{conversation_id}",
+        tags=["Conversations"],
+        response_model=ConversationDetail,
+    )
+    async def get_conversation_detail_endpoint(
+        conversation_id: UUID,
+        user: AuthenticatedUser = Depends(get_current_user),
+    ) -> ConversationDetail:
+        pool = app.state.db_pool
+        if pool is None:
+            raise ProductAPIError(
+                503, "PERSISTENCE_UNAVAILABLE", "Database belum dikonfigurasi.", True
+            )
+        return await get_conversation_detail(
+            pool,
+            app.state.settings,
+            user.id,
+            conversation_id,
+        )
 
     @app.get(
         "/api/v1/learning/modules",

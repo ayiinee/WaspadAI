@@ -21,6 +21,10 @@ from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_image_review_required_result, build_review_required_result
 from app.models import (
+    ConversationDetail,
+    ConversationItem,
+    ConversationPage,
+    ConversationTurn,
     HistoryItem,
     HistoryMeta,
     HistoryPage,
@@ -46,6 +50,7 @@ def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
         "page_context": request.page_context.model_dump(mode="json")
         if request.page_context
         else None,
+        "conversation_id": str(request.conversation_id) if request.conversation_id else None,
         "output_mode": "BOTH",
     }
 
@@ -53,10 +58,18 @@ def canonical_payload(request: TextVerificationRequest) -> dict[str, object]:
 def remote_text_payload(
     request: TextVerificationRequest,
     community_evidence: list[dict[str, Any]] | None = None,
+    conversation_context: dict[str, str] | None = None,
 ) -> dict[str, object]:
     payload = canonical_payload(request)
+    payload.pop("conversation_id", None)
     if payload["question"] is None:
         payload["question"] = DEFAULT_TEXT_QUESTION
+    if conversation_context is not None:
+        payload["page_context"] = {
+            "title": conversation_context["title"][:300],
+            "before": conversation_context["user_message"][-500:],
+            "after": conversation_context["assistant_message"][-500:],
+        }
     payload["output_mode"] = "BOTH"
     payload["community_evidence"] = _community_evidence_for_ai(community_evidence)
     return payload
@@ -107,6 +120,45 @@ def save_reason(result: AIResult, settings: Settings) -> str:
     raise ValueError("not eligible for history")
 
 
+async def _load_conversation_context(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    conversation_id: UUID | None,
+) -> dict[str, str] | None:
+    if conversation_id is None:
+        return None
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """select conversation.title, latest.sanitized_text, latest.result_json
+                 from public.verification_conversations conversation
+                 left join lateral (
+                     select c.sanitized_text, r.result_json
+                       from public.verification_cases c
+                       join public.verification_results r on r.case_id = c.id
+                      where c.conversation_id = conversation.id
+                        and c.deleted_at is null
+                      order by c.turn_index desc
+                      limit 1
+                 ) latest on true
+                where conversation.id = %s
+                  and conversation.deleted_at is null""",
+            (conversation_id,),
+        )
+        row = await query.fetchone()
+    if row is None:
+        raise ProductAPIError(404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan.")
+    result_json = row.get("result_json") or {}
+    presentation = result_json.get("presentation") or {}
+    narrative = presentation.get("narrative") or {}
+    assistant_message = narrative.get("text") or result_json.get("headline") or row["title"]
+    return {
+        "title": row["title"],
+        "user_message": row.get("sanitized_text") or "",
+        "assistant_message": str(assistant_message),
+    }
+
+
 async def verify_text(
     pool: AsyncConnectionPool,
     settings: Settings,
@@ -115,6 +167,12 @@ async def verify_text(
     request: TextVerificationRequest,
     http_client: httpx.AsyncClient | None = None,
 ) -> VerificationEnvelope:
+    conversation_context = await _load_conversation_context(
+        pool,
+        settings,
+        user_id,
+        request.conversation_id,
+    )
     digest = payload_hash(request)
     operation = await _claim_or_replay(
         pool, settings, user_id, idempotency_key, digest, VERIFY_TEXT_ROUTE
@@ -143,6 +201,7 @@ async def verify_text(
                     settings,
                     request,
                     community_evidence=community_evidence,
+                    conversation_context=conversation_context,
                 )
             except ProductAPIError as error:
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
@@ -158,7 +217,8 @@ async def verify_text(
             settings=settings,
             user_id=user_id,
             operation_id=operation["id"],
-            request=request,
+            input_text=request.text,
+            conversation_id=request.conversation_id,
             digest=digest,
             result=result,
             execution_mode=execution_mode,
@@ -186,6 +246,12 @@ async def verify_image(
     request: ImageVerificationRequest,
     http_client: httpx.AsyncClient | None = None,
 ) -> VerificationEnvelope:
+    conversation_context = await _load_conversation_context(
+        pool,
+        settings,
+        user_id,
+        request.conversation_id,
+    )
     digest = image_payload_hash(image_bytes, request)
     operation = await _claim_or_replay(
         pool, settings, user_id, idempotency_key, digest, VERIFY_IMAGE_ROUTE
@@ -232,6 +298,7 @@ async def verify_image(
                     content_type,
                     request,
                     community_evidence=community_evidence,
+                    conversation_context=conversation_context,
                 )
             except ProductAPIError as error:
                 await _record_upstream_failure(pool, settings, user_id, operation["id"], error)
@@ -246,7 +313,8 @@ async def verify_image(
             settings=settings,
             user_id=user_id,
             operation_id=operation["id"],
-            request=None,
+            input_text=request.question or "Gambar dikirim untuk diperiksa.",
+            conversation_id=request.conversation_id,
             digest=digest,
             result=result,
             execution_mode=execution_mode,
@@ -325,7 +393,8 @@ async def get_history_detail(
 ) -> VerificationEnvelope:
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         query = await connection.execute(
-            """select c.id, c.product_request_id, c.save_reason, c.community_state,
+            """select c.id, c.conversation_id, c.product_request_id,
+                      c.save_reason, c.community_state,
                       c.sanitized_text,
                       r.result_json, r.execution_mode
                  from public.verification_cases c
@@ -340,11 +409,124 @@ async def get_history_detail(
     return _envelope(
         request_id=row["product_request_id"],
         case_id=row["id"],
+        conversation_id=row["conversation_id"],
         reason=row["save_reason"],
         community_state=row["community_state"],
         result=result,
         execution_mode=row["execution_mode"],
         input_text=row["sanitized_text"],
+    )
+
+
+async def list_conversations(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    limit: int,
+    cursor_value: str | None,
+) -> ConversationPage:
+    secret = _cursor_secret(settings)
+    cursor = decode_cursor(cursor_value, secret, user_id) if cursor_value else None
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        query = await connection.execute(
+            """select id, title, latest_message_preview, latest_message_role,
+                      last_verdict, created_at, updated_at
+                 from public.verification_conversations
+                where deleted_at is null
+                  and (%s::timestamptz is null or (updated_at, id) < (%s::timestamptz, %s::uuid))
+                order by updated_at desc, id desc
+                limit %s""",
+            (
+                cursor.created_at if cursor else None,
+                cursor.created_at if cursor else None,
+                cursor.case_id if cursor else None,
+                limit + 1,
+            ),
+        )
+        rows = await query.fetchall()
+
+    has_next = len(rows) > limit
+    page_rows = rows[:limit]
+    items = [
+        ConversationItem(
+            conversation_id=row["id"],
+            title=row["title"],
+            latest_message_preview=row["latest_message_preview"],
+            latest_message_role=row["latest_message_role"],
+            last_verdict=row["last_verdict"],
+            created_at=_iso8601(row["created_at"]),
+            updated_at=_iso8601(row["updated_at"]),
+        )
+        for row in page_rows
+    ]
+    next_cursor = None
+    if has_next and page_rows:
+        final_row = page_rows[-1]
+        next_cursor = encode_cursor(
+            HistoryCursor(
+                user_id=user_id,
+                created_at=final_row["updated_at"],
+                case_id=final_row["id"],
+            ),
+            secret,
+        )
+    return ConversationPage(items=items, next_cursor=next_cursor)
+
+
+async def get_conversation_detail(
+    pool: AsyncConnectionPool,
+    settings: Settings,
+    user_id: UUID,
+    conversation_id: UUID,
+) -> ConversationDetail:
+    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
+        conversation_query = await connection.execute(
+            """select id, title, created_at, updated_at
+                 from public.verification_conversations
+                where id = %s and deleted_at is null""",
+            (conversation_id,),
+        )
+        conversation = await conversation_query.fetchone()
+        if conversation is None:
+            raise ProductAPIError(404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan.")
+        turns_query = await connection.execute(
+            """select c.id, c.input_type, c.sanitized_text, c.save_reason,
+                      c.community_state, c.created_at, r.result_json, r.execution_mode
+                 from public.verification_cases c
+                 join public.verification_results r on r.case_id = c.id
+                where c.conversation_id = %s and c.deleted_at is null
+                order by c.turn_index asc""",
+            (conversation_id,),
+        )
+        rows = await turns_query.fetchall()
+
+    turns: list[ConversationTurn] = []
+    for row in rows:
+        result = AIResult.model_validate(row["result_json"])
+        turns.append(
+            ConversationTurn(
+                case_id=row["id"],
+                input_type=row["input_type"],
+                input_text=row["sanitized_text"] or "Gambar dikirim untuk diperiksa.",
+                created_at=_iso8601(row["created_at"]),
+                execution_mode=row["execution_mode"],
+                history=HistoryMeta(
+                    saved=True,
+                    case_id=row["id"],
+                    conversation_id=conversation_id,
+                    save_reason=row["save_reason"],
+                    community_eligible=result.community_status == "ELIGIBLE_WITH_CONSENT",
+                    community_state=row["community_state"],
+                ),
+                result=result,
+            )
+        )
+    return ConversationDetail(
+        conversation_id=conversation["id"],
+        title=conversation["title"],
+        created_at=_iso8601(conversation["created_at"]),
+        updated_at=_iso8601(conversation["updated_at"]),
+        turns=turns,
     )
 
 
@@ -435,7 +617,8 @@ async def _persist_terminal_result(
     settings: Settings,
     user_id: UUID,
     operation_id: UUID,
-    request: TextVerificationRequest | None,
+    input_text: str,
+    conversation_id: UUID | None,
     digest: str,
     result: AIResult,
     execution_mode: str,
@@ -448,33 +631,81 @@ async def _persist_terminal_result(
     reason = save_reason(result, settings) if eligible else "NOT_REQUIRED"
     case_id = uuid4() if eligible else None
     community_state = "PRIVATE" if eligible else "NOT_AVAILABLE"
-    sanitized_text = (
-        request.text
-        if request is not None
-        else (result.headline or result.privacy_notice or "")
-    )
-    envelope = _envelope(
-        request_id=operation_id,
-        case_id=case_id,
-        reason=reason,
-        community_state=community_state,
-        result=result,
-        execution_mode=execution_mode,
-    )
+    sanitized_text = input_text.strip() or "Gambar dikirim untuk diperiksa."
+    resolved_conversation_id = conversation_id
     async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
         if eligible:
+            latest_preview = _result_narrative(result)[:2000]
+            retention_days = settings.history_retention_days
+            if resolved_conversation_id is None:
+                resolved_conversation_id = uuid4()
+                turn_index = 1
+                await connection.execute(
+                    """insert into public.verification_conversations
+                           (id, user_id, title, latest_message_preview, latest_message_role,
+                            last_verdict, next_turn_index, retention_expires_at)
+                       values (%s, %s, %s, %s, 'ASSISTANT', %s, 2,
+                               now() + make_interval(days => %s))""",
+                    (
+                        resolved_conversation_id,
+                        user_id,
+                        result.headline,
+                        latest_preview,
+                        result.verdict,
+                        retention_days,
+                    ),
+                )
+            else:
+                locked = await connection.execute(
+                    """select next_turn_index
+                         from public.verification_conversations
+                        where id = %s and deleted_at is null
+                        for update""",
+                    (resolved_conversation_id,),
+                )
+                conversation = await locked.fetchone()
+                if conversation is None:
+                    raise ProductAPIError(
+                        404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan."
+                    )
+                turn_index = conversation["next_turn_index"]
+                await connection.execute(
+                    """update public.verification_conversations
+                          set latest_message_preview = %s,
+                              latest_message_role = 'ASSISTANT',
+                              last_verdict = %s,
+                              next_turn_index = %s,
+                              retention_expires_at = now() + make_interval(days => %s)
+                        where id = %s""",
+                    (
+                        latest_preview,
+                        result.verdict,
+                        turn_index + 1,
+                        retention_days,
+                        resolved_conversation_id,
+                    ),
+                )
+                await connection.execute(
+                    """update public.verification_cases
+                          set retention_expires_at = now() + make_interval(days => %s)
+                        where conversation_id = %s""",
+                    (retention_days, resolved_conversation_id),
+                )
             await connection.execute(
                 """insert into public.verification_cases
-                       (id, user_id, operation_id, product_request_id, input_type, input_source,
+                       (id, user_id, operation_id, product_request_id, conversation_id, turn_index,
+                        input_type, input_source,
                         sanitized_text, input_hash, headline, verdict, risk_level,
                         requires_human_review, save_reason, community_state, retention_expires_at)
-                   values (%s, %s, %s, %s, %s, 'MANUAL', %s, %s, %s, %s, %s,
+                   values (%s, %s, %s, %s, %s, %s, %s, 'MANUAL', %s, %s, %s, %s, %s,
                            %s, %s, %s, now() + make_interval(days => %s))""",
                 (
                     case_id,
                     user_id,
                     operation_id,
                     operation_id,
+                    resolved_conversation_id,
+                    turn_index,
                     input_type,
                     sanitized_text,
                     digest,
@@ -528,6 +759,16 @@ async def _persist_terminal_result(
                     execution_mode,
                 ),
             )
+        envelope = _envelope(
+            request_id=operation_id,
+            case_id=case_id,
+            conversation_id=resolved_conversation_id,
+            reason=reason,
+            community_state=community_state,
+            result=result,
+            execution_mode=execution_mode,
+            input_text=sanitized_text,
+        )
         await connection.execute(
             """update private.request_operations
                set state = 'COMPLETED', lease_until = null, upstream_started_at = now(),
@@ -595,6 +836,7 @@ def _envelope(
     *,
     request_id: UUID,
     case_id: UUID | None,
+    conversation_id: UUID | None = None,
     reason: str,
     community_state: str,
     result: AIResult,
@@ -607,6 +849,7 @@ def _envelope(
         history=HistoryMeta(
             saved=case_id is not None,
             case_id=case_id,
+            conversation_id=conversation_id,
             save_reason=reason,
             community_eligible=case_id is not None
             and result.community_status == "ELIGIBLE_WITH_CONSENT",
@@ -616,6 +859,13 @@ def _envelope(
         execution_mode=execution_mode,
         input_text=input_text,
     )
+
+
+def _result_narrative(result: AIResult) -> str:
+    presentation = result.presentation or {}
+    narrative = presentation.get("narrative") or {}
+    text = narrative.get("text") if isinstance(narrative, dict) else None
+    return str(text or result.headline)
 
 
 def _cursor_secret(settings: Settings) -> str:
@@ -634,6 +884,8 @@ def image_payload_hash(image_bytes: bytes, request: ImageVerificationRequest) ->
     digest.update(image_bytes)
     digest.update(b"\0")
     digest.update((request.question or "").encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(str(request.conversation_id or "").encode("utf-8"))
     return digest.hexdigest()
 
 
@@ -642,6 +894,7 @@ async def verify_remote_text(
     settings: Settings,
     request: TextVerificationRequest | None,
     community_evidence: list[dict[str, Any]] | None = None,
+    conversation_context: dict[str, str] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
         raise ProductAPIError(
@@ -657,7 +910,11 @@ async def verify_remote_text(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                 },
-                json=remote_text_payload(request, community_evidence),
+                json=remote_text_payload(
+                    request,
+                    community_evidence,
+                    conversation_context=conversation_context,
+                ),
             )
 
     try:
@@ -702,6 +959,7 @@ async def verify_remote_image(
     content_type: str,
     request: ImageVerificationRequest,
     community_evidence: list[dict[str, Any]] | None = None,
+    conversation_context: dict[str, str] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
         raise ProductAPIError(
@@ -718,7 +976,7 @@ async def verify_remote_image(
                 },
                 files={"image": ("verification-image", image_bytes, content_type)},
                 data={
-                    "question": request.question or "",
+                    "question": _image_question_with_context(request, conversation_context),
                     "output_mode": "BOTH",
                     "community_evidence_json": json.dumps(
                         _community_evidence_for_ai(community_evidence),
@@ -761,6 +1019,21 @@ async def verify_remote_image(
         raise ProductAPIError(
             502, "FACT_CHECK_UPSTREAM_INVALID", "Respons layanan AI tidak valid.", True
         ) from error
+
+
+def _image_question_with_context(
+    request: ImageVerificationRequest,
+    conversation_context: dict[str, str] | None,
+) -> str:
+    question = request.question or "Periksa keamanan dan kebenaran gambar ini."
+    if conversation_context is None:
+        return question
+    context = (
+        f"Konteks percakapan: {conversation_context['title']}. "
+        f"Jawaban sebelumnya: {conversation_context['assistant_message']}. "
+        f"Pesan terbaru: {question}"
+    )
+    return context[:500]
 
 
 def _ai_concurrency_limit(settings: Settings) -> asyncio.Semaphore:

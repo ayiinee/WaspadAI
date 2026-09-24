@@ -40,11 +40,28 @@ class PostgresHomeRepository:
             cases_query = await connection.execute(
                 """select p.id as community_id, p.case_id, p.title,
                           p.redacted_text as summary, c.verdict, c.risk_level,
-                          c.requires_human_review, p.published_at as created_at
+                          c.requires_human_review,
+                          private.community_display_name(p.owner_id) as creator_name,
+                          coalesce(p.verified_at, p.published_at) as created_at,
+                          case when media.id is null then null else
+                              '/api/v1/community/' || p.id::text || '/media/' || media.id::text
+                          end as image_url
                      from public.community_posts p
                      join public.verification_cases c on c.id = p.case_id
+                     left join lateral (
+                         select m.id
+                           from public.community_media m
+                          where m.community_id = p.id
+                          order by m.sort_order, m.id
+                          limit 1
+                     ) media on true
                     where p.withdrawn_at is null
-                      and p.status in ('PUBLISHED_UNVERIFIED', 'VERIFIED_EVIDENCE')
+                      and p.status = 'VERIFIED_EVIDENCE'
+                      and c.requires_human_review = false
+                      and upper(c.verdict) in (
+                          'HOAX', 'HOAKS', 'PALSU', 'FALSE',
+                          'VALID', 'BENAR', 'TRUE', 'FAKTA'
+                      )
                       and p.publication_consent_id is not null
                       and exists (
                           select 1
@@ -54,7 +71,7 @@ class PostgresHomeRepository:
                              and consent.revoked_at is null
                              and (consent.expires_at is null or consent.expires_at > now())
                       )
-                    order by p.published_at desc, p.case_id desc
+                    order by coalesce(p.verified_at, p.published_at) desc, p.case_id desc
                     limit %s""",
                 (case_limit,),
             )
@@ -93,12 +110,14 @@ class PostgresHomeRepository:
             HomeCase(
                 community_id=row["community_id"],
                 case_id=row["case_id"],
+                creator_name=row["creator_name"],
                 title=row["title"],
                 summary=row["summary"],
                 verdict=row["verdict"],
                 risk_level=row["risk_level"],
                 requires_human_review=row["requires_human_review"],
                 created_at=row["created_at"],
+                image_url=row["image_url"],
             )
             for row in case_rows
         ]

@@ -215,10 +215,12 @@ async def submit_quiz_attempt(
             """
             insert into public.quiz_attempts
                 (user_id, module_id, module_version, submission_key, total_questions,
-                 correct_answers, score, question_snapshot)
-            values (%s, %s, %s, %s, %s, %s, %s, %s)
+                 correct_answers, score, question_snapshot, reading_duration_seconds,
+                 quiz_duration_seconds)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             on conflict (user_id, module_id, submission_key) do nothing
-            returning id, score, correct_answers, total_questions, question_snapshot
+            returning id, score, correct_answers, total_questions, question_snapshot,
+                      reading_duration_seconds, quiz_duration_seconds
             """,
             (
                 user_id,
@@ -229,6 +231,8 @@ async def submit_quiz_attempt(
                 scoring["correct_answers"],
                 scoring["score"],
                 Jsonb(scoring["snapshot"]),
+                payload.reading_duration_seconds,
+                payload.quiz_duration_seconds,
             ),
         )
         attempt = await inserted.fetchone()
@@ -273,6 +277,8 @@ async def get_learning_progress(
                    latest.score::float as latest_score,
                    latest.correct_answers::int as latest_correct_answers,
                    latest.total_questions::int as latest_total_questions,
+                   latest.reading_duration_seconds::int as reading_duration_seconds,
+                   latest.quiz_duration_seconds::int as quiz_duration_seconds,
                    best.best_score::float as best_score,
                    latest.completed_at as latest_quiz_completed_at,
                    module_progress.first_opened_at, module_progress.last_opened_at
@@ -281,7 +287,8 @@ async def get_learning_progress(
               left join public.lesson_progress lp
                 on lp.lesson_id = l.id and lp.user_id = %s
               left join lateral (
-                  select a.score, a.correct_answers, a.total_questions, a.completed_at
+                  select a.score, a.correct_answers, a.total_questions, a.completed_at,
+                         a.reading_duration_seconds, a.quiz_duration_seconds
                     from public.quiz_attempts a
                    where a.user_id = %s and a.module_id = m.id
                    order by a.completed_at desc, a.id desc
@@ -295,7 +302,9 @@ async def get_learning_progress(
               left join public.learning_module_progress module_progress
                 on module_progress.module_id = m.id and module_progress.user_id = %s
              group by m.id, m.display_order, latest.score, latest.correct_answers,
-                      latest.total_questions, latest.completed_at, best.best_score,
+                      latest.total_questions, latest.completed_at,
+                      latest.reading_duration_seconds, latest.quiz_duration_seconds,
+                      best.best_score,
                       module_progress.first_opened_at, module_progress.last_opened_at
              order by m.display_order, m.id
             """,
@@ -434,7 +443,8 @@ async def _fetch_attempt_by_key(
 ) -> DictRow | None:
     query = await connection.execute(  # type: ignore[attr-defined]
         """
-        select id, score, correct_answers, total_questions, question_snapshot
+        select id, score, correct_answers, total_questions, question_snapshot,
+               reading_duration_seconds, quiz_duration_seconds
           from public.quiz_attempts
          where user_id = %s and module_id = %s and submission_key = %s
         """,
@@ -569,6 +579,8 @@ def _attempt_result(row: DictRow) -> QuizAttemptResult:
         score=float(row["score"]),
         correct_answers=row["correct_answers"],
         total_questions=row["total_questions"],
+        reading_duration_seconds=row.get("reading_duration_seconds") or 0,
+        quiz_duration_seconds=row.get("quiz_duration_seconds") or 0,
         feedback=feedback,
     )
 
@@ -586,6 +598,8 @@ def _progress_item(row: DictRow) -> LearningProgressItem:
         best_score=float(row["best_score"]) if row["best_score"] is not None else None,
         latest_correct_answers=row.get("latest_correct_answers"),
         latest_total_questions=row.get("latest_total_questions"),
+        reading_duration_seconds=row.get("reading_duration_seconds"),
+        quiz_duration_seconds=row.get("quiz_duration_seconds"),
         updated_at=_iso8601(updated_at),
         first_opened_at=_iso8601(row["first_opened_at"]) if row.get("first_opened_at") else None,
         last_opened_at=_iso8601(row["last_opened_at"]) if row.get("last_opened_at") else None,

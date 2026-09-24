@@ -4,6 +4,9 @@
 do $$
 declare
     seed_user uuid;
+    alya_user uuid := '10000000-0000-0000-0000-000000000001';
+    dimas_user uuid := '10000000-0000-0000-0000-000000000002';
+    rifqi_user uuid := '10000000-0000-0000-0000-000000000003';
     unverified_case uuid := '00000000-0000-0000-0000-000000000101';
     verified_case uuid := '00000000-0000-0000-0000-000000000102';
     private_case uuid := '00000000-0000-0000-0000-000000000103';
@@ -51,28 +54,81 @@ declare
         'disclaimer', 'Fixture development.'
     );
 begin
-    select id into seed_user from auth.users order by created_at limit 1;
+    select id into seed_user
+      from auth.users
+     where id not in (alya_user, dimas_user, rifqi_user)
+     order by created_at
+     limit 1;
     if seed_user is null then
         raise notice 'No local Auth user found; community seed skipped.';
     else
-    end if;
 
     insert into public.profiles (id, display_name)
     values (seed_user, 'Pengguna Fixture')
     on conflict (id) do nothing;
 
+    -- Akun kreator fiktif lokal untuk membuat feed Koneksi terasa nyata.
+    insert into auth.users
+        (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+         raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+    values
+        ('00000000-0000-0000-0000-000000000000', alya_user, 'authenticated', 'authenticated',
+         'alya.seed@waspadai.local', crypt('WaspadAI-seed-only', gen_salt('bf')), now(),
+         '{"provider":"email","providers":["email"]}'::jsonb,
+         '{"full_name":"Alya Prameswari"}'::jsonb, now() - interval '40 days', now()),
+        ('00000000-0000-0000-0000-000000000000', dimas_user, 'authenticated', 'authenticated',
+         'dimas.seed@waspadai.local', crypt('WaspadAI-seed-only', gen_salt('bf')), now(),
+         '{"provider":"email","providers":["email"]}'::jsonb,
+         '{"full_name":"Dimas Kurniawan"}'::jsonb, now() - interval '35 days', now()),
+        ('00000000-0000-0000-0000-000000000000', rifqi_user, 'authenticated', 'authenticated',
+         'rifqi.seed@waspadai.local', crypt('WaspadAI-seed-only', gen_salt('bf')), now(),
+         '{"provider":"email","providers":["email"]}'::jsonb,
+         '{"full_name":"Rifqi Aditya"}'::jsonb, now() - interval '28 days', now())
+    on conflict (id) do nothing;
+
+    update public.profiles
+       set display_name = case id
+           when alya_user then 'Alya Prameswari'
+           when dimas_user then 'Dimas Kurniawan'
+           when rifqi_user then 'Rifqi Aditya'
+           else display_name
+       end
+     where id in (alya_user, dimas_user, rifqi_user);
+
+    insert into public.verification_conversations
+        (id, user_id, title, latest_message_preview, latest_message_role,
+         last_verdict, next_turn_index, retention_expires_at)
+    values
+        (unverified_case, seed_user, 'Kasus komunitas belum terverifikasi',
+         'Bukti pada kasus komunitas ini belum cukup untuk memastikan klaim.',
+         'ASSISTANT', 'UNVERIFIED', 2, now() + interval '90 days'),
+        (verified_case, seed_user, 'Kasus komunitas dengan bukti',
+         'Kasus ini sudah memiliki bukti komunitas yang terverifikasi.',
+         'ASSISTANT', 'UNVERIFIED', 2, now() + interval '90 days'),
+        (private_case, seed_user, 'Kasus privat fixture',
+         'Kasus privat ini tersimpan untuk pengguna pemilik.',
+         'ASSISTANT', 'UNVERIFIED', 2, now() + interval '90 days')
+    on conflict (id) do update set
+        title = excluded.title,
+        latest_message_preview = excluded.latest_message_preview,
+        deleted_at = null;
+
     insert into public.verification_cases
-        (id, user_id, product_request_id, input_type, input_source, input_hash,
+        (id, user_id, product_request_id, conversation_id, turn_index,
+         input_type, input_source, input_hash,
          headline, verdict, risk_level, requires_human_review, save_reason,
          community_state, retention_expires_at)
     values
-        (unverified_case, seed_user, unverified_case, 'TEXT', 'MANUAL', repeat('1', 64),
+        (unverified_case, seed_user, unverified_case, unverified_case, 1,
+         'TEXT', 'MANUAL', repeat('1', 64),
          'Kasus komunitas belum terverifikasi', 'UNVERIFIED', 'UNKNOWN', true,
          'UNVERIFIED', 'PUBLISHED_UNVERIFIED', now() + interval '90 days'),
-        (verified_case, seed_user, verified_case, 'TEXT', 'MANUAL', repeat('2', 64),
+        (verified_case, seed_user, verified_case, verified_case, 1,
+         'TEXT', 'MANUAL', repeat('2', 64),
          'Kasus komunitas dengan bukti', 'UNVERIFIED', 'UNKNOWN', true,
          'UNVERIFIED', 'VERIFIED_EVIDENCE', now() + interval '90 days'),
-        (private_case, seed_user, private_case, 'TEXT', 'MANUAL', repeat('3', 64),
+        (private_case, seed_user, private_case, private_case, 1,
+         'TEXT', 'MANUAL', repeat('3', 64),
          'Kasus privat fixture', 'UNVERIFIED', 'UNKNOWN', true,
          'UNVERIFIED', 'PRIVATE', now() + interval '90 days')
     on conflict (id) do nothing;
@@ -221,6 +277,216 @@ begin
         revision = excluded.revision,
         verified_at = excluded.verified_at,
         withdrawn_at = null;
+
+    -- Delapan postingan contoh dengan caption, kreator, waktu, dan hasil final.
+    -- Tiga yang paling baru otomatis menjadi isi "Verifikasi Kasus Terbaru".
+    insert into public.verification_conversations
+        (id, user_id, title, latest_message_preview, latest_message_role,
+         last_verdict, next_turn_index, retention_expires_at, created_at, updated_at)
+    select seeded.id, seeded.user_id, seeded.title,
+           seeded.title, 'ASSISTANT', seeded.verdict, 2,
+           now() + interval '90 days', seeded.created_at, seeded.created_at
+      from (values
+        ('10000000-0000-0000-0000-000000000611'::uuid, alya_user, 'Pesan pemblokiran rekening meminta klik tautan', 'HOAX', now() - interval '20 minutes'),
+        ('10000000-0000-0000-0000-000000000612'::uuid, dimas_user, 'Foto banjir lingkungan disebut berasal dari luar negeri', 'VALID', now() - interval '2 hours'),
+        ('10000000-0000-0000-0000-000000000613'::uuid, rifqi_user, 'Giveaway meminta data pribadi dan biaya klaim', 'HOAX', now() - interval '5 hours'),
+        ('10000000-0000-0000-0000-000000000614'::uuid, seed_user, 'Potongan video pidato tanpa konteks utuh', 'HOAX', now() - interval '1 day'),
+        ('10000000-0000-0000-0000-000000000615'::uuid, alya_user, 'Klaim pencopotan pejabat tanpa pengumuman resmi', 'HOAX', now() - interval '2 days'),
+        ('10000000-0000-0000-0000-000000000616'::uuid, dimas_user, 'Domain layanan perbankan sesuai kanal resmi', 'VALID', now() - interval '3 days'),
+        ('10000000-0000-0000-0000-000000000617'::uuid, rifqi_user, 'Undangan digital berbentuk APK berbahaya', 'HOAX', now() - interval '4 days'),
+        ('10000000-0000-0000-0000-000000000618'::uuid, seed_user, 'Jadwal layanan publik sesuai pengumuman resmi', 'VALID', now() - interval '5 days')
+      ) as seeded(id, user_id, title, verdict, created_at)
+    on conflict (id) do update set
+        title = excluded.title,
+        latest_message_preview = excluded.latest_message_preview,
+        last_verdict = excluded.last_verdict,
+        updated_at = excluded.updated_at,
+        deleted_at = null;
+
+    insert into public.verification_cases
+        (id, user_id, product_request_id, conversation_id, turn_index,
+         input_type, input_source, input_hash,
+         headline, verdict, risk_level, requires_human_review, save_reason,
+         community_state, retention_expires_at, created_at)
+    values
+        ('10000000-0000-0000-0000-000000000611', alya_user, '10000000-0000-0000-0000-000000000611', '10000000-0000-0000-0000-000000000611', 1, 'IMAGE', 'MANUAL', repeat('a', 64),
+         'Pesan pemblokiran rekening meminta klik tautan', 'HOAX', 'HIGH', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '20 minutes'),
+        ('10000000-0000-0000-0000-000000000612', dimas_user, '10000000-0000-0000-0000-000000000612', '10000000-0000-0000-0000-000000000612', 1, 'IMAGE', 'MANUAL', repeat('b', 64),
+         'Foto banjir lingkungan disebut berasal dari luar negeri', 'VALID', 'LOW', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '2 hours'),
+        ('10000000-0000-0000-0000-000000000613', rifqi_user, '10000000-0000-0000-0000-000000000613', '10000000-0000-0000-0000-000000000613', 1, 'IMAGE', 'MANUAL', repeat('c', 64),
+         'Giveaway meminta data pribadi dan biaya klaim', 'HOAX', 'HIGH', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '5 hours'),
+        ('10000000-0000-0000-0000-000000000614', seed_user, '10000000-0000-0000-0000-000000000614', '10000000-0000-0000-0000-000000000614', 1, 'IMAGE', 'MANUAL', repeat('d', 64),
+         'Potongan video pidato tanpa konteks utuh', 'HOAX', 'HIGH', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '1 day'),
+        ('10000000-0000-0000-0000-000000000615', alya_user, '10000000-0000-0000-0000-000000000615', '10000000-0000-0000-0000-000000000615', 1, 'IMAGE', 'MANUAL', repeat('e', 64),
+         'Klaim pencopotan pejabat tanpa pengumuman resmi', 'HOAX', 'HIGH', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '2 days'),
+        ('10000000-0000-0000-0000-000000000616', dimas_user, '10000000-0000-0000-0000-000000000616', '10000000-0000-0000-0000-000000000616', 1, 'TEXT', 'MANUAL', repeat('f', 64),
+         'Domain layanan perbankan sesuai kanal resmi', 'VALID', 'LOW', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '3 days'),
+        ('10000000-0000-0000-0000-000000000617', rifqi_user, '10000000-0000-0000-0000-000000000617', '10000000-0000-0000-0000-000000000617', 1, 'TEXT', 'MANUAL', repeat('1', 64),
+         'Undangan digital berbentuk APK berbahaya', 'HOAX', 'HIGH', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '4 days'),
+        ('10000000-0000-0000-0000-000000000618', seed_user, '10000000-0000-0000-0000-000000000618', '10000000-0000-0000-0000-000000000618', 1, 'TEXT', 'MANUAL', repeat('2', 64),
+         'Jadwal layanan publik sesuai pengumuman resmi', 'VALID', 'LOW', false, 'ALL_POLICY', 'VERIFIED_EVIDENCE', now() + interval '90 days', now() - interval '5 days')
+    on conflict (id) do update set
+        headline = excluded.headline,
+        verdict = excluded.verdict,
+        risk_level = excluded.risk_level,
+        requires_human_review = excluded.requires_human_review,
+        community_state = excluded.community_state,
+        created_at = excluded.created_at,
+        deleted_at = null;
+
+    insert into public.verification_results
+        (case_id, factual_status, source_authenticity, sender_identity,
+         channel_status, scam_risk, content_authenticity, evidence_sufficiency,
+         result_json, execution_mode)
+    select c.id,
+           case when c.verdict = 'HOAX' then 'FALSE' else 'SUPPORTED' end,
+           'VERIFIED', 'VERIFIED', 'VERIFIED',
+           case when c.verdict = 'HOAX' then 'HIGH' else 'LOW' end,
+           'VERIFIED', .92,
+           result_json || jsonb_build_object(
+               'verdict', c.verdict,
+               'risk_level', c.risk_level,
+               'headline', c.headline,
+               'requires_human_review', false,
+               'community_status', 'VERIFIED_EVIDENCE'
+           ),
+           'MOCK'
+      from public.verification_cases c
+     where c.id between '10000000-0000-0000-0000-000000000611'::uuid
+                    and '10000000-0000-0000-0000-000000000618'::uuid
+    on conflict (case_id) do update set
+        factual_status = excluded.factual_status,
+        scam_risk = excluded.scam_risk,
+        result_json = excluded.result_json;
+
+    insert into private.consent_records
+        (id, user_id, scope, case_id, content_hash, policy_version, granted_at)
+    values
+        ('10000000-0000-0000-0000-000000000811', alya_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000611', repeat('a', 64), 'community-v1', now() - interval '20 minutes'),
+        ('10000000-0000-0000-0000-000000000812', dimas_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000612', repeat('b', 64), 'community-v1', now() - interval '2 hours'),
+        ('10000000-0000-0000-0000-000000000813', rifqi_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000613', repeat('c', 64), 'community-v1', now() - interval '5 hours'),
+        ('10000000-0000-0000-0000-000000000814', seed_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000614', repeat('d', 64), 'community-v1', now() - interval '1 day'),
+        ('10000000-0000-0000-0000-000000000815', alya_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000615', repeat('e', 64), 'community-v1', now() - interval '2 days'),
+        ('10000000-0000-0000-0000-000000000816', dimas_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000616', repeat('f', 64), 'community-v1', now() - interval '3 days'),
+        ('10000000-0000-0000-0000-000000000817', rifqi_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000617', repeat('1', 64), 'community-v1', now() - interval '4 days'),
+        ('10000000-0000-0000-0000-000000000818', seed_user, 'COMMUNITY_PUBLICATION', '10000000-0000-0000-0000-000000000618', repeat('2', 64), 'community-v1', now() - interval '5 days')
+    on conflict (id) do update set revoked_at = null, expires_at = null;
+
+    insert into public.community_posts
+        (id, case_id, owner_id, title, redacted_text, status,
+         publication_consent_id, content_hash, revision, published_at, verified_at)
+    values
+        ('10000000-0000-0000-0000-000000000711', '10000000-0000-0000-0000-000000000611', alya_user,
+         'Pesan pemblokiran rekening meminta klik tautan',
+         'Aku menerima pesan yang mendesak untuk verifikasi rekening lewat tautan pendek. Hasil pemeriksaan menunjukkan halaman tersebut bukan kanal resmi dan bertujuan mengambil data masuk.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000811', repeat('a', 64), 1, now() - interval '20 minutes', now() - interval '18 minutes'),
+        ('10000000-0000-0000-0000-000000000712', '10000000-0000-0000-0000-000000000612', dimas_user,
+         'Foto banjir ini benar, tetapi narasinya salah lokasi',
+         'Foto memang menunjukkan banjir lingkungan setelah hujan deras. Penelusuran konteks membuktikan lokasinya di Indonesia, bukan di negara lain seperti narasi yang beredar.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000812', repeat('b', 64), 1, now() - interval '2 hours', now() - interval '110 minutes'),
+        ('10000000-0000-0000-0000-000000000713', '10000000-0000-0000-0000-000000000613', rifqi_user,
+         'Giveaway berhadiah meminta biaya klaim',
+         'Unggahan mengaku memberikan hadiah besar tetapi meminta data pribadi dan transfer biaya administrasi. Akun serta mekanisme giveaway tidak dapat diverifikasi.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000813', repeat('c', 64), 1, now() - interval '5 hours', now() - interval '290 minutes'),
+        ('10000000-0000-0000-0000-000000000714', '10000000-0000-0000-0000-000000000614', seed_user,
+         'Potongan video pidato kehilangan konteks',
+         'Video pendek yang ramai dibagikan memotong bagian penting dari pidato. Rekaman utuh menunjukkan pembicaraan berbeda dari klaim pada caption viral.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000814', repeat('d', 64), 1, now() - interval '1 day', now() - interval '23 hours'),
+        ('10000000-0000-0000-0000-000000000715', '10000000-0000-0000-0000-000000000615', alya_user,
+         'Klaim pencopotan pejabat belum pernah diumumkan',
+         'Tidak ditemukan keputusan atau pengumuman resmi yang mendukung klaim pencopotan tersebut. Gambar judul berita telah disunting dan sumber aslinya membahas topik lain.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000815', repeat('e', 64), 1, now() - interval '2 days', now() - interval '47 hours'),
+        ('10000000-0000-0000-0000-000000000716', '10000000-0000-0000-0000-000000000616', dimas_user,
+         'Alamat domain layanan perbankan sesuai kanal resmi',
+         'Alamat situs yang diperiksa cocok dengan domain yang tercantum pada aplikasi dan pusat bantuan resmi. Tetap ketik alamat secara mandiri dan jangan masuk dari tautan pesan.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000816', repeat('f', 64), 1, now() - interval '3 days', now() - interval '70 hours'),
+        ('10000000-0000-0000-0000-000000000717', '10000000-0000-0000-0000-000000000617', rifqi_user,
+         'Undangan digital berbentuk APK adalah modus berbahaya',
+         'File undangan dikirim sebagai aplikasi APK dan meminta akses SMS. Format ini bukan undangan biasa dan berisiko mencuri kode OTP serta data perangkat.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000817', repeat('1', 64), 1, now() - interval '4 days', now() - interval '94 hours'),
+        ('10000000-0000-0000-0000-000000000718', '10000000-0000-0000-0000-000000000618', seed_user,
+         'Jadwal layanan publik sesuai pengumuman resmi',
+         'Jadwal yang beredar cocok dengan pengumuman pada kanal resmi instansi. Tanggal, lokasi, dan nomor layanan telah diperiksa ulang.',
+         'VERIFIED_EVIDENCE', '10000000-0000-0000-0000-000000000818', repeat('2', 64), 1, now() - interval '5 days', now() - interval '118 hours')
+    on conflict (case_id) do update set
+        owner_id = excluded.owner_id,
+        title = excluded.title,
+        redacted_text = excluded.redacted_text,
+        status = excluded.status,
+        publication_consent_id = excluded.publication_consent_id,
+        content_hash = excluded.content_hash,
+        published_at = excluded.published_at,
+        verified_at = excluded.verified_at,
+        withdrawn_at = null;
+
+    -- Media pada bucket khusus ini dibaca dari backend/assets/community saat demo lokal.
+    insert into private.stored_assets
+        (id, user_id, case_id, bucket, object_path, purpose, mime_type, size_bytes, sha256)
+    values
+        ('10000000-0000-0000-0000-000000000911', alya_user, '10000000-0000-0000-0000-000000000611', 'seed-assets', 'phishing-account.png', 'SCREENSHOT_OPT_IN', 'image/png', 1939479, repeat('a', 64)),
+        ('10000000-0000-0000-0000-000000000912', dimas_user, '10000000-0000-0000-0000-000000000612', 'seed-assets', 'neighborhood-flood.png', 'SCREENSHOT_OPT_IN', 'image/png', 2793477, repeat('b', 64)),
+        ('10000000-0000-0000-0000-000000000913', rifqi_user, '10000000-0000-0000-0000-000000000613', 'seed-assets', 'fake-giveaway.png', 'SCREENSHOT_OPT_IN', 'image/png', 1931634, repeat('c', 64)),
+        ('10000000-0000-0000-0000-000000000914', seed_user, '10000000-0000-0000-0000-000000000614', 'seed-assets', 'prabowo-video.png', 'SCREENSHOT_OPT_IN', 'image/png', 1070596, repeat('d', 64)),
+        ('10000000-0000-0000-0000-000000000915', alya_user, '10000000-0000-0000-0000-000000000615', 'seed-assets', 'gibran-rumor.png', 'SCREENSHOT_OPT_IN', 'image/png', 186941, repeat('e', 64))
+    on conflict (id) do update set
+        object_path = excluded.object_path,
+        size_bytes = excluded.size_bytes,
+        deleted_at = null;
+
+    insert into public.community_media
+        (id, community_id, asset_id, media_type, sort_order)
+    values
+        ('10000000-0000-0000-0000-000000000921', '10000000-0000-0000-0000-000000000711', '10000000-0000-0000-0000-000000000911', 'IMAGE', 0),
+        ('10000000-0000-0000-0000-000000000922', '10000000-0000-0000-0000-000000000712', '10000000-0000-0000-0000-000000000912', 'IMAGE', 0),
+        ('10000000-0000-0000-0000-000000000923', '10000000-0000-0000-0000-000000000713', '10000000-0000-0000-0000-000000000913', 'IMAGE', 0),
+        ('10000000-0000-0000-0000-000000000924', '10000000-0000-0000-0000-000000000714', '10000000-0000-0000-0000-000000000914', 'IMAGE', 0),
+        ('10000000-0000-0000-0000-000000000925', '10000000-0000-0000-0000-000000000715', '10000000-0000-0000-0000-000000000915', 'IMAGE', 0)
+    on conflict (id) do nothing;
+
+    insert into public.community_votes (post_id, user_id, vote, reasoning, created_at)
+    values
+        ('10000000-0000-0000-0000-000000000711', dimas_user, 'HOAKS', 'Tautan tidak menggunakan domain resmi dan meminta kredensial.', now() - interval '15 minutes'),
+        ('10000000-0000-0000-0000-000000000711', rifqi_user, 'HOAKS', 'Bahasa mendesak dan tautan pendek merupakan pola phishing.', now() - interval '14 minutes'),
+        ('10000000-0000-0000-0000-000000000712', alya_user, 'VALID', 'Foto asli, tetapi konteks lokasi pada caption awal memang keliru.', now() - interval '100 minutes'),
+        ('10000000-0000-0000-0000-000000000712', rifqi_user, 'VALID', 'Konteks telah cocok dengan sumber lokal.', now() - interval '95 minutes'),
+        ('10000000-0000-0000-0000-000000000713', alya_user, 'HOAKS', 'Akun tidak resmi dan meminta biaya sebelum hadiah diterima.', now() - interval '4 hours'),
+        ('10000000-0000-0000-0000-000000000713', dimas_user, 'HOAKS', 'Mekanisme hadiah tidak mempunyai syarat resmi yang dapat dicek.', now() - interval '4 hours'),
+        ('10000000-0000-0000-0000-000000000714', alya_user, 'HOAKS', 'Potongan video menghilangkan kalimat sebelum dan sesudahnya.', now() - interval '22 hours'),
+        ('10000000-0000-0000-0000-000000000715', dimas_user, 'HOAKS', 'Tidak ada keputusan resmi yang mendukung klaim.', now() - interval '46 hours'),
+        ('10000000-0000-0000-0000-000000000716', alya_user, 'VALID', 'Domain cocok dengan pusat bantuan resmi.', now() - interval '69 hours'),
+        ('10000000-0000-0000-0000-000000000717', dimas_user, 'HOAKS', 'File APK dari chat bukan undangan digital yang aman.', now() - interval '93 hours'),
+        ('10000000-0000-0000-0000-000000000718', alya_user, 'VALID', 'Tanggal dan lokasi sama dengan pengumuman instansi.', now() - interval '117 hours')
+    on conflict (post_id, user_id) do update set
+        vote = excluded.vote,
+        reasoning = excluded.reasoning,
+        created_at = excluded.created_at,
+        updated_at = excluded.created_at;
+
+    insert into public.community_likes (post_id, user_id, created_at)
+    values
+        ('10000000-0000-0000-0000-000000000711', seed_user, now() - interval '12 minutes'),
+        ('10000000-0000-0000-0000-000000000711', dimas_user, now() - interval '11 minutes'),
+        ('10000000-0000-0000-0000-000000000712', seed_user, now() - interval '80 minutes'),
+        ('10000000-0000-0000-0000-000000000712', alya_user, now() - interval '75 minutes'),
+        ('10000000-0000-0000-0000-000000000713', seed_user, now() - interval '3 hours'),
+        ('10000000-0000-0000-0000-000000000714', alya_user, now() - interval '20 hours'),
+        ('10000000-0000-0000-0000-000000000715', dimas_user, now() - interval '44 hours')
+    on conflict (post_id, user_id) do nothing;
+
+    insert into public.community_views (post_id, user_id, first_seen_at, last_seen_at)
+    select post.id, viewer.id, post.published_at, greatest(post.published_at, now() - interval '5 minutes')
+      from public.community_posts post
+      cross join (values (seed_user), (alya_user), (dimas_user), (rifqi_user)) viewer(id)
+     where post.id between '10000000-0000-0000-0000-000000000711'::uuid
+                       and '10000000-0000-0000-0000-000000000718'::uuid
+    on conflict (post_id, user_id) do update set last_seen_at = excluded.last_seen_at;
+
+    insert into public.community_shares (id, post_id, user_id, created_at)
+    values
+        ('10000000-0000-0000-0000-000000000931', '10000000-0000-0000-0000-000000000711', seed_user, now() - interval '8 minutes'),
+        ('10000000-0000-0000-0000-000000000932', '10000000-0000-0000-0000-000000000712', alya_user, now() - interval '70 minutes'),
+        ('10000000-0000-0000-0000-000000000933', '10000000-0000-0000-0000-000000000713', dimas_user, now() - interval '3 hours')
+    on conflict (id) do nothing;
 
     end if;
 

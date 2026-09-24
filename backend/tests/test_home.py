@@ -64,12 +64,14 @@ def test_home_route_delegates_to_service(monkeypatch: pytest.MonkeyPatch) -> Non
                 {
                     "community_id": uuid4(),
                     "case_id": uuid4(),
+                    "creator_name": "Alya Prameswari",
                     "title": "Undangan APK berbahaya",
                     "summary": "File APK tidak berasal dari kanal resmi.",
                     "verdict": "UNVERIFIED",
                     "risk_level": "HIGH",
                     "requires_human_review": True,
                     "created_at": now,
+                    "image_url": None,
                 }
             ],
             learning_recommendations=[],
@@ -107,12 +109,14 @@ def test_home_service_maps_domain_snapshot() -> None:
                     HomeCase(
                         community_id=uuid4(),
                         case_id=case_id,
+                        creator_name="Alya Prameswari",
                         title="Kasus uji",
                         summary="Ringkasan aman untuk halaman beranda.",
                         verdict="SUPPORTED",
                         risk_level="LOW",
                         requires_human_review=False,
                         created_at=now,
+                        image_url="/api/v1/community/post/media/image",
                     )
                 ],
                 learning_recommendations=[
@@ -149,12 +153,14 @@ def test_postgres_home_repository_uses_scoped_queries(
                 {
                     "community_id": community_id,
                     "case_id": case_id,
+                    "creator_name": "Dimas Kurniawan",
                     "title": "Kasus terbaru",
                     "summary": "Alasan utama pemeriksaan.",
                     "verdict": "UNVERIFIED",
                     "risk_level": "HIGH",
                     "requires_human_review": True,
                     "created_at": now,
+                    "image_url": None,
                 }
             ],
             [
@@ -185,6 +191,7 @@ def test_postgres_home_repository_uses_scoped_queries(
     assert result.profile == HomeProfile("Putu Alvin")
     assert result.recent_cases[0].case_id == case_id
     assert result.recent_cases[0].community_id == community_id
+    assert result.recent_cases[0].creator_name == "Dimas Kurniawan"
     assert result.learning_recommendations[0].progress_percent == 50.0
     assert connection.executed[1][1] == (3,)
     assert connection.executed[2][1] == (user_id, 2)
