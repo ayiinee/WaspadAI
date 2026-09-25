@@ -182,7 +182,15 @@ private fun WaspadAiApp(
             baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
         ),
     )
+    val profileViewModel: ProfileViewModel = viewModel(
+        factory = ProfileViewModel.Factory(
+            repository = app.profileRepository,
+            tokenProvider = app.authRepository,
+            baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
+        ),
+    )
     val learningUiState by learningViewModel.uiState.collectAsStateWithLifecycle()
+    val profileState by profileViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(currentRoute) {
         if (currentRoute == LearningRouteName) learningViewModel.onAction(LearningAction.Refresh)
     }
@@ -244,7 +252,7 @@ private fun WaspadAiApp(
                 communityViewModel.onAction(CommunityAction.PrefetchBackend)
                 verificationViewModel.onAction(VerificationAction.RefreshHistory)
             }
-            CommunityRouteName -> communityViewModel.onAction(CommunityAction.InitScreen)
+            CommunityRouteName -> communityViewModel.onAction(CommunityAction.RefreshBackend)
         }
     }
 
@@ -421,6 +429,8 @@ private fun WaspadAiApp(
                 viewModel = communityViewModel,
                 initialPostId = sharedCaseId,
                 onDestinationSelected = navigateToTopLevel,
+                currentUserName = profileState.profile?.displayName,
+                currentUserAvatarUrl = profileState.profile?.avatarUrl,
             )
         }
         composable(LearningRouteName) {
@@ -431,14 +441,6 @@ private fun WaspadAiApp(
             )
         }
         composable(ProfileRouteName) {
-            val profileViewModel: ProfileViewModel = viewModel(
-                factory = ProfileViewModel.Factory(
-                    repository = app.profileRepository,
-                    tokenProvider = app.authRepository,
-                    baseUrl = BuildConfig.WASPADAI_API_BASE_URL,
-                ),
-            )
-            val profileState by profileViewModel.uiState.collectAsStateWithLifecycle()
             ProfileRoute(
                 state = profileState,
                 accessToken = profileState.accessToken,

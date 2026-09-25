@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,6 +62,8 @@ import coil3.request.ImageRequest
 import id.waspadai.app.feature.profile.domain.ProfileActivityItem
 import id.waspadai.app.feature.profile.domain.ProfileLearningItem
 import id.waspadai.app.feature.profile.domain.UserProfile
+import id.waspadai.app.core.ui.SkeletonBlock
+import id.waspadai.app.core.ui.rememberSkeletonBrush
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAIDarkBlue
 import id.waspadai.app.ui.theme.WaspadAIHoax
@@ -490,13 +493,104 @@ private fun ProfileSettingsRow(
 
 @Composable
 internal fun ProfileLoadingState() {
-    Box(
+    val brush = rememberSkeletonBrush()
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("profile-loading"),
-        contentAlignment = Alignment.Center,
+            .testTag("profile-loading")
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        CircularProgressIndicator(color = WaspadAIBlue)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("profile-skeleton"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            SkeletonBlock(
+                modifier = Modifier.size(72.dp),
+                shape = CircleShape,
+                brush = brush,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                SkeletonBlock(
+                    modifier = Modifier.fillMaxWidth(.58f).height(18.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    brush = brush,
+                )
+                SkeletonBlock(
+                    modifier = Modifier.fillMaxWidth(.76f).height(14.dp),
+                    shape = RoundedCornerShape(7.dp),
+                    brush = brush,
+                )
+                SkeletonBlock(
+                    modifier = Modifier.fillMaxWidth(.9f).height(13.dp),
+                    shape = RoundedCornerShape(7.dp),
+                    brush = brush,
+                )
+            }
+            SkeletonBlock(
+                modifier = Modifier.size(36.dp),
+                shape = CircleShape,
+                brush = brush,
+            )
+        }
+
+        SkeletonBlock(
+            modifier = Modifier.width(128.dp).height(20.dp),
+            shape = RoundedCornerShape(8.dp),
+            brush = brush,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            repeat(4) {
+                ProfileMenuSkeleton(brush)
+            }
+        }
+        SkeletonBlock(
+            modifier = Modifier.width(72.dp).height(20.dp),
+            shape = RoundedCornerShape(8.dp),
+            brush = brush,
+        )
+        ProfileMenuSkeleton(brush)
+    }
+}
+
+@Composable
+private fun ProfileMenuSkeleton(brush: androidx.compose.ui.graphics.Brush) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        SkeletonBlock(
+            modifier = Modifier.size(38.dp),
+            shape = RoundedCornerShape(12.dp),
+            brush = brush,
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            SkeletonBlock(
+                modifier = Modifier.fillMaxWidth(.52f).height(15.dp),
+                shape = RoundedCornerShape(7.dp),
+                brush = brush,
+            )
+            SkeletonBlock(
+                modifier = Modifier.fillMaxWidth(.78f).height(12.dp),
+                shape = RoundedCornerShape(6.dp),
+                brush = brush,
+            )
+        }
+        SkeletonBlock(
+            modifier = Modifier.size(20.dp),
+            shape = CircleShape,
+            brush = brush,
+        )
     }
 }
 

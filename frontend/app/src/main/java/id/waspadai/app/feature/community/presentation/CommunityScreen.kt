@@ -59,9 +59,9 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Verified
@@ -75,6 +75,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -134,6 +136,10 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.ImageRequest
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
 import id.waspadai.app.core.ui.SkeletonBlock
@@ -163,6 +169,18 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+private fun CommunityPost.withCurrentUserProfile(
+    displayName: String?,
+    profileAvatarUrl: String?,
+): CommunityPost = if (isOwner) {
+    copy(
+        author = displayName?.trim().takeUnless { it.isNullOrEmpty() } ?: author,
+        avatarUrl = profileAvatarUrl,
+    )
+} else {
+    this
+}
+
 @Composable
 fun CommunityRoute(
     repository: CommunityRepository,
@@ -170,6 +188,8 @@ fun CommunityRoute(
     defaultAccessToken: String,
     onBack: () -> Unit,
     onDestinationSelected: (String) -> Unit = {},
+    currentUserName: String? = null,
+    currentUserAvatarUrl: String? = null,
     initialPostId: String? = null,
     viewModel: CommunityViewModel = viewModel(
         factory = CommunityViewModel.Factory(
@@ -185,6 +205,7 @@ fun CommunityRoute(
     val context = LocalContext.current
     var selectedPostId by rememberSaveable { mutableStateOf(initialPostId) }
     val selectedPost = uiState.posts.firstOrNull { it.id == selectedPostId }
+        ?.withCurrentUserProfile(currentUserName, currentUserAvatarUrl)
     val timelineState = rememberCommunityTimelineState(uiState.selectedFeedScope)
 
     // Trigger auto-refresh saat layar pertama kali ditampilkan
@@ -282,6 +303,8 @@ fun CommunityRoute(
                 },
                 onOpenPost = { selectedPostId = it.id },
                 onDestinationSelected = onDestinationSelected,
+                currentUserName = currentUserName,
+                currentUserAvatarUrl = currentUserAvatarUrl,
             )
         }
     }
@@ -296,6 +319,8 @@ fun CommunityScreen(
     onSharePost: (CommunityPost) -> Unit,
     onOpenPost: (CommunityPost) -> Unit,
     onDestinationSelected: (String) -> Unit,
+    currentUserName: String? = null,
+    currentUserAvatarUrl: String? = null,
     modifier: Modifier = Modifier,
 ) {
     var deletingPost by remember { mutableStateOf<CommunityPost?>(null) }
@@ -354,8 +379,7 @@ fun CommunityScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(bottom = bottomNavigationPadding),
+                    .padding(innerPadding),
             ) {
             // Header tetap terlihat saat daftar koneksi digulir.
             CommunityPageHeader(
@@ -411,8 +435,11 @@ fun CommunityScreen(
                 val scope = scopes[page]
                 CommunityFeedPage(
                     scope = scope,
-                    posts = uiState.visiblePosts(scope),
+                    posts = uiState.visiblePosts(scope).map { post ->
+                        post.withCurrentUserProfile(currentUserName, currentUserAvatarUrl)
+                    },
                     listState = timelineState.listState(scope),
+                    bottomContentPadding = bottomNavigationPadding,
                     accessToken = uiState.accessTokenDraft,
                     isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading &&
                         uiState.posts.isNotEmpty(),
@@ -541,6 +568,7 @@ private fun CommunityFeedPage(
     scope: CommunityFeedScope,
     posts: List<CommunityPost>,
     listState: LazyListState,
+    bottomContentPadding: androidx.compose.ui.unit.Dp = 0.dp,
     accessToken: String,
     isRefreshing: Boolean,
     showInitialSkeleton: Boolean,
@@ -571,7 +599,10 @@ private fun CommunityFeedPage(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("community-feed-${scope.name}"),
-            contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
+            contentPadding = PaddingValues(
+                top = 14.dp,
+                bottom = bottomContentPadding + 18.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             if (showInitialSkeleton) {
@@ -959,14 +990,34 @@ private fun CommunityPostCard(
     ) {
         Column(modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(post.avatarRes),
-                    contentDescription = "Foto ${post.author}",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape),
-                )
+                if (post.avatarUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(post.avatarUrl)
+                            .httpHeaders(
+                                NetworkHeaders.Builder()
+                                    .set("Authorization", "Bearer $accessToken")
+                                    .build(),
+                            )
+                            .build(),
+                        contentDescription = "Foto ${post.author}",
+                        contentScale = ContentScale.Crop,
+                        placeholder = painterResource(post.avatarRes),
+                        error = painterResource(post.avatarRes),
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape),
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(post.avatarRes),
+                        contentDescription = "Foto ${post.author}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape),
+                    )
+                }
                 Spacer(Modifier.width(13.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -992,15 +1043,30 @@ private fun CommunityPostCard(
                     )
                 }
                 if (post.isOwner) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Delete,
-                            contentDescription = "Hapus postingan",
-                            tint = WaspadAIHoax,
-                        )
+                    var isOwnerMenuExpanded by remember(post.id) { mutableStateOf(false) }
+                    Box {
+                        IconButton(
+                            onClick = { isOwnerMenuExpanded = true },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "Menu postingan",
+                                tint = Color.Black.copy(alpha = .68f),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = isOwnerMenuExpanded,
+                            onDismissRequest = { isOwnerMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Hapus", color = WaspadAIHoax) },
+                                onClick = {
+                                    isOwnerMenuExpanded = false
+                                    onDelete()
+                                },
+                            )
+                        }
                     }
                 }
             }

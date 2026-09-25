@@ -562,7 +562,7 @@ fun AnalysisCard(
                     Text("✦", color = BrandBlue, fontSize = 14.sp)
                 }
                 Spacer(Modifier.width(8.dp))
-                Text("Hasil Analisis", color = BrandBlue, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text("Hasil Pemeriksaan", color = BrandBlue, fontWeight = FontWeight.Bold, fontSize = 17.sp)
             }
             if (isSample) {
                 Text("CONTOH TAMPILAN", color = Color(0xFF728995), fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -583,68 +583,22 @@ fun AnalysisCard(
                     if (index > 0) Spacer(Modifier.height(8.dp))
                     Text(paragraph, color = Ink, fontSize = 16.sp, lineHeight = 22.sp)
                 }
+                Spacer(Modifier.height(12.dp))
+                RiskLabel(result.riskLevel)
                 return@Column
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ResultPill("Truth: ${result.verdict.label}")
-                ResultPill("Fakta: ${result.factualStatus.label}")
-            }
-            Spacer(Modifier.height(10.dp))
             Text(result.narrative, color = Ink, fontSize = 16.sp, lineHeight = 22.sp)
+            Spacer(Modifier.height(12.dp))
+            RiskLabel(result.riskLevel)
             if (result.reasons.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
-                Text("Mengapa berisiko", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Alasan Utama", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 result.reasons.forEach { Bullet(it) }
             }
             if (result.recommendedActions.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                Text("Tindakan yang disarankan", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Langkah Paling Aman", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 result.recommendedActions.forEach { Bullet(it) }
-            }
-            Spacer(Modifier.height(13.dp))
-            RiskLabel(result.riskLevel)
-            if (result.evidence.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                Text("Evidence", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                result.evidence.forEach { evidence ->
-                    val evidenceTitle = evidence.title
-                        .ifBlank { evidence.publisher.ifBlank { "Bukti pendukung" } }
-                        .limitWords(20)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = SoftBlue),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(
-                                evidenceTitle,
-                                color = Ink,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (evidence.url.isNotBlank()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    evidence.url,
-                                    color = Color(0xFF557383),
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Button(
-                                    onClick = {
-                                        runCatching {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(evidence.url)))
-                                        }
-                                    },
-                                ) { Text("Lihat berita") }
-                            }
-                        }
-                    }
-                }
             }
             if (result.sources.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
@@ -703,20 +657,6 @@ fun AnalysisCard(
             }
         }
     }
-}
-
-@Composable
-private fun ResultPill(text: String) {
-    Text(
-        text = text,
-        color = BrandBlue,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(SoftBlue)
-            .padding(horizontal = 9.dp, vertical = 5.dp),
-    )
 }
 
 @Composable

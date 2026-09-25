@@ -32,6 +32,7 @@ data class CommunityPost(
     val statusLabel: String = "Belum diverifikasi",
     val canReceiveAssessment: Boolean = true,
     @DrawableRes val avatarRes: Int,
+    val avatarUrl: String? = null,
     @DrawableRes val evidenceRes: Int? = null,
     val imageUrl: String? = null,
     val media: List<CommunityMedia> = emptyList(),

@@ -132,6 +132,17 @@ class ProfileScreenTest {
 
         composeRule.onNodeWithTag("profile-header").assertIsDisplayed()
         composeRule.onNodeWithTag("profile-loading").assertIsDisplayed()
+        composeRule.onNodeWithTag("profile-skeleton").assertIsDisplayed()
+    }
+
+    @Test
+    fun refreshWithExistingProfileKeepsProfileContentVisible() {
+        composeRule.setContent {
+            TestProfileRoute(state = dashboardState().copy(loading = true))
+        }
+
+        composeRule.onNodeWithText("Pengguna Uji").assertIsDisplayed()
+        composeRule.onNodeWithTag("profile-skeleton").assertDoesNotExist()
     }
 
     @Test

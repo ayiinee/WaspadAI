@@ -34,6 +34,10 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Visibility
@@ -140,6 +144,7 @@ private data class LearningSessionStats(
 private data class LearningStatus(
     val kind: String,
     val questionIndex: Int = 0,
+    val progressPercent: Float = 0f,
 )
 
 private fun formatElapsed(totalSeconds: Long): String =
@@ -277,9 +282,9 @@ fun LearningScreen(
         .firstOrNull { it.moduleId == material.moduleId }
         ?.let { module ->
             when {
-                module.progressPercent >= 100 -> LearningStatus("completed")
-                module.completedLessons > 0 -> LearningStatus("in_progress")
-                else -> null
+                module.progressPercent >= 100 -> LearningStatus("completed", progressPercent = 1f)
+                module.progressPercent > 0 -> LearningStatus("in_progress", progressPercent = (module.progressPercent / 100).toFloat())
+                else -> LearningStatus("not_started", progressPercent = 0f)
             }
         }
 
@@ -334,6 +339,9 @@ private fun LearningListScreen(
     onDestinationSelected: (String) -> Unit,
 ) {
     val completedCount = materials.count { statusFor(it)?.kind == "completed" }
+    val totalProgress = if (materials.isEmpty()) 0f else materials
+        .map { statusFor(it)?.progressPercent ?: 0f }
+        .average().toFloat()
     val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -352,30 +360,9 @@ private fun LearningListScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 item {
-                    Column(
-                        modifier = Modifier.padding(
-                            start = learningContentGutter(),
-                            top = 24.dp,
-                            end = learningContentGutter(),
-                        ),
-                    ) {
-                        Text(
-                            "Belajar lebih aman setiap hari",
-                            color = WaspadAIDarkBlue,
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "Kenali modus penipuan dan informasi mencurigakan lewat materi singkat.",
-                            color = WaspadAIMuted,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                        )
+                    Column(Modifier.padding(top = 22.dp)) {
+                        LearningProgressSection(completedCount, materials.size, totalProgress)
                     }
-                }
-                item {
-                    LearningProgressSection(completedCount, materials.size)
                 }
                 item {
                     materials.firstOrNull()?.let { first ->
@@ -421,35 +408,58 @@ private fun LearningListScreen(
 }
 
 @Composable
-private fun LearningProgressSection(completedCount: Int, totalCount: Int) {
+private fun LearningProgressSection(completedCount: Int, totalCount: Int, progress: Float) {
     val isComplete = totalCount > 0 && completedCount == totalCount
-    Column(
-        modifier = Modifier.padding(horizontal = learningContentGutter()),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = learningContentGutter()),
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFFFFF3C4),
+        shadowElevation = 2.dp,
     ) {
-        Text("Progress belajarmu", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            if (isComplete) "Semua materi selesai" else "$completedCount dari $totalCount materi selesai",
-            color = WaspadAIDarkBlue,
-            fontSize = 14.sp,
-        )
-        Box(
-            modifier = Modifier.fillMaxWidth().height(4.dp)
-                .background(WaspadAILightBlue, RoundedCornerShape(4.dp)),
+        Row(
+            modifier = Modifier.padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(if (totalCount == 0) 0f else completedCount.toFloat() / totalCount)
-                    .height(4.dp)
-                    .background(WaspadAIBlue, RoundedCornerShape(4.dp)),
-            )
-        }
-        if (isComplete) {
-            Text(
-                "Kamu sudah menyelesaikan seluruh materi yang tersedia.",
-                color = WaspadAIMuted,
-                fontSize = 12.sp,
-            )
+                    .size(64.dp)
+                    .background(Color(0xFFFFD85A), RoundedCornerShape(20.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = Color(0xFF765A00), modifier = Modifier.size(34.dp))
+                Icon(
+                    Icons.Rounded.Star,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(17.dp).align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("Progres belajarmu", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (isComplete) "Semua materi selesai" else "$completedCount dari $totalCount materi selesai",
+                    color = WaspadAIDarkBlue,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Box(Modifier.fillMaxWidth().height(7.dp).background(Color.White.copy(alpha = .8f), RoundedCornerShape(8.dp))) {
+                    Box(
+                        Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(7.dp)
+                            .background(Color(0xFFE1A900), RoundedCornerShape(8.dp))
+                    )
+                }
+                Text(
+                    when {
+                        isComplete -> "Hebat! Pertahankan kebiasaan verifikasi informasimu."
+                        progress >= .65f -> "Sedikit lagi, lanjutkan materi yang belum selesai."
+                        else -> "Lanjutkan belajar untuk memperkuat kemampuan verifikasi."
+                    },
+                    color = Color(0xFF685A28),
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                )
+            }
         }
     }
 }
@@ -474,31 +484,19 @@ private fun LearningDailyMissions(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("Misi hari ini", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFFFFAE8),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF0E1A8)),
-        ) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                LearningMissionRow(
-                    title = "Jadi detektif hoaks",
-                    description = "Pelajari materi dan jawab 3 soal",
-                    isComplete = isCurrentMissionComplete,
-                    onClick = onCurrentMissionClick,
-                )
-                LearningMissionRow(
-                    title = "Cek sumber informasi",
-                    description = "Latih kemampuan memeriksa sumber",
-                    isComplete = true,
-                )
-                Spacer(Modifier.height(7.dp))
-                Text(
-                    "${if (isCurrentMissionComplete) 2 else 1} dari 2 selesai",
-                    color = Color(0xFF685A28),
-                    fontSize = 11.sp,
-                )
-            }
-        }
+        LearningMissionRow(
+            title = "Jadi detektif hoaks hari ini",
+            description = "Pelajari satu materi dan jawab 3 soal.",
+            icon = Icons.Rounded.Search,
+            isComplete = isCurrentMissionComplete,
+            onClick = onCurrentMissionClick,
+        )
+        LearningMissionRow(
+            title = "Cek sumber informasi",
+            description = "Latih kebiasaan membandingkan sumber resmi.",
+            icon = Icons.Rounded.Security,
+            isComplete = true,
+        )
     }
 }
 
@@ -506,36 +504,37 @@ private fun LearningDailyMissions(
 private fun LearningMissionRow(
     title: String,
     description: String,
+    icon: ImageVector,
     isComplete: Boolean,
     onClick: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = 7.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 1.dp,
     ) {
-        Box(
-            modifier = Modifier.size(20.dp).then(
-                if (isComplete) Modifier.background(WaspadAIBlue, CircleShape)
-                else Modifier.border(1.5.dp, Color(0xFF9B8B4B), CircleShape)
-            ),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (isComplete) {
-                Icon(
-                    Icons.Rounded.Check,
-                    contentDescription = "Misi selesai",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp),
-                )
+            Box(Modifier.size(42.dp).background(Color(0xFFFFF3C4), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = Color(0xFF9A7000), modifier = Modifier.size(23.dp))
             }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = WaspadAIDarkBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(description, color = Color(0xFF685A28), fontSize = 11.sp, lineHeight = 15.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = WaspadAIDarkBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(3.dp))
+                Text(description, color = WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
+            }
+            Box(
+                modifier = Modifier.size(24.dp).then(
+                    if (isComplete) Modifier.background(WaspadAIBlue, CircleShape)
+                    else Modifier.border(1.5.dp, Color(0xFF9B8B4B), CircleShape)
+                ), contentAlignment = Alignment.Center,
+            ) {
+                if (isComplete) Icon(Icons.Rounded.Check, "Misi selesai", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }
@@ -549,10 +548,7 @@ private fun LearningMaterialCard(
 ) {
     val isInProgress = status?.kind == "in_progress"
     val isCompleted = status?.kind == "completed"
-    val strokeColor = when {
-        isInProgress -> Color(0xFF7EAECA)
-        else -> Color(0xFFD8E4EC)
-    }
+    val progress = status?.progressPercent ?: 0f
     val correctAnswers = sessionStats?.correctAnswers ?: material.latestCorrectAnswers
     val totalQuestions = sessionStats?.totalQuestions ?: material.latestTotalQuestions
     Surface(
@@ -562,8 +558,7 @@ private fun LearningMaterialCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         color = Color.White,
-        shadowElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, strokeColor),
+        shadowElevation = 2.dp,
     ) {
         Row(
                 modifier = Modifier.padding(16.dp),
@@ -572,11 +567,17 @@ private fun LearningMaterialCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
-                        .background(material.iconColor.copy(alpha = .12f), RoundedCornerShape(12.dp)),
+                        .size(54.dp)
+                        .background(material.iconColor.copy(alpha = .12f), RoundedCornerShape(17.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(material.icon, contentDescription = null, tint = material.iconColor, modifier = Modifier.size(21.dp))
+                    Box(Modifier.size(38.dp).background(Color.White.copy(alpha = .82f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+                        Icon(material.icon, contentDescription = null, tint = material.iconColor, modifier = Modifier.size(24.dp))
+                    }
+                    Box(
+                        Modifier.size(12.dp).background(Color(0xFFFFC928), CircleShape)
+                            .border(2.dp, Color.White, CircleShape).align(Alignment.TopEnd)
+                    )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -601,6 +602,24 @@ private fun LearningMaterialCard(
                             color = Color(0xFF627885),
                             fontSize = 11.sp,
                         )
+                    } else {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            when {
+                                isCompleted -> "Selesai"
+                                isInProgress -> "Lanjutkan belajar • ${(progress * 100).toInt()}%"
+                                else -> "Belum dimulai"
+                            },
+                            color = if (isInProgress) WaspadAIBlue else WaspadAIMuted,
+                            fontSize = 11.sp,
+                            fontWeight = if (isInProgress) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    }
+                    if (isInProgress) {
+                        Spacer(Modifier.height(7.dp))
+                        Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFE7EEF2), RoundedCornerShape(5.dp))) {
+                            Box(Modifier.fillMaxWidth(progress.coerceIn(.04f, 1f)).height(4.dp).background(WaspadAIBlue, RoundedCornerShape(5.dp)))
+                        }
                     }
                 }
                 when (status?.kind) {

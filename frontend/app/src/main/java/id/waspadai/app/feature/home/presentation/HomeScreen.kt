@@ -156,7 +156,9 @@ private fun HomeHero() {
             Image(
                 painter = painterResource(R.drawable.waspadai_logo),
                 contentDescription = "Logo WaspadAI",
-                modifier = Modifier.size(42.dp),
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Fit,
             )
             Spacer(Modifier.width(10.dp))

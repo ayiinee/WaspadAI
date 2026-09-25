@@ -126,7 +126,7 @@ fun ProfileRoute(
                         .padding(bottom = bottomNavigationPadding),
                 ) {
                     when {
-                        state.loading -> ProfileLoadingState()
+                        state.loading && state.profile == null && state.overview == null -> ProfileLoadingState()
                         state.page == ProfilePage.Dashboard -> ProfileDashboard(state, accessToken, onAction)
                         state.page == ProfilePage.Edit -> EditProfilePage(
                             state, accessToken, onAction,
