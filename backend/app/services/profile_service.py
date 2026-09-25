@@ -198,8 +198,19 @@ async def upload_avatar(
         ) from error
     if response.is_error:
         raise ProductAPIError(503, "STORAGE_UNAVAILABLE", "Penyimpanan avatar ditolak.", True)
-    asset_id = await repository.insert_avatar_asset(user_id, path, content_type, len(data), digest)
-    old = await repository.replace_avatar(user_id, asset_id)
+    try:
+        asset_id = await repository.insert_avatar_asset(
+            user_id, path, content_type, len(data), digest
+        )
+        old = await repository.replace_avatar(user_id, asset_id)
+    except Exception as error:
+        await _delete_storage_object(client, settings, "profile-assets", path)
+        raise ProductAPIError(
+            503,
+            "PERSISTENCE_UNAVAILABLE",
+            "Avatar belum dapat disimpan. Silakan coba lagi.",
+            True,
+        ) from error
     if old and old.get("object_path"):
         await _delete_storage_object(client, settings, old["bucket"], old["object_path"])
 

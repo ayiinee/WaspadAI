@@ -41,6 +41,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
@@ -584,7 +585,8 @@ private fun QuickAccessDialog(
                 icon = Icons.Rounded.SmartToy,
                 title = "Assistant perangkat",
                 description = "Panggil WaspadAI dengan gesture assistant di perangkatmu.",
-                status = if (assistantEnabled) "Sudah aktif" else "Belum aktif",
+                status = null,
+                isComplete = assistantEnabled,
                 actionLabel = if (assistantEnabled) null else "Aktifkan",
                 onAction = if (assistantAvailable) onSetAssistant else onOpenAssistantSettings,
             )
@@ -600,7 +602,8 @@ private fun QuickAccessDialog(
                 icon = Icons.Rounded.GridView,
                 title = "Quick Settings",
                 description = "Tambahkan tombol Periksa layar ke panel cepat.",
-                status = if (quickTileAdded) "Sudah ditambahkan" else "Belum ditambahkan",
+                status = null,
+                isComplete = quickTileAdded,
                 actionLabel = if (quickTileAdded) null else "Tambahkan",
                 onAction = onAddQuickTile,
             )
@@ -614,6 +617,7 @@ private fun QuickAccessSetting(
     title: String,
     description: String,
     status: String?,
+    isComplete: Boolean = false,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
     switchChecked: Boolean? = null,
@@ -642,6 +646,13 @@ private fun QuickAccessSetting(
             }
             if (switchChecked != null) {
                 Switch(checked = switchChecked, onCheckedChange = onSwitchChanged)
+            } else if (isComplete) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = "$title selesai",
+                    tint = Color(0xFF237A57),
+                    modifier = Modifier.size(22.dp),
+                )
             } else if (actionLabel != null) {
                 TextButton(onClick = onAction) { Text(actionLabel, fontSize = 12.sp) }
             }
