@@ -1,8 +1,60 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class OfficialReferralRoute(BaseModel):
+    route_type: str
+    priority: Literal["PRIMARY", "SECONDARY"]
+    reason: str
+
+
+class OfficialReferral(BaseModel):
+    status: Literal["NOT_REQUIRED", "RECOMMENDED", "URGENT"] = "NOT_REQUIRED"
+    mode: Literal["PREVENTION", "RECOVERY"] | None = None
+    reason_codes: list[str] = Field(default_factory=list)
+    summary: str | None = None
+    routes: list[OfficialReferralRoute] = Field(default_factory=list)
+
+
+class OfficialChannel(BaseModel):
+    id: str
+    route_type: str
+    organization_name: str
+    channel_name: str
+    description: str
+    destination_url: str
+    region_code: str | None = None
+    is_active: bool = True
+    verified_at: date
+
+
+class ResolvedRoute(BaseModel):
+    route_type: str
+    priority: Literal["PRIMARY", "SECONDARY"]
+    reason: str
+    action_type: Literal["EXTERNAL_URL", "GUIDANCE_ONLY"]
+    title: str
+    guidance: str | None = None
+    channel: OfficialChannel | None = None
+
+
+class OfficialReportingOption(BaseModel):
+    subject: Literal["SUSPICIOUS_NUMBER", "SUSPICIOUS_CONTENT"]
+    title: str
+    description: str
+    channel: OfficialChannel
+
+
+class ResolvedOfficialReferral(BaseModel):
+    status: Literal["NOT_REQUIRED", "RECOMMENDED", "URGENT"] = "NOT_REQUIRED"
+    mode: Literal["PREVENTION", "RECOVERY"] | None = None
+    summary: str | None = None
+    routes: list[ResolvedRoute] = Field(default_factory=list)
+    government_reporting_options: list[OfficialReportingOption] = Field(default_factory=list)
 
 
 class AIResult(BaseModel):
@@ -35,3 +87,5 @@ class AIResult(BaseModel):
     pipeline: list[dict[str, Any]]
     presentation: dict[str, Any]
     disclaimer: str
+    official_referral: OfficialReferral = Field(default_factory=OfficialReferral)
+    resolved_official_referral: ResolvedOfficialReferral | None = None

@@ -2600,6 +2600,19 @@
           "disclaimer": {
             "type": "string",
             "title": "Disclaimer"
+          },
+          "official_referral": {
+            "$ref": "#/components/schemas/OfficialReferral"
+          },
+          "resolved_official_referral": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedOfficialReferral"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -4669,6 +4682,180 @@
         ],
         "title": "LessonCompleteResponse"
       },
+      "OfficialChannel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "route_type": {
+            "type": "string",
+            "title": "Route Type"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "channel_name": {
+            "type": "string",
+            "title": "Channel Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "destination_url": {
+            "type": "string",
+            "title": "Destination Url"
+          },
+          "region_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Code"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Verified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "route_type",
+          "organization_name",
+          "channel_name",
+          "description",
+          "destination_url",
+          "verified_at"
+        ],
+        "title": "OfficialChannel"
+      },
+      "OfficialReferral": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_REQUIRED",
+              "RECOMMENDED",
+              "URGENT"
+            ],
+            "title": "Status",
+            "default": "NOT_REQUIRED"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PREVENTION",
+                  "RECOVERY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reason Codes"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialReferralRoute"
+            },
+            "type": "array",
+            "title": "Routes"
+          }
+        },
+        "type": "object",
+        "title": "OfficialReferral"
+      },
+      "OfficialReferralRoute": {
+        "properties": {
+          "route_type": {
+            "type": "string",
+            "title": "Route Type"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "PRIMARY",
+              "SECONDARY"
+            ],
+            "title": "Priority"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "route_type",
+          "priority",
+          "reason"
+        ],
+        "title": "OfficialReferralRoute"
+      },
+      "OfficialReportingOption": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "enum": [
+              "SUSPICIOUS_NUMBER",
+              "SUSPICIOUS_CONTENT"
+            ],
+            "title": "Subject"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/OfficialChannel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "title",
+          "description",
+          "channel"
+        ],
+        "title": "OfficialReportingOption"
+      },
       "PageContext": {
         "properties": {
           "title": {
@@ -5345,6 +5532,124 @@
           "explanation"
         ],
         "title": "QuizQuestionFeedback"
+      },
+      "ResolvedOfficialReferral": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_REQUIRED",
+              "RECOMMENDED",
+              "URGENT"
+            ],
+            "title": "Status",
+            "default": "NOT_REQUIRED"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PREVENTION",
+                  "RECOVERY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedRoute"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "government_reporting_options": {
+            "items": {
+              "$ref": "#/components/schemas/OfficialReportingOption"
+            },
+            "type": "array",
+            "title": "Government Reporting Options"
+          }
+        },
+        "type": "object",
+        "title": "ResolvedOfficialReferral"
+      },
+      "ResolvedRoute": {
+        "properties": {
+          "route_type": {
+            "type": "string",
+            "title": "Route Type"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "PRIMARY",
+              "SECONDARY"
+            ],
+            "title": "Priority"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "action_type": {
+            "type": "string",
+            "enum": [
+              "EXTERNAL_URL",
+              "GUIDANCE_ONLY"
+            ],
+            "title": "Action Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "guidance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guidance"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialChannel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "route_type",
+          "priority",
+          "reason",
+          "action_type",
+          "title"
+        ],
+        "title": "ResolvedRoute"
       },
       "SenderContext": {
         "type": "string",

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 import anyio
 import pytest
+from psycopg import OperationalError
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.errors import ProductAPIError
 from app.history_cursor import HistoryCursor, decode_cursor, encode_cursor
 from app.mock_ai import build_not_required_result, build_review_required_result
 from app.models import ConversationUpdateRequest, TextVerificationRequest
 from app.verification_service import (
+    _load_conversation_context,
     _persist_terminal_result,
     canonical_payload,
     conversation_title,
@@ -18,6 +22,59 @@ from app.verification_service import (
     requires_history,
     save_reason,
 )
+
+
+def test_conversation_context_recovers_from_stale_database_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    class Connection:
+        async def execute(self, *_args: object) -> object:
+            class Query:
+                async def fetchone(self) -> dict[str, object]:
+                    return {"title": "Percakapan", "sanitized_text": "Pesan", "result_json": {}}
+
+            return Query()
+
+    @asynccontextmanager
+    async def transaction(*_args: object):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OperationalError("server closed the connection unexpectedly")
+        yield Connection()
+
+    monkeypatch.setattr("app.verification_service.user_transaction", transaction)
+
+    async def check() -> None:
+        context = await _load_conversation_context(
+            object(), Settings(_env_file=None), uuid4(), uuid4()
+        )
+        assert context is not None
+        assert context["title"] == "Percakapan"
+        assert attempts == 2
+
+    anyio.run(check)
+
+
+def test_conversation_context_reports_database_outage_as_retryable_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    @asynccontextmanager
+    async def transaction(*_args: object):
+        raise OperationalError("server closed the connection unexpectedly")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr("app.verification_service.user_transaction", transaction)
+
+    async def check() -> None:
+        with pytest.raises(ProductAPIError) as captured:
+            await _load_conversation_context(object(), Settings(_env_file=None), uuid4(), uuid4())
+        assert captured.value.status_code == 503
+        assert captured.value.retryable
+
+    anyio.run(check)
 
 
 def test_conversation_title_uses_first_seven_normalized_words() -> None:
@@ -251,8 +308,7 @@ def test_persist_follow_up_appends_to_existing_conversation(
         assert case_insert[5] == 2
         assert envelope.history.conversation_id == conversation_id
         assert not any(
-            "insert into public.verification_conversations" in sql
-            for sql, _ in connection.calls
+            "insert into public.verification_conversations" in sql for sql, _ in connection.calls
         )
 
     anyio.run(check)

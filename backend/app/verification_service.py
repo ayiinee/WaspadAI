@@ -8,8 +8,9 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
+from psycopg import InterfaceError, OperationalError
 from psycopg.types.json import Jsonb
-from psycopg_pool import AsyncConnectionPool
+from psycopg_pool import AsyncConnectionPool, PoolTimeout
 
 from app.community_evidence_service import (
     build_image_community_evidence,
@@ -33,6 +34,7 @@ from app.models import (
     TextVerificationRequest,
     VerificationEnvelope,
 )
+from app.official_referral import resolve_official_referral
 from app.schemas.verification import AIResult
 from app.supabase_storage import delete_verification_input, upload_verification_input
 
@@ -136,9 +138,13 @@ async def _load_conversation_context(
 ) -> dict[str, str] | None:
     if conversation_id is None:
         return None
-    async with user_transaction(pool, user_id, settings.db_statement_timeout_seconds) as connection:
-        query = await connection.execute(
-            """select conversation.title, latest.sanitized_text, latest.result_json
+    for attempt in range(2):
+        try:
+            async with user_transaction(
+                pool, user_id, settings.db_statement_timeout_seconds
+            ) as connection:
+                query = await connection.execute(
+                    """select conversation.title, latest.sanitized_text, latest.result_json
                  from public.verification_conversations conversation
                  left join lateral (
                      select c.sanitized_text, r.result_json
@@ -151,9 +157,19 @@ async def _load_conversation_context(
                  ) latest on true
                 where conversation.id = %s
                   and conversation.deleted_at is null""",
-            (conversation_id,),
-        )
-        row = await query.fetchone()
+                    (conversation_id,),
+                )
+                row = await query.fetchone()
+            break
+        except (OperationalError, InterfaceError, PoolTimeout) as error:
+            if attempt == 0 and not isinstance(error, PoolTimeout):
+                continue
+            raise ProductAPIError(
+                503,
+                "PERSISTENCE_UNAVAILABLE",
+                "Koneksi database sementara terputus. Coba lagi sebentar.",
+                retryable=True,
+            ) from error
     if row is None:
         raise ProductAPIError(404, "CONVERSATION_NOT_FOUND", "Percakapan tidak ditemukan.")
     result_json = row.get("result_json") or {}
@@ -332,14 +348,10 @@ async def verify_image(
             input_asset_size_bytes=len(image_bytes),
         )
     except ProductAPIError:
-        await _delete_unpersisted_input(
-            http_client, settings, input_asset_object_path
-        )
+        await _delete_unpersisted_input(http_client, settings, input_asset_object_path)
         raise
     except Exception as error:
-        await _delete_unpersisted_input(
-            http_client, settings, input_asset_object_path
-        )
+        await _delete_unpersisted_input(http_client, settings, input_asset_object_path)
         await _record_persistence_failure(pool, settings, user_id, operation["id"], result)
         raise ProductAPIError(
             503,
@@ -439,7 +451,7 @@ async def get_history_detail(
         row = await query.fetchone()
     if row is None:
         raise ProductAPIError(404, "CASE_NOT_FOUND", "History tidak ditemukan.")
-    result = AIResult.model_validate(row["result_json"])
+    result = _with_resolved_referral(AIResult.model_validate(row["result_json"]))
     return _envelope(
         request_id=row["product_request_id"],
         case_id=row["id"],
@@ -644,7 +656,7 @@ async def get_conversation_detail(
 
     turns: list[ConversationTurn] = []
     for row in rows:
-        result = AIResult.model_validate(row["result_json"])
+        result = _with_resolved_referral(AIResult.model_validate(row["result_json"]))
         turns.append(
             ConversationTurn(
                 case_id=row["id"],
@@ -665,7 +677,9 @@ async def get_conversation_detail(
                     available=row["attachment_available"],
                     content_type=row["attachment_content_type"],
                     size_bytes=row["attachment_size_bytes"],
-                ) if row["input_type"] == "IMAGE" else None,
+                )
+                if row["input_type"] == "IMAGE"
+                else None,
             )
         )
     return ConversationDetail(
@@ -774,6 +788,7 @@ async def _persist_terminal_result(
     input_asset_content_type: str | None = None,
     input_asset_size_bytes: int | None = None,
 ) -> VerificationEnvelope:
+    result = _with_resolved_referral(result)
     eligible = requires_history(result, settings)
     reason = save_reason(result, settings) if eligible else "NOT_REQUIRED"
     case_id = uuid4() if eligible else None
@@ -989,6 +1004,15 @@ async def _record_upstream_failure(
         return
 
 
+def _with_resolved_referral(result: AIResult) -> AIResult:
+    try:
+        resolved = resolve_official_referral(result.official_referral)
+    except Exception:
+        # Referral resolution must not invalidate the verification result.
+        resolved = None
+    return result.model_copy(update={"resolved_official_referral": resolved})
+
+
 def _envelope(
     *,
     request_id: UUID,
@@ -1054,9 +1078,7 @@ async def verify_remote_text(
     conversation_context: dict[str, str] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
-        raise ProductAPIError(
-            503, "SERVICE_UNAVAILABLE", "Layanan AI belum dikonfigurasi.", True
-        )
+        raise ProductAPIError(503, "SERVICE_UNAVAILABLE", "Layanan AI belum dikonfigurasi.", True)
 
     async def post_to_ai() -> httpx.Response:
         async with _ai_concurrency_limit(settings):
@@ -1092,9 +1114,7 @@ async def verify_remote_text(
             502, "FACT_CHECK_UPSTREAM_FAILURE", "Layanan pemeriksaan AI menolak request.", True
         )
     if response.status_code == 429:
-        raise ProductAPIError(
-            429, "RATE_LIMITED", "Layanan pemeriksaan AI sedang sibuk.", True, 5
-        )
+        raise ProductAPIError(429, "RATE_LIMITED", "Layanan pemeriksaan AI sedang sibuk.", True, 5)
     if response.is_error:
         raise ProductAPIError(
             502, "FACT_CHECK_UPSTREAM_FAILURE", "Layanan pemeriksaan AI gagal.", True
@@ -1119,9 +1139,7 @@ async def verify_remote_image(
     conversation_context: dict[str, str] | None = None,
 ) -> AIResult:
     if settings.ai_service_base_url is None or settings.ai_service_api_key is None:
-        raise ProductAPIError(
-            503, "SERVICE_UNAVAILABLE", "Layanan AI belum dikonfigurasi.", True
-        )
+        raise ProductAPIError(503, "SERVICE_UNAVAILABLE", "Layanan AI belum dikonfigurasi.", True)
 
     async def post_to_ai() -> httpx.Response:
         async with _ai_concurrency_limit(settings):
@@ -1161,9 +1179,7 @@ async def verify_remote_image(
             502, "FACT_CHECK_UPSTREAM_FAILURE", "Layanan pemeriksaan AI menolak request.", True
         )
     if response.status_code == 429:
-        raise ProductAPIError(
-            429, "RATE_LIMITED", "Layanan pemeriksaan AI sedang sibuk.", True, 5
-        )
+        raise ProductAPIError(429, "RATE_LIMITED", "Layanan pemeriksaan AI sedang sibuk.", True, 5)
     if response.is_error:
         raise ProductAPIError(
             502, "FACT_CHECK_UPSTREAM_FAILURE", "Layanan pemeriksaan AI gagal.", True
