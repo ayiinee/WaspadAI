@@ -577,6 +577,14 @@ fun AnalysisCard(
                 )
                 Spacer(Modifier.height(8.dp))
             }
+            if (result.isNonCheckableImage) {
+                val paragraphs = result.narrativeParagraphs.ifEmpty { listOf(result.narrative) }
+                paragraphs.forEachIndexed { index, paragraph ->
+                    if (index > 0) Spacer(Modifier.height(8.dp))
+                    Text(paragraph, color = Ink, fontSize = 16.sp, lineHeight = 22.sp)
+                }
+                return@Column
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ResultPill("Truth: ${result.verdict.label}")
                 ResultPill("Fakta: ${result.factualStatus.label}")
@@ -599,6 +607,9 @@ fun AnalysisCard(
                 Spacer(Modifier.height(14.dp))
                 Text("Evidence", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 result.evidence.forEach { evidence ->
+                    val evidenceTitle = evidence.title
+                        .ifBlank { evidence.publisher.ifBlank { "Bukti pendukung" } }
+                        .limitWords(20)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -607,33 +618,29 @@ fun AnalysisCard(
                     ) {
                         Column(Modifier.padding(12.dp)) {
                             Text(
-                                evidence.title.ifBlank { evidence.publisher.ifBlank { "Bukti pendukung" } },
+                                evidenceTitle,
                                 color = Ink,
                                 fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            if (evidence.publisher.isNotBlank()) {
-                                Text(evidence.publisher, color = BrandBlue, fontSize = 12.sp)
-                            }
-                            if (evidence.excerpt.isNotBlank()) {
-                                Text(evidence.excerpt, color = Ink, fontSize = 13.sp, lineHeight = 18.sp)
-                            }
-                            if (evidence.stance.isNotBlank() || evidence.verificationStatus.isNotBlank()) {
-                                Text(
-                                    listOf(evidence.stance, evidence.verificationStatus)
-                                        .filter(String::isNotBlank)
-                                        .joinToString(" • "),
-                                    color = Color(0xFF557383),
-                                    fontSize = 11.sp,
-                                )
-                            }
                             if (evidence.url.isNotBlank()) {
-                                TextButton(
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    evidence.url,
+                                    color = Color(0xFF557383),
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Button(
                                     onClick = {
                                         runCatching {
                                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(evidence.url)))
                                         }
                                     },
-                                ) { Text("Buka bukti") }
+                                ) { Text("Lihat berita") }
                             }
                         }
                     }
@@ -1086,6 +1093,12 @@ private fun NavigationIcon(label: String, color: Color) {
             }
         }
     }
+}
+
+private fun String.limitWords(maxWords: Int): String {
+    val words = trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+    if (words.size <= maxWords) return trim()
+    return words.take(maxWords).joinToString(" ") + "…"
 }
 
 @Composable

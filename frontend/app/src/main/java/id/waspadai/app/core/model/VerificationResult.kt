@@ -2,10 +2,12 @@ package id.waspadai.app.core.model
 
 data class VerificationResult(
     val narrative: String,
-    val headline: String = "",
     val riskLevel: RiskLevel,
     val reasons: List<String>,
     val recommendedActions: List<String>,
+    val headline: String = "",
+    val narrativeParagraphs: List<String> = emptyList(),
+    val isNonCheckableImage: Boolean = false,
     val verdict: Verdict = Verdict.UNKNOWN,
     val factualStatus: FactualStatus = FactualStatus.UNKNOWN,
     val evidence: List<VerificationEvidence> = emptyList(),

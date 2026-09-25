@@ -33,7 +33,13 @@ data class VerificationResponseDto(
     val uncertainty: String = "",
     @SerialName("requires_human_review") val requiresHumanReview: Boolean = false,
     val disclaimer: String = "",
+    val rulebook: RulebookDto? = null,
     val presentation: PresentationDto? = null,
+)
+
+@Serializable
+data class RulebookDto(
+    @SerialName("retrieval_mode") val retrievalMode: String? = null,
 )
 
 @Serializable
@@ -72,7 +78,8 @@ data class PresentationDto(
 
 @Serializable
 data class NarrativeDto(
-    val text: String? = null
+    val text: String? = null,
+    val paragraphs: List<String> = emptyList(),
 )
 
 @Serializable
