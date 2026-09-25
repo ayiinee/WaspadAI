@@ -57,6 +57,23 @@ class LearningViewModelTest {
         assertEquals(125L, repository.submittedReadingSeconds)
         assertEquals(48L, repository.submittedQuizSeconds)
     }
+
+    @Test fun `practice opens first module in quiz mode and close clears it`() = runTest {
+        val repository = FakeLearningRepository()
+        val viewModel = LearningViewModel(repository, StaticAccessTokenProvider("token"), "https://api.test")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(LearningAction.OpenPractice)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("module-1", repository.openedModule)
+        assertEquals("module-1", viewModel.uiState.value.selectedModule?.moduleId)
+        assertTrue(viewModel.uiState.value.openQuizOnModuleLoad)
+        assertTrue(viewModel.uiState.value.quiz != null)
+
+        viewModel.onAction(LearningAction.CloseModule)
+        assertTrue(!viewModel.uiState.value.openQuizOnModuleLoad)
+    }
 }
 
 private class FakeLearningRepository : LearningRepository {

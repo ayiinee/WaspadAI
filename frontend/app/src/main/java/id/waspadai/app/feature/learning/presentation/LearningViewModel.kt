@@ -29,12 +29,14 @@ data class LearningUiState(
     val submitting: Boolean = false,
     val error: String? = null,
     val accessToken: String = "",
+    val openQuizOnModuleLoad: Boolean = false,
 )
 
 sealed interface LearningAction {
     data object ResetPrivateState : LearningAction
     data object Refresh : LearningAction
     data class OpenModule(val moduleId: String) : LearningAction
+    data object OpenPractice : LearningAction
     data object CloseModule : LearningAction
     data class CompleteLesson(val lessonId: String) : LearningAction
     data class SelectAnswer(val questionId: String, val optionId: String) : LearningAction
@@ -60,8 +62,16 @@ class LearningViewModel(
             LearningAction.ResetPrivateState -> _uiState.value = LearningUiState(loading = false)
             LearningAction.Refresh -> loadModules()
             is LearningAction.OpenModule -> openModule(action.moduleId)
+            LearningAction.OpenPractice -> openPractice()
             LearningAction.CloseModule -> _uiState.update {
-                it.copy(selectedModule = null, quiz = null, answers = emptyMap(), quizResult = null, error = null)
+                it.copy(
+                    selectedModule = null,
+                    quiz = null,
+                    answers = emptyMap(),
+                    quizResult = null,
+                    error = null,
+                    openQuizOnModuleLoad = false,
+                )
             }
             is LearningAction.CompleteLesson -> completeLesson(action.lessonId)
             is LearningAction.SelectAnswer -> _uiState.update {
@@ -132,6 +142,12 @@ class LearningViewModel(
         } else {
             _uiState.update { it.copy(detailLoading = false, error = (detailResult as AppResult.Failure).message) }
         }
+    }
+
+    private fun openPractice() {
+        val firstModuleId = _uiState.value.modules.firstOrNull()?.moduleId ?: return
+        _uiState.update { it.copy(openQuizOnModuleLoad = true) }
+        openModule(firstModuleId)
     }
 
     private fun completeLesson(lessonId: String) = viewModelScope.launch {

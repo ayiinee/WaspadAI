@@ -43,6 +43,8 @@ import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -84,6 +86,7 @@ import coil3.network.httpHeaders
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import com.mikepenz.markdown.m3.Markdown
+import id.waspadai.app.R
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import id.waspadai.app.ui.theme.WaspadAIContribution
@@ -118,6 +121,8 @@ private data class LearningMaterial(
     val description: String,
     val icon: ImageVector,
     val iconColor: Color,
+    val illustrationRes: Int? = null,
+    val illustrationTileColor: Color = Color(0xFFEAF4FB),
     val stages: List<LearningStage>,
     val questions: List<LearningQuestion>,
     val moduleId: String = "",
@@ -146,6 +151,25 @@ private data class LearningStatus(
     val questionIndex: Int = 0,
     val progressPercent: Float = 0f,
 )
+
+private data class LearningVisual(
+    val illustrationRes: Int?,
+    val tileColor: Color,
+)
+
+private fun learningVisualFor(title: String): LearningVisual = when {
+    title.contains("Phishing", ignoreCase = true) ||
+        title.contains("OTP", ignoreCase = true) ||
+        title.contains("PIN", ignoreCase = true) ->
+        LearningVisual(R.drawable.learning_phishing, Color(0xFFE4F2FC))
+    title.contains("Impersonation", ignoreCase = true) ||
+        title.contains("instansi", ignoreCase = true) ->
+        LearningVisual(R.drawable.learning_impersonation, Color(0xFFF0ECFF))
+    title.contains("Misinformasi", ignoreCase = true) ||
+        title.contains("Hoaks", ignoreCase = true) ->
+        LearningVisual(R.drawable.learning_hoax, Color(0xFFFFE7E7))
+    else -> LearningVisual(null, Color(0xFFEAF4FB))
+}
 
 private fun formatElapsed(totalSeconds: Long): String =
     "%02d:%02d".format(totalSeconds / 60, totalSeconds % 60)
@@ -233,11 +257,14 @@ fun LearningScreen(
 ) {
     val sessionStats = remember { mutableStateMapOf<String, LearningSessionStats>() }
     val materials = uiState.modules.mapIndexed { index, module ->
+        val visual = learningVisualFor(module.title)
         LearningMaterial(
             title = module.title,
             description = module.summary,
             icon = listOf(Icons.Rounded.MenuBook, Icons.Rounded.CollectionsBookmark, Icons.Rounded.Warning, Icons.Rounded.Lightbulb)[index % 4],
             iconColor = listOf(WaspadAIBlue, Color(0xFF635BBA), Color(0xFFCF7B12), Color(0xFF277B59))[index % 4],
+            illustrationRes = visual.illustrationRes,
+            illustrationTileColor = visual.tileColor,
             stages = emptyList(),
             questions = emptyList(),
             moduleId = module.moduleId,
@@ -251,11 +278,14 @@ fun LearningScreen(
         )
     }
     val selectedMaterial = uiState.selectedModule?.let { detail ->
+        val visual = learningVisualFor(detail.title)
         LearningMaterial(
             title = detail.title,
             description = detail.summary,
             icon = Icons.Rounded.MenuBook,
             iconColor = WaspadAIBlue,
+            illustrationRes = visual.illustrationRes,
+            illustrationTileColor = visual.tileColor,
             stages = detail.lessons.sortedBy { it.displayOrder }.map { LearningStage(it.title, it.bodyMd, it.lessonId) },
             questions = uiState.quiz?.questions.orEmpty().map { question ->
                 LearningQuestion(
@@ -294,11 +324,13 @@ fun LearningScreen(
             statusFor = ::statusFor,
             sessionStats = sessionStats,
             onMaterialSelected = { onAction(LearningAction.OpenModule(it.moduleId)) },
+            onPracticeSelected = { onAction(LearningAction.OpenPractice) },
             onDestinationSelected = onDestinationSelected,
         )
     } else {
         LearningDetailScreen(
             material = selectedMaterial,
+            openQuizOnLoad = uiState.openQuizOnModuleLoad,
             savedQuestionIndex = 0,
             quizResult = uiState.quizResult,
             submitting = uiState.submitting,
@@ -336,6 +368,7 @@ private fun LearningListScreen(
     statusFor: (LearningMaterial) -> LearningStatus?,
     sessionStats: Map<String, LearningSessionStats>,
     onMaterialSelected: (LearningMaterial) -> Unit,
+    onPracticeSelected: () -> Unit,
     onDestinationSelected: (String) -> Unit,
 ) {
     val completedCount = materials.count { statusFor(it)?.kind == "completed" }
@@ -349,55 +382,60 @@ private fun LearningListScreen(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { padding ->
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LearningPageHeader(
-                title = "Pelajari",
-                onBack = { onDestinationSelected("Periksa") },
-                showBack = false,
-            )
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = bottomNavigationPadding + 18.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                item {
-                    Column(Modifier.padding(top = 22.dp)) {
-                        LearningProgressSection(completedCount, materials.size, totalProgress)
-                    }
-                }
-                item {
-                    materials.firstOrNull()?.let { first ->
+                LearningPageHeader(
+                    title = "Pelajari",
+                    onBack = { onDestinationSelected("Periksa") },
+                    showBack = false,
+                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 20.dp, bottom = bottomNavigationPadding + 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item { LearningProgressSection(completedCount, materials.size, totalProgress) }
+                    item {
+                        val practiceModule = materials.firstOrNull()
+                        val practiceProgress = practiceModule?.let { material ->
+                            val correct = material.latestCorrectAnswers
+                            val total = material.latestTotalQuestions
+                            if (correct != null && total != null && total > 0) {
+                                (correct.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+                            } else {
+                                statusFor(material)?.progressPercent?.coerceIn(0f, 1f) ?: 0f
+                            }
+                        } ?: 0f
+                        val practiceLabel = when {
+                            practiceProgress >= 1f -> "Latihan selesai"
+                            practiceProgress > 0f -> "Lanjutkan latihan"
+                            else -> "Mulai latihan"
+                        }
                         LearningDailyMissions(
-                            isCurrentMissionComplete = statusFor(first)?.kind == "completed",
-                            onCurrentMissionClick = { onMaterialSelected(first) },
+                            isCurrentMissionComplete = materials.firstOrNull()?.let { statusFor(it)?.kind == "completed" } == true,
+                            onCurrentMissionClick = materials.firstOrNull()?.let { { onMaterialSelected(it) } },
+                            onPracticeClick = onPracticeSelected.takeIf { materials.isNotEmpty() },
+                            practiceProgress = practiceProgress,
+                            practiceLabel = practiceLabel,
                         )
                     }
-                }
-                item {
-                    Text(
-                        "Materi untukmu",
-                        modifier = Modifier.padding(horizontal = learningContentGutter()),
-                        color = WaspadAIDarkBlue,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                items(materials, key = { it.moduleId }) { material ->
-                    LearningMaterialCard(
-                        material = material,
-                        status = statusFor(material),
-                        sessionStats = sessionStats[material.moduleId],
-                        onClick = { onMaterialSelected(material) },
-                    )
-                }
-                if (materials.isNotEmpty() && completedCount == materials.size) {
                     item {
-                        LearningCompletedNextAction(
-                            onClick = { onMaterialSelected(materials.first()) },
+                        Text(
+                            "Materi untukmu",
+                            modifier = Modifier.padding(horizontal = learningContentGutter()),
+                            color = WaspadAIDarkBlue,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    items(materials, key = { it.moduleId }) { material ->
+                        LearningMaterialCard(
+                            material = material,
+                            status = statusFor(material),
+                            sessionStats = sessionStats[material.moduleId],
+                            onClick = { onMaterialSelected(material) },
                         )
                     }
                 }
             }
-        }
         }
         WaspadAIBottomNavigation(
             selectedDestination = "Pelajari",
@@ -423,29 +461,28 @@ private fun LearningProgressSection(completedCount: Int, totalCount: Int, progre
         ) {
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .background(Color(0xFFFFD85A), RoundedCornerShape(20.dp)),
+                    .size(88.dp)
+                    .background(Color(0xFFFFE48A), RoundedCornerShape(26.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = Color(0xFF765A00), modifier = Modifier.size(34.dp))
-                Icon(
-                    Icons.Rounded.Star,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(17.dp).align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp),
+                Image(
+                    painter = painterResource(R.drawable.learning_trophy),
+                    contentDescription = "Ilustrasi progres belajar",
+                    modifier = Modifier.size(76.dp),
+                    contentScale = ContentScale.Fit,
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("Progres belajarmu", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Progres belajarmu", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                 Text(
                     if (isComplete) "Semua materi selesai" else "$completedCount dari $totalCount materi selesai",
                     color = WaspadAIDarkBlue,
-                    fontSize = 14.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Box(Modifier.fillMaxWidth().height(7.dp).background(Color.White.copy(alpha = .8f), RoundedCornerShape(8.dp))) {
+                Box(Modifier.fillMaxWidth().height(9.dp).background(Color.White.copy(alpha = .8f), RoundedCornerShape(8.dp))) {
                     Box(
-                        Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(7.dp)
+                        Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(9.dp)
                             .background(Color(0xFFE1A900), RoundedCornerShape(8.dp))
                     )
                 }
@@ -475,7 +512,10 @@ private fun LearningPageHeader(title: String, onBack: () -> Unit, showBack: Bool
 @Composable
 private fun LearningDailyMissions(
     isCurrentMissionComplete: Boolean,
-    onCurrentMissionClick: () -> Unit,
+    onCurrentMissionClick: (() -> Unit)?,
+    onPracticeClick: (() -> Unit)?,
+    practiceProgress: Float,
+    practiceLabel: String,
 ) {
     Column(
         modifier = Modifier
@@ -483,19 +523,24 @@ private fun LearningDailyMissions(
             .padding(horizontal = learningContentGutter()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Misi hari ini", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text("Misi hari ini", color = WaspadAIDarkBlue, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         LearningMissionRow(
             title = "Jadi detektif hoaks hari ini",
             description = "Pelajari satu materi dan jawab 3 soal.",
             icon = Icons.Rounded.Search,
+            illustrationRes = R.drawable.learning_magnify,
             isComplete = isCurrentMissionComplete,
             onClick = onCurrentMissionClick,
         )
         LearningMissionRow(
-            title = "Cek sumber informasi",
-            description = "Latih kebiasaan membandingkan sumber resmi.",
-            icon = Icons.Rounded.Security,
-            isComplete = true,
+            title = "Latihan",
+            description = "Uji pemahamanmu lewat latihan soal.",
+            icon = Icons.Rounded.MenuBook,
+            illustrationRes = R.drawable.learning_practice,
+            isComplete = practiceProgress >= 1f,
+            onClick = onPracticeClick,
+            progress = practiceProgress,
+            progressLabel = practiceLabel,
         )
     }
 }
@@ -505,8 +550,11 @@ private fun LearningMissionRow(
     title: String,
     description: String,
     icon: ImageVector,
+    illustrationRes: Int? = null,
     isComplete: Boolean,
     onClick: (() -> Unit)? = null,
+    progress: Float? = null,
+    progressLabel: String? = null,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
@@ -520,12 +568,43 @@ private fun LearningMissionRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(Modifier.size(42.dp).background(Color(0xFFFFF3C4), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = Color(0xFF9A7000), modifier = Modifier.size(23.dp))
+                if (illustrationRes != null) {
+                    Image(
+                        painter = painterResource(illustrationRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(35.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Icon(icon, contentDescription = null, tint = Color(0xFF9A7000), modifier = Modifier.size(23.dp))
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = WaspadAIDarkBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(3.dp))
                 Text(description, color = WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
+                if (progress != null && progressLabel != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(Color(0xFFE7EEF2), RoundedCornerShape(5.dp)),
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                                .height(3.dp)
+                                .background(WaspadAIBlue, RoundedCornerShape(5.dp)),
+                        )
+                    }
+                    Text(
+                        progressLabel,
+                        color = if (progress > 0f) WaspadAIBlue else WaspadAIMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             Box(
                 modifier = Modifier.size(24.dp).then(
@@ -551,39 +630,40 @@ private fun LearningMaterialCard(
     val progress = status?.progressPercent ?: 0f
     val correctAnswers = sessionStats?.correctAnswers ?: material.latestCorrectAnswers
     val totalQuestions = sessionStats?.totalQuestions ?: material.latestTotalQuestions
-    Surface(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = learningContentGutter())
+            .background(Color.White)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White,
-        shadowElevation = 2.dp,
     ) {
         Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
+            modifier = Modifier.padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
                 Box(
                     modifier = Modifier
-                        .size(54.dp)
-                        .background(material.iconColor.copy(alpha = .12f), RoundedCornerShape(17.dp)),
+                        .size(64.dp)
+                        .background(material.illustrationTileColor, RoundedCornerShape(15.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(Modifier.size(38.dp).background(Color.White.copy(alpha = .82f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-                        Icon(material.icon, contentDescription = null, tint = material.iconColor, modifier = Modifier.size(24.dp))
+                    if (material.illustrationRes != null) {
+                        Image(
+                            painter = painterResource(material.illustrationRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp),
+                            contentScale = ContentScale.Fit,
+                        )
+                    } else {
+                        Icon(material.icon, contentDescription = null, tint = material.iconColor, modifier = Modifier.size(34.dp))
                     }
-                    Box(
-                        Modifier.size(12.dp).background(Color(0xFFFFC928), CircleShape)
-                            .border(2.dp, Color.White, CircleShape).align(Alignment.TopEnd)
-                    )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         conciseLearningTitle(material.title),
                         color = WaspadAIDarkBlue,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                     )
@@ -591,8 +671,8 @@ private fun LearningMaterialCard(
                     Text(
                         conciseLearningDescription(material.title, material.description),
                         color = WaspadAIMuted,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
                         maxLines = 2,
                     )
                     if (correctAnswers != null && totalQuestions != null) {
@@ -600,25 +680,25 @@ private fun LearningMaterialCard(
                         Text(
                             "$correctAnswers/$totalQuestions jawaban benar",
                             color = Color(0xFF627885),
-                            fontSize = 11.sp,
+                        fontSize = 11.sp,
                         )
                     } else {
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(3.dp))
                         Text(
                             when {
                                 isCompleted -> "Selesai"
-                                isInProgress -> "Lanjutkan belajar • ${(progress * 100).toInt()}%"
+                                isInProgress -> "Lanjutkan belajar"
                                 else -> "Belum dimulai"
                             },
                             color = if (isInProgress) WaspadAIBlue else WaspadAIMuted,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = if (isInProgress) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     }
                     if (isInProgress) {
-                        Spacer(Modifier.height(7.dp))
-                        Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFE7EEF2), RoundedCornerShape(5.dp))) {
-                            Box(Modifier.fillMaxWidth(progress.coerceIn(.04f, 1f)).height(4.dp).background(WaspadAIBlue, RoundedCornerShape(5.dp)))
+                        Spacer(Modifier.height(4.dp))
+                        Box(Modifier.fillMaxWidth().height(3.dp).background(Color(0xFFE7EEF2), RoundedCornerShape(5.dp))) {
+                            Box(Modifier.fillMaxWidth(progress.coerceIn(.04f, 1f)).height(3.dp).background(WaspadAIBlue, RoundedCornerShape(5.dp)))
                         }
                     }
                 }
@@ -627,16 +707,24 @@ private fun LearningMaterialCard(
                         Icons.Rounded.CheckCircle,
                         contentDescription = "Materi selesai",
                         tint = Color(0xFF3F8065),
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
+                    )
+                    "in_progress" -> CircularProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.size(28.dp),
+                        color = WaspadAIBlue,
+                        trackColor = Color(0xFFDDE5EA),
+                        strokeWidth = 4.dp,
                     )
                     else -> Icon(
                         Icons.Rounded.ChevronRight,
                         contentDescription = if (isInProgress) "Lanjutkan materi" else "Buka materi",
                         tint = WaspadAIBlue,
-                        modifier = Modifier.size(23.dp),
+                        modifier = Modifier.size(21.dp),
                     )
                 }
             }
+        HorizontalDivider(color = Color(0xFFE1E9EE), thickness = 1.dp)
     }
 }
 
@@ -656,31 +744,9 @@ private fun conciseLearningTitle(title: String): String = when {
 }
 
 @Composable
-private fun LearningCompletedNextAction(onClick: () -> Unit) {
-    Column(
-        modifier = Modifier.padding(horizontal = learningContentGutter()),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text("Lanjutkan latihan", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            "Ulangi materi atau coba kuis untuk memperkuat pemahaman.",
-            color = WaspadAIMuted,
-            fontSize = 12.sp,
-        )
-        Text(
-            "Coba kuis lagi",
-            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)
-                .padding(horizontal = 2.dp, vertical = 8.dp),
-            color = WaspadAIBlue,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
 private fun LearningDetailScreen(
     material: LearningMaterial,
+    openQuizOnLoad: Boolean,
     savedQuestionIndex: Int,
     quizResult: id.waspadai.app.feature.learning.domain.QuizAttemptResult?,
     submitting: Boolean,
@@ -696,9 +762,13 @@ private fun LearningDetailScreen(
 ) {
     var stageIndex by remember(material.title) { mutableIntStateOf(0) }
     var completedStages by remember(material.title) { mutableIntStateOf(0) }
-    var showOverview by rememberSaveable(material.moduleId) { mutableStateOf(true) }
-    var showQuizChoice by remember(material.title) { mutableStateOf(false) }
-    var showQuiz by remember(material.title) { mutableStateOf(false) }
+    var showOverview by rememberSaveable(material.moduleId, openQuizOnLoad, material.questions.isNotEmpty()) {
+        mutableStateOf(!openQuizOnLoad || material.questions.isEmpty())
+    }
+    var showQuizChoice by remember(material.title, openQuizOnLoad) { mutableStateOf(false) }
+    var showQuiz by remember(material.title, openQuizOnLoad, material.questions.isNotEmpty()) {
+        mutableStateOf(openQuizOnLoad && material.questions.isNotEmpty())
+    }
     var readingSeconds by rememberSaveable(material.moduleId) { mutableLongStateOf(0L) }
     var readingFinished by rememberSaveable(material.moduleId) { mutableStateOf(false) }
 
@@ -874,15 +944,24 @@ private fun LearningMaterialOverview(
         Box(
             modifier = Modifier
                 .size(86.dp)
-                .background(material.iconColor.copy(alpha = .13f), RoundedCornerShape(26.dp)),
+                .background(material.illustrationTileColor, RoundedCornerShape(26.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = material.icon,
-                contentDescription = null,
-                tint = material.iconColor,
-                modifier = Modifier.size(44.dp),
-            )
+            if (material.illustrationRes != null) {
+                Image(
+                    painter = painterResource(material.illustrationRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Icon(
+                    imageVector = material.icon,
+                    contentDescription = null,
+                    tint = material.iconColor,
+                    modifier = Modifier.size(44.dp),
+                )
+            }
         }
         Spacer(Modifier.height(14.dp))
         Text(
