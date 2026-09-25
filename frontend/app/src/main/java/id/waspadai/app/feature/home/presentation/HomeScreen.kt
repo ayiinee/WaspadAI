@@ -28,7 +28,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -46,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -64,6 +64,8 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.SkeletonBlock
+import id.waspadai.app.core.ui.rememberSkeletonBrush
 import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.ui.theme.WaspadAIBackground
 import id.waspadai.app.ui.theme.WaspadAIBlue
@@ -212,12 +214,7 @@ private fun HomeBody(
             modifier = Modifier.padding(start = 21.dp, top = 13.dp, end = 21.dp),
         )
         if (uiState.loading && uiState.cases.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = WaspadAIBlue, modifier = Modifier.size(28.dp))
-            }
+            HomeCasesSkeleton()
         } else if (uiState.error != null && uiState.cases.isEmpty()) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 HomeEmptyMessage(uiState.error)
@@ -249,7 +246,9 @@ private fun HomeBody(
             onSeeAll = onLearningClick,
             modifier = Modifier.padding(start = 21.dp, top = 16.dp, end = 21.dp),
         )
-        if (uiState.visibleLearningRecommendations.isEmpty()) {
+        if (uiState.loading && uiState.learningRecommendations.isEmpty()) {
+            HomeLearningSkeleton()
+        } else if (uiState.visibleLearningRecommendations.isEmpty()) {
             HomeEmptyMessage("Materi tidak ditemukan.")
         } else {
             Row(
@@ -269,6 +268,55 @@ private fun HomeBody(
                 if (uiState.visibleLearningRecommendations.size == 1) {
                     Spacer(Modifier.weight(1f))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCasesSkeleton() {
+    val brush = rememberSkeletonBrush()
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("home-cases-skeleton"),
+    ) {
+        repeat(2) {
+            HorizontalDivider(color = Color.Black.copy(alpha = .08f))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 21.dp, vertical = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SkeletonBlock(Modifier.size(44.dp), CircleShape, brush)
+                    Spacer(Modifier.width(13.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        SkeletonBlock(Modifier.fillMaxWidth(.42f).height(13.dp), RoundedCornerShape(6.dp), brush)
+                        SkeletonBlock(Modifier.fillMaxWidth(.25f).height(9.dp), RoundedCornerShape(5.dp), brush)
+                    }
+                    SkeletonBlock(Modifier.width(62.dp).height(30.dp), RoundedCornerShape(4.dp), brush)
+                }
+                Spacer(Modifier.height(10.dp))
+                SkeletonBlock(Modifier.fillMaxWidth().height(10.dp), RoundedCornerShape(5.dp), brush)
+                Spacer(Modifier.height(6.dp))
+                SkeletonBlock(Modifier.fillMaxWidth(.78f).height(10.dp), RoundedCornerShape(5.dp), brush)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeLearningSkeleton() {
+    val brush = rememberSkeletonBrush()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 21.dp)
+            .testTag("home-learning-skeleton"),
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
+    ) {
+        repeat(2) {
+            Column(
+                modifier = Modifier.weight(1f).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                SkeletonBlock(Modifier.fillMaxWidth().height(104.dp), RoundedCornerShape(6.dp), brush)
+                SkeletonBlock(Modifier.fillMaxWidth(.78f).height(11.dp), RoundedCornerShape(5.dp), brush)
+                SkeletonBlock(Modifier.fillMaxWidth().height(9.dp), RoundedCornerShape(5.dp), brush)
+                SkeletonBlock(Modifier.fillMaxWidth(.62f).height(9.dp), RoundedCornerShape(5.dp), brush)
             }
         }
     }

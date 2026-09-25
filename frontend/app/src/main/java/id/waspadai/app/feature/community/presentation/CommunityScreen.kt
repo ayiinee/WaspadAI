@@ -136,6 +136,8 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.SkeletonBlock
+import id.waspadai.app.core.ui.rememberSkeletonBrush
 import id.waspadai.app.core.ui.ActionFeedbackHost
 import id.waspadai.app.core.ui.ActionFeedbackKind
 import id.waspadai.app.core.ui.showActionFeedback
@@ -412,7 +414,10 @@ fun CommunityScreen(
                     posts = uiState.visiblePosts(scope),
                     listState = timelineState.listState(scope),
                     accessToken = uiState.accessTokenDraft,
-                    isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading,
+                    isRefreshing = uiState.backendPhase == CommunityBackendPhase.Loading &&
+                        uiState.posts.isNotEmpty(),
+                    showInitialSkeleton = uiState.backendPhase == CommunityBackendPhase.Loading &&
+                        uiState.posts.isEmpty(),
                     onRefresh = { onAction(CommunityAction.RefreshBackend) },
                     onSupportPost = { post ->
                         onAction(CommunityAction.SupportClicked(post.id))
@@ -538,6 +543,7 @@ private fun CommunityFeedPage(
     listState: LazyListState,
     accessToken: String,
     isRefreshing: Boolean,
+    showInitialSkeleton: Boolean,
     onRefresh: () -> Unit,
     onSupportPost: (CommunityPost) -> Unit,
     onVerdictPost: (CommunityPost, CommunityVerdict) -> Unit,
@@ -568,7 +574,11 @@ private fun CommunityFeedPage(
             contentPadding = PaddingValues(top = 14.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            if (posts.isEmpty()) {
+            if (showInitialSkeleton) {
+                items(3) { index ->
+                    CommunityPostSkeleton(index)
+                }
+            } else if (posts.isEmpty()) {
                 item { EmptyCommunityResult() }
             } else {
                 items(items = posts, key = CommunityPost::id) { post ->
@@ -585,6 +595,42 @@ private fun CommunityFeedPage(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CommunityPostSkeleton(index: Int) {
+    val brush = rememberSkeletonBrush()
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .testTag("community-post-skeleton-$index")
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SkeletonBlock(Modifier.size(44.dp), CircleShape, brush)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                SkeletonBlock(Modifier.fillMaxWidth(.38f).height(13.dp), RoundedCornerShape(6.dp), brush)
+                SkeletonBlock(Modifier.fillMaxWidth(.22f).height(9.dp), RoundedCornerShape(5.dp), brush)
+            }
+            SkeletonBlock(Modifier.width(76.dp).height(26.dp), RoundedCornerShape(13.dp), brush)
+        }
+        Spacer(Modifier.height(14.dp))
+        SkeletonBlock(Modifier.fillMaxWidth(.72f).height(15.dp), RoundedCornerShape(6.dp), brush)
+        Spacer(Modifier.height(8.dp))
+        SkeletonBlock(Modifier.fillMaxWidth().height(10.dp), RoundedCornerShape(5.dp), brush)
+        Spacer(Modifier.height(6.dp))
+        SkeletonBlock(Modifier.fillMaxWidth(.86f).height(10.dp), RoundedCornerShape(5.dp), brush)
+        Spacer(Modifier.height(12.dp))
+        SkeletonBlock(Modifier.fillMaxWidth().height(148.dp), RoundedCornerShape(14.dp), brush)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            repeat(3) {
+                SkeletonBlock(Modifier.width(54.dp).height(18.dp), RoundedCornerShape(9.dp), brush)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = Color.Black.copy(alpha = .08f))
     }
 }
 

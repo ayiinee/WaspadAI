@@ -448,7 +448,7 @@ private fun WaspadAiApp(
                     runCatching { app.authRepository.updatePassword(password) }
                 },
                 onLogout = {
-                    runCatching { app.authRepository.signOut() }
+                    app.authRepository.clearSession()
                     communityViewModel.onAction(CommunityAction.ResetPrivateState)
                     learningViewModel.onAction(LearningAction.ResetPrivateState)
                     app.rememberedCredentialsStore.clear()

@@ -349,8 +349,34 @@ private fun LearningListScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = bottomNavigationPadding + 18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
+                item {
+                    Column(
+                        modifier = Modifier.padding(
+                            start = learningContentGutter(),
+                            top = 24.dp,
+                            end = learningContentGutter(),
+                        ),
+                    ) {
+                        Text(
+                            "Belajar lebih aman setiap hari",
+                            color = WaspadAIDarkBlue,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Kenali modus penipuan dan informasi mencurigakan lewat materi singkat.",
+                            color = WaspadAIMuted,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
+                }
+                item {
+                    LearningProgressSection(completedCount, materials.size)
+                }
                 item {
                     materials.firstOrNull()?.let { first ->
                         LearningDailyMissions(
@@ -360,30 +386,13 @@ private fun LearningListScreen(
                     }
                 }
                 item {
-                    Column(modifier = Modifier.padding(horizontal = learningContentGutter(), vertical = 3.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom,
-                        ) {
-                            Text("Materi untukmu", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                            Text("$completedCount dari ${materials.size}", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.height(7.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .background(WaspadAILightBlue, RoundedCornerShape(8.dp)),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(if (materials.isEmpty()) 0f else completedCount.toFloat() / materials.size)
-                                    .height(6.dp)
-                                    .background(WaspadAIBlue, RoundedCornerShape(8.dp)),
-                            )
-                        }
-                    }
+                    Text(
+                        "Materi untukmu",
+                        modifier = Modifier.padding(horizontal = learningContentGutter()),
+                        color = WaspadAIDarkBlue,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
                 items(materials, key = { it.moduleId }) { material ->
                     LearningMaterialCard(
@@ -393,6 +402,13 @@ private fun LearningListScreen(
                         onClick = { onMaterialSelected(material) },
                     )
                 }
+                if (materials.isNotEmpty() && completedCount == materials.size) {
+                    item {
+                        LearningCompletedNextAction(
+                            onClick = { onMaterialSelected(materials.first()) },
+                        )
+                    }
+                }
             }
         }
         }
@@ -401,6 +417,40 @@ private fun LearningListScreen(
             onDestinationSelected = onDestinationSelected,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+    }
+}
+
+@Composable
+private fun LearningProgressSection(completedCount: Int, totalCount: Int) {
+    val isComplete = totalCount > 0 && completedCount == totalCount
+    Column(
+        modifier = Modifier.padding(horizontal = learningContentGutter()),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Text("Progress belajarmu", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            if (isComplete) "Semua materi selesai" else "$completedCount dari $totalCount materi selesai",
+            color = WaspadAIDarkBlue,
+            fontSize = 14.sp,
+        )
+        Box(
+            modifier = Modifier.fillMaxWidth().height(4.dp)
+                .background(WaspadAILightBlue, RoundedCornerShape(4.dp)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(if (totalCount == 0) 0f else completedCount.toFloat() / totalCount)
+                    .height(4.dp)
+                    .background(WaspadAIBlue, RoundedCornerShape(4.dp)),
+            )
+        }
+        if (isComplete) {
+            Text(
+                "Kamu sudah menyelesaikan seluruh materi yang tersedia.",
+                color = WaspadAIMuted,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 
@@ -420,77 +470,72 @@ private fun LearningDailyMissions(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = learningContentGutter(), top = 16.dp, end = learningContentGutter(), bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+            .padding(horizontal = learningContentGutter()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Misi harian", color = WaspadAIDarkBlue, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-        LearningMissionCard(
-            title = "Jadi detektif hoaks hari ini",
-            description = if (isCurrentMissionComplete) {
-                "Materi dan 3 soal sudah kamu selesaikan."
-            } else {
-                "Pelajari ciri hoaks, lalu jawab 3 soal singkat."
-            },
-            isComplete = isCurrentMissionComplete,
-            onClick = onCurrentMissionClick,
-        )
-        LearningMissionCard(
-            title = "Misi cek sumber selesai",
-            description = "Kamu sudah berlatih memeriksa sumber informasi.",
-            isComplete = true,
-        )
+        Text("Misi hari ini", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFFFFFAE8),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF0E1A8)),
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                LearningMissionRow(
+                    title = "Jadi detektif hoaks",
+                    description = "Pelajari materi dan jawab 3 soal",
+                    isComplete = isCurrentMissionComplete,
+                    onClick = onCurrentMissionClick,
+                )
+                LearningMissionRow(
+                    title = "Cek sumber informasi",
+                    description = "Latih kemampuan memeriksa sumber",
+                    isComplete = true,
+                )
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "${if (isCurrentMissionComplete) 2 else 1} dari 2 selesai",
+                    color = Color(0xFF685A28),
+                    fontSize = 11.sp,
+                )
+            }
+        }
     }
 }
+
 @Composable
-private fun LearningMissionCard(
+private fun LearningMissionRow(
     title: String,
     description: String,
     isComplete: Boolean,
     onClick: (() -> Unit)? = null,
 ) {
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(14.dp),
-        color = if (isComplete) WaspadAIContribution else Color.White,
-        shadowElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (isComplete) Color(0xFFF2CF67) else Color(0xFFD8E4EC),
-        ),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 7.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        Box(
+            modifier = Modifier.size(20.dp).then(
+                if (isComplete) Modifier.background(WaspadAIBlue, CircleShape)
+                else Modifier.border(1.5.dp, Color(0xFF9B8B4B), CircleShape)
+            ),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier.size(42.dp).background(WaspadAIBlue, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
+            if (isComplete) {
                 Icon(
-                    imageVector = if (isComplete) Icons.Rounded.Check else Icons.Rounded.PlayArrow,
-                    contentDescription = null,
+                    Icons.Rounded.Check,
+                    contentDescription = "Misi selesai",
                     tint = Color.White,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(14.dp),
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = WaspadAIDarkBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(1.dp))
-                Text(description, color = if (isComplete) Color(0xFF554714) else WaspadAIMuted, fontSize = 11.sp, lineHeight = 15.sp)
-            }
-            if (isComplete) {
-                Box(
-                    modifier = Modifier.size(26.dp).border(2.dp, WaspadAIDarkBlue, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.Check, contentDescription = "Misi selesai", tint = WaspadAIDarkBlue, modifier = Modifier.size(17.dp))
-                }
-            } else if (onClick != null) {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Buka misi", tint = WaspadAIBlue, modifier = Modifier.size(25.dp))
-            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = WaspadAIDarkBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(description, color = Color(0xFF685A28), fontSize = 11.sp, lineHeight = 15.sp)
         }
     }
 }
@@ -504,102 +549,113 @@ private fun LearningMaterialCard(
 ) {
     val isInProgress = status?.kind == "in_progress"
     val isCompleted = status?.kind == "completed"
-    val highlighted = isCompleted
-    val cardBackground = if (highlighted) WaspadAIBlue else Color.White
-    val contentColor = if (highlighted) Color.White else WaspadAIDarkBlue
-    val supportingColor = if (highlighted) Color(0xFFDCEFFC) else WaspadAIMuted
     val strokeColor = when {
-        isCompleted -> WaspadAIBlue
         isInProgress -> Color(0xFF7EAECA)
         else -> Color(0xFFD8E4EC)
     }
     val correctAnswers = sessionStats?.correctAnswers ?: material.latestCorrectAnswers
     val totalQuestions = sessionStats?.totalQuestions ?: material.latestTotalQuestions
-    val completedAt = sessionStats?.completedAt ?: formatCompletionTime(material.progressUpdatedAt)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = learningContentGutter())
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        color = cardBackground,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White,
         shadowElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, strokeColor),
     ) {
-        Column {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        Row(
+                modifier = Modifier.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .background(if (highlighted) Color.White else material.iconColor, RoundedCornerShape(11.dp)),
+                        .size(42.dp)
+                        .background(material.iconColor.copy(alpha = .12f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(material.icon, contentDescription = null, tint = if (highlighted) WaspadAIBlue else Color.White, modifier = Modifier.size(19.dp))
+                    Icon(material.icon, contentDescription = null, tint = material.iconColor, modifier = Modifier.size(21.dp))
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        material.title,
-                        color = contentColor,
+                        conciseLearningTitle(material.title),
+                        color = WaspadAIDarkBlue,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(1.dp))
-                    Text(
-                        material.description,
-                        color = supportingColor,
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        conciseLearningDescription(material.title, material.description),
+                        color = WaspadAIMuted,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 2,
+                    )
+                    if (correctAnswers != null && totalQuestions != null) {
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            "$correctAnswers/$totalQuestions jawaban benar",
+                            color = Color(0xFF627885),
+                            fontSize = 11.sp,
+                        )
+                    }
                 }
                 when (status?.kind) {
-                    "completed" -> Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .border(2.dp, Color.White, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Rounded.Check, contentDescription = "Materi selesai", tint = Color.White, modifier = Modifier.size(17.dp)) }
-                    "in_progress" -> Box(
-                        modifier = Modifier.size(30.dp).border(1.dp, WaspadAIBlue, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = "Lanjutkan materi", tint = WaspadAIBlue, modifier = Modifier.size(22.dp))
-                    }
-                    else -> Icon(Icons.Rounded.ChevronRight, contentDescription = "Buka materi", tint = WaspadAIBlue, modifier = Modifier.size(25.dp))
+                    "completed" -> Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = "Materi selesai",
+                        tint = Color(0xFF3F8065),
+                        modifier = Modifier.size(22.dp),
+                    )
+                    else -> Icon(
+                        Icons.Rounded.ChevronRight,
+                        contentDescription = if (isInProgress) "Lanjutkan materi" else "Buka materi",
+                        tint = WaspadAIBlue,
+                        modifier = Modifier.size(23.dp),
+                    )
                 }
             }
-            if (isCompleted) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp)
-                        .background(Color.White, RoundedCornerShape(10.dp))
-                        .border(1.dp, Color(0xFFD8E4EC), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 11.dp, vertical = 9.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val resultText = if (correctAnswers != null && totalQuestions != null) {
-                            "$correctAnswers/$totalQuestions jawaban benar"
-                        } else material.latestScore?.let { "Nilai ${it.toInt()}" }.orEmpty()
-                        Text(resultText, color = WaspadAIDarkBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        completedAt?.let {
-                            Text("Selesai $it", color = WaspadAIBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
+    }
+}
+
+private fun conciseLearningDescription(title: String, fallback: String): String = when {
+    title.contains("Phishing", ignoreCase = true) ->
+        "Kenali pencurian OTP, PIN, dan kredensial."
+    title.contains("Impersonation", ignoreCase = true) ->
+        "Kenali penipuan yang mengatasnamakan instansi resmi."
+    title.contains("Misinformasi", ignoreCase = true) || title.contains("Hoaks", ignoreCase = true) ->
+        "Belajar mengenali berita palsu dan memeriksa sumber informasi."
+    else -> fallback
+}
+
+private fun conciseLearningTitle(title: String): String = when {
+    title.contains("Misinformasi", ignoreCase = true) -> "Misinformasi dan Hoaks"
+    else -> title
+}
+
+@Composable
+private fun LearningCompletedNextAction(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.padding(horizontal = learningContentGutter()),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("Lanjutkan latihan", color = WaspadAIDarkBlue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Ulangi materi atau coba kuis untuk memperkuat pemahaman.",
+            color = WaspadAIMuted,
+            fontSize = 12.sp,
+        )
+        Text(
+            "Coba kuis lagi",
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)
+                .padding(horizontal = 2.dp, vertical = 8.dp),
+            color = WaspadAIBlue,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

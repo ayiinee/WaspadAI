@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,6 +58,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -194,6 +197,10 @@ fun VerificationScreen(
     val isSubmitting = state.phase is VerificationPhase.Validating || state.phase is VerificationPhase.Submitting
 
     BackHandler(enabled = isChatScreen, onBack = onBackToConversations)
+
+    LaunchedEffect(state.activeConversationId) {
+        isBottomNavigationVisible = true
+    }
 
     val scrollDirectionListener = remember {
         object : NestedScrollConnection {
@@ -564,49 +571,59 @@ private fun QuickAccessDialog(
     onAddQuickTile: () -> Unit,
     onToggleBubble: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.88f
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Color.White,
+        scrimColor = Color.Black.copy(alpha = 0.32f),
+        dragHandle = { BottomSheetDefaults.DragHandle() },
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = maxSheetHeight),
         ) {
-            Text("Akses Cepat", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            Text(
-                "Pilih cara yang paling nyaman untuk menggunakan WaspadAI.",
-                color = Color(0xFF557383),
-                fontSize = 13.sp,
-            )
-            Spacer(Modifier.height(6.dp))
-            QuickAccessSetting(
-                icon = Icons.Rounded.SmartToy,
-                title = "Assistant perangkat",
-                description = "Panggil WaspadAI dengan gesture assistant di perangkatmu.",
-                status = null,
-                isComplete = assistantEnabled,
-                actionLabel = if (assistantEnabled) null else "Aktifkan",
-                onAction = if (assistantAvailable) onSetAssistant else onOpenAssistantSettings,
-            )
-            QuickAccessSetting(
-                icon = Icons.Rounded.ChatBubbleOutline,
-                title = "Tanyain",
-                description = "Tampilkan tombol mengambang untuk bertanya tentang isi layar.",
-                status = if (bubbleEnabled) "Aktif" else null,
-                switchChecked = bubbleEnabled,
-                onSwitchChanged = { onToggleBubble() },
-            )
-            QuickAccessSetting(
-                icon = Icons.Rounded.GridView,
-                title = "Quick Settings",
-                description = "Tambahkan tombol Periksa layar ke panel cepat.",
-                status = null,
-                isComplete = quickTileAdded,
-                actionLabel = if (quickTileAdded) null else "Tambahkan",
-                onAction = onAddQuickTile,
-            )
+            Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
+                Text("Akses Cepat", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(
+                    "Pilih cara yang paling nyaman untuk menggunakan WaspadAI.",
+                    color = Color(0xFF557383),
+                    fontSize = 13.sp,
+                )
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                QuickAccessSetting(
+                    icon = Icons.Rounded.SmartToy,
+                    title = "Assistant perangkat",
+                    description = "Panggil WaspadAI dengan gesture assistant di perangkatmu.",
+                    status = null,
+                    isComplete = assistantEnabled,
+                    actionLabel = if (assistantEnabled) null else "Aktifkan",
+                    onAction = if (assistantAvailable) onSetAssistant else onOpenAssistantSettings,
+                )
+                QuickAccessSetting(
+                    icon = Icons.Rounded.ChatBubbleOutline,
+                    title = "Tanyain",
+                    description = "Tampilkan tombol mengambang untuk bertanya tentang isi layar.",
+                    status = if (bubbleEnabled) "Aktif" else null,
+                    switchChecked = bubbleEnabled,
+                    onSwitchChanged = { onToggleBubble() },
+                )
+                QuickAccessSetting(
+                    icon = Icons.Rounded.GridView,
+                    title = "Quick Settings",
+                    description = "Tambahkan tombol Periksa layar ke panel cepat.",
+                    status = null,
+                    isComplete = quickTileAdded,
+                    actionLabel = if (quickTileAdded) null else "Tambahkan",
+                    onAction = onAddQuickTile,
+                )
+            }
         }
     }
 }

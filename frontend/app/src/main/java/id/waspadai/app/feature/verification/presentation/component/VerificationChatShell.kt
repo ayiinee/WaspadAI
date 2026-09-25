@@ -199,12 +199,12 @@ fun VerificationChatShell(
                 composer(
                     Modifier.fillMaxWidth().background(Color.White)
                         .padding(horizontal = contentGutter, vertical = 10.dp)
-                        .then(if (emptyChat) Modifier.padding(bottom = bottomNavigationPadding) else Modifier.navigationBarsPadding())
+                        .then(if (showBottomNavigation) Modifier.padding(bottom = bottomNavigationPadding) else Modifier.navigationBarsPadding())
                         .imePadding(),
                 )
             }
             AnimatedVisibility(
-                visible = emptyChat && showBottomNavigation,
+                visible = showBottomNavigation,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
@@ -214,7 +214,7 @@ fun VerificationChatShell(
             ActionFeedbackHost(
                 snackbar,
                 Modifier.align(Alignment.BottomCenter)
-                    .padding(bottom = if (emptyChat && showBottomNavigation) bottomNavigationPadding else 0.dp),
+                    .padding(bottom = if (showBottomNavigation) bottomNavigationPadding else 0.dp),
             )
         }
     }

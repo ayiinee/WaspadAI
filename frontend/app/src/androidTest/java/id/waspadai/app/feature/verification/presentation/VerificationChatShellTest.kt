@@ -59,7 +59,7 @@ class VerificationChatShellTest {
     }
 
     @Test
-    fun bottomNavigationOnlyAppearsForEmptyChat() {
+    fun bottomNavigationAppearsForEmptyAndActiveChatWhenVisible() {
         composeRule.setContent {
             WaspadAITheme {
                 VerificationChatShell(
@@ -84,6 +84,7 @@ class VerificationChatShellTest {
                 VerificationChatShell(
                     state = VerificationUiState(
                         conversation = listOf(VerificationConversationItem.UserMessage("Pesan")),
+                        activeConversationId = "conversation-1",
                     ),
                     listState = rememberLazyListState(),
                     scrollDirectionListener = nestedScrollConnection,
@@ -97,6 +98,26 @@ class VerificationChatShellTest {
             }
         }
 
+        composeRule.onNodeWithTag("bottom-navigation-wrapper").assertIsDisplayed()
+
+        composeRule.setContent {
+            WaspadAITheme {
+                VerificationChatShell(
+                    state = VerificationUiState(
+                        conversation = listOf(VerificationConversationItem.UserMessage("Pesan")),
+                        activeConversationId = "conversation-1",
+                    ),
+                    listState = rememberLazyListState(),
+                    scrollDirectionListener = nestedScrollConnection,
+                    contentGutter = 16.dp,
+                    bottomNavigationPadding = 80.dp,
+                    showBottomNavigation = false,
+                    onAction = {},
+                    onDestinationSelected = {},
+                    composer = { Text("Composer", modifier = it) },
+                )
+            }
+        }
         composeRule.onAllNodesWithTag("bottom-navigation-wrapper").assertCountEquals(0)
     }
 

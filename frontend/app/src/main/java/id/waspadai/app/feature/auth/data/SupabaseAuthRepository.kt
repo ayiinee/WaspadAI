@@ -1,5 +1,6 @@
 package id.waspadai.app.feature.auth.data
 
+import android.util.Base64
 import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -14,6 +15,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.json.JSONObject
 
 class SupabaseAuthRepository(
     private val client: HttpClient,
@@ -25,19 +29,25 @@ class SupabaseAuthRepository(
     private val restoredSession = sessionStore.load()
     private var accessToken: String = restoredSession?.accessToken ?: initialAccessToken.trim()
     private var refreshToken: String = restoredSession?.refreshToken.orEmpty()
+    private val refreshMutex = Mutex()
 
-    override suspend fun currentAccessToken(): String? = accessToken.takeIf(String::isNotBlank)
+    override suspend fun currentAccessToken(): String? {
+        if (accessToken.isBlank()) return null
+        if (!accessToken.expiresSoon()) return accessToken
+        return runCatching { refreshAccessToken() }.getOrNull() ?: accessToken
+    }
 
-    fun hasSession(): Boolean = accessToken.isNotBlank()
+    fun hasSession(): Boolean = accessToken.isNotBlank() || refreshToken.isNotBlank()
 
-    override suspend fun refreshAccessToken(): String? {
-        val token = refreshToken.takeIf(String::isNotBlank) ?: return currentAccessToken()
+    override suspend fun refreshAccessToken(): String? = refreshMutex.withLock {
+        val token = refreshToken.takeIf(String::isNotBlank)
+            ?: return@withLock accessToken.takeIf(String::isNotBlank)
         val session = requestSession(
             path = "token?grant_type=refresh_token",
             body = RefreshRequestDto(refreshToken = token),
         )
         saveSession(session)
-        return currentAccessToken()
+        accessToken.takeIf(String::isNotBlank)
     }
 
     suspend fun signIn(email: String, password: String) {
@@ -184,6 +194,15 @@ class SupabaseAuthRepository(
 }
 
 class SupabaseAuthException(message: String) : RuntimeException(message)
+
+private fun String.expiresSoon(): Boolean = runCatching {
+    val payload = split('.').getOrNull(1) ?: return@runCatching false
+    val decoded = String(
+        Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+    )
+    val expiresAtSeconds = JSONObject(decoded).optLong("exp", Long.MAX_VALUE)
+    expiresAtSeconds <= System.currentTimeMillis() / 1000L + 60L
+}.getOrDefault(false)
 
 @Serializable
 private data class EmailPasswordRequestDto(
