@@ -1,6 +1,5 @@
 package id.waspadai.app.feature.auth.data
 
-import android.util.Base64
 import id.waspadai.app.feature.verification.data.AccessTokenProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -17,7 +16,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.json.JSONObject
+import java.util.Base64
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 class SupabaseAuthRepository(
     private val client: HttpClient,
@@ -197,10 +200,9 @@ class SupabaseAuthException(message: String) : RuntimeException(message)
 
 private fun String.expiresSoon(): Boolean = runCatching {
     val payload = split('.').getOrNull(1) ?: return@runCatching false
-    val decoded = String(
-        Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-    )
-    val expiresAtSeconds = JSONObject(decoded).optLong("exp", Long.MAX_VALUE)
+    val decoded = String(Base64.getUrlDecoder().decode(payload))
+    val expiresAtSeconds = Json.parseToJsonElement(decoded)
+        .jsonObject["exp"]?.jsonPrimitive?.longOrNull ?: Long.MAX_VALUE
     expiresAtSeconds <= System.currentTimeMillis() / 1000L + 60L
 }.getOrDefault(false)
 

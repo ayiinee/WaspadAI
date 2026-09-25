@@ -22,6 +22,33 @@ import org.junit.Test
 
 class SupabaseAuthRepositoryTest {
     @Test
+    fun `expired persisted access token is refreshed without asking user to login`() = runTest {
+        val expiredJwt = "header.eyJleHAiOjF9.signature"
+        val store = FakeSessionStore(StoredAuthSession(expiredJwt, "persisted-refresh"))
+        val engine = MockEngine { request ->
+            assertEquals(
+                "https://project.supabase.co/auth/v1/token?grant_type=refresh_token",
+                request.url.toString(),
+            )
+            val payload = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+            assertEquals("persisted-refresh", payload["refresh_token"]?.jsonPrimitive?.content)
+            respond(
+                """{"access_token":"renewed-access","refresh_token":"renewed-refresh"}""",
+                headers = jsonHeaders(),
+            )
+        }
+        val repository = SupabaseAuthRepository(
+            client = httpClient(engine),
+            supabaseUrl = "https://project.supabase.co",
+            publishableKey = "publishable-key",
+            sessionStore = store,
+        )
+
+        assertEquals("renewed-access", repository.currentAccessToken())
+        assertTrue(repository.hasSession())
+    }
+
+    @Test
     fun `restores persisted session after process recreation and clears it on logout`() = runTest {
         val store = FakeSessionStore(StoredAuthSession("restored-access", "restored-refresh"))
         val repository = SupabaseAuthRepository(

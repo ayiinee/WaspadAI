@@ -107,7 +107,9 @@ class VerificationViewModel(
                 it.copy(communityShare = it.communityShare.copy(ragReuseConsent = action.granted))
             }
             is VerificationAction.CommunityCaptionChanged -> _state.update {
-                it.copy(communityShare = it.communityShare.copy(caption = action.caption.take(5000)))
+                val caption = action.caption.takeIf { value -> value.wordCount() <= 500 }
+                    ?: it.communityShare.caption
+                it.copy(communityShare = it.communityShare.copy(caption = caption))
             }
             VerificationAction.PublishCommunity -> publishCommunity()
             VerificationAction.DismissCommunityShare -> dismissCommunityShare()
@@ -936,3 +938,9 @@ class VerificationViewModel(
             .ifBlank { "Pemeriksaan gambar" }
     }
 }
+
+private fun String.wordCount(): Int = trim()
+    .takeIf { it.isNotEmpty() }
+    ?.split(Regex("\\s+"))
+    ?.size
+    ?: 0

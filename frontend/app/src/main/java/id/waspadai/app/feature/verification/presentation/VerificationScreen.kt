@@ -23,6 +23,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,9 +32,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
@@ -43,6 +47,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
@@ -54,13 +59,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Switch
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -88,6 +97,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -403,16 +414,11 @@ fun VerificationScreen(
                         )
                     }
                 }
-            CommunityConsentDialog(
-                preview = sharePhase.preview,
+            CommunitySharePage(
                 sourceAttachment = sourceAttachment,
                 caption = state.communityShare.caption,
-                ragReuseConsent = state.communityShare.ragReuseConsent,
                 onCaptionChanged = {
                     onAction(VerificationAction.CommunityCaptionChanged(it))
-                },
-                onRagReuseConsentChanged = {
-                    onAction(VerificationAction.CommunityRagConsentChanged(it))
                 },
                 onDismiss = { onAction(VerificationAction.DismissCommunityShare) },
                 onPublish = { onAction(VerificationAction.PublishCommunity) },
@@ -706,6 +712,143 @@ private fun Context.openAssistantSettings() {
         ).show()
     }
 }
+
+@Composable
+private fun CommunitySharePage(
+    sourceAttachment: ImageVerificationPreview?,
+    caption: String,
+    onCaptionChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onPublish: () -> Unit,
+) {
+    val sourceBitmap = remember(sourceAttachment?.imageBytes) {
+        sourceAttachment?.imageBytes?.let { bytes ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }
+    }
+    val wordCount = remember(caption) { caption.wordCount() }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.White,
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .padding(horizontal = 12.dp),
+                ) {
+                    Text(
+                        text = "Bagikan ke Koneksi",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Tutup",
+                            tint = Color(0xFF415F70),
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    if (sourceBitmap != null) {
+                        Image(
+                            bitmap = sourceBitmap.asImageBitmap(),
+                            contentDescription = sourceAttachment?.fileName?.let { "Preview $it" },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 220.dp, max = 360.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFFD7E3EA), RoundedCornerShape(16.dp))
+                                .background(Color(0xFFF7FAFC)),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Caption",
+                            color = Color(0xFF183B52),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        OutlinedTextField(
+                            value = caption,
+                            onValueChange = { updatedCaption ->
+                                if (updatedCaption.wordCount() <= 500) {
+                                    onCaptionChanged(updatedCaption)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 132.dp),
+                            placeholder = { Text("Tulis konteks kasus ini...") },
+                            shape = RoundedCornerShape(16.dp),
+                            minLines = 4,
+                            maxLines = 8,
+                        )
+                        Text(
+                            text = "Wajib diisi • $wordCount/500 kata",
+                            color = Color(0xFF607D8B),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text("Batal")
+                    }
+                    Button(
+                        onClick = onPublish,
+                        enabled = caption.isNotBlank() && wordCount <= 500,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text("Publikasikan")
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun String.wordCount(): Int = trim()
+    .takeIf { it.isNotEmpty() }
+    ?.split(Regex("\\s+"))
+    ?.size
+    ?: 0
 
 @Composable
 private fun CommunityConsentDialog(
