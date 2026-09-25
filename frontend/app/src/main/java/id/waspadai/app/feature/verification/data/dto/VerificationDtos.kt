@@ -35,6 +35,61 @@ data class VerificationResponseDto(
     val disclaimer: String = "",
     val rulebook: RulebookDto? = null,
     val presentation: PresentationDto? = null,
+    @SerialName("official_referral") val officialReferral: OfficialReferralDto = OfficialReferralDto(),
+    @SerialName("resolved_official_referral") val resolvedOfficialReferral: ResolvedOfficialReferralDto? = null,
+)
+
+@Serializable
+data class OfficialReferralDto(
+    val status: String = "NOT_REQUIRED",
+    val mode: String? = null,
+    @SerialName("reason_codes") val reasonCodes: List<String> = emptyList(),
+    val summary: String? = null,
+    val routes: List<OfficialReferralRouteDto> = emptyList(),
+)
+
+@Serializable
+data class OfficialReferralRouteDto(
+    @SerialName("route_type") val routeType: String,
+    val priority: String,
+    val reason: String,
+)
+
+@Serializable
+data class ResolvedOfficialReferralDto(
+    val status: String = "NOT_REQUIRED",
+    val mode: String? = null,
+    val summary: String? = null,
+    val routes: List<ResolvedOfficialRouteDto> = emptyList(),
+    @SerialName("government_reporting_options") val governmentReportingOptions: List<OfficialReportingOptionDto> = emptyList(),
+)
+
+@Serializable
+data class OfficialReportingOptionDto(
+    val subject: String,
+    val title: String,
+    val description: String,
+    val channel: OfficialChannelDto,
+)
+
+@Serializable
+data class ResolvedOfficialRouteDto(
+    @SerialName("route_type") val routeType: String,
+    val priority: String,
+    val reason: String,
+    @SerialName("action_type") val actionType: String,
+    val title: String,
+    val guidance: String? = null,
+    val channel: OfficialChannelDto? = null,
+)
+
+@Serializable
+data class OfficialChannelDto(
+    val id: String,
+    @SerialName("organization_name") val organizationName: String,
+    @SerialName("channel_name") val channelName: String,
+    val description: String,
+    @SerialName("destination_url") val destinationUrl: String,
 )
 
 @Serializable
@@ -67,6 +122,7 @@ data class SourceDto(
 
 @Serializable
 data class RecommendedActionDto(
+    val code: String? = null,
     val title: String? = null,
     val detail: String? = null
 )

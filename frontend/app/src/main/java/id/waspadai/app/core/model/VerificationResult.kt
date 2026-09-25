@@ -5,6 +5,9 @@ data class VerificationResult(
     val riskLevel: RiskLevel,
     val reasons: List<String>,
     val recommendedActions: List<String>,
+    val recommendedActionCodes: List<String> = emptyList(),
+    val recommendedActionDetails: List<RecommendedAction> = emptyList(),
+    val officialReferral: OfficialReferral = OfficialReferral(),
     val headline: String = "",
     val narrativeParagraphs: List<String> = emptyList(),
     val isNonCheckableImage: Boolean = false,
@@ -19,6 +22,45 @@ data class VerificationResult(
     val conversationId: String? = null,
     val communityEligible: Boolean = false,
     val communityState: String = "",
+)
+
+data class RecommendedAction(
+    val code: String? = null,
+    val title: String? = null,
+    val detail: String? = null,
+)
+
+data class OfficialReferral(
+    val status: String = "NOT_REQUIRED",
+    val mode: String? = null,
+    val reasonCodes: List<String> = emptyList(),
+    val summary: String? = null,
+    val routes: List<OfficialReferralRoute> = emptyList(),
+    val governmentReportingOptions: List<OfficialReportingOption> = emptyList(),
+) {
+    val isVisible: Boolean get() = status == "RECOMMENDED" || status == "URGENT"
+}
+
+data class OfficialReportingOption(
+    val subject: String,
+    val title: String,
+    val description: String,
+    val channelId: String,
+    val organization: String,
+    val destinationUrl: String,
+)
+
+data class OfficialReferralRoute(
+    val routeType: String,
+    val priority: String,
+    val reason: String,
+    val actionType: String,
+    val title: String,
+    val guidance: String? = null,
+    val channelId: String? = null,
+    val organization: String? = null,
+    val channelDescription: String? = null,
+    val destinationUrl: String? = null,
 )
 
 enum class RiskLevel(val label: String) {

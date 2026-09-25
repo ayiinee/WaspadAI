@@ -3,9 +3,11 @@ package id.waspadai.app.feature.verification.presentation.component
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,7 +98,12 @@ fun VerificationMobileHeader(
             )
             TextButton(
                 onClick = onOpenQuickAccess,
-                modifier = Modifier.testTag("verification-quick-access"),
+                modifier = Modifier
+                    .testTag("verification-quick-access")
+                    .padding(end = 5.dp)
+                    .border(1.dp, Color.White.copy(alpha = .9f), RoundedCornerShape(50)),
+                shape = RoundedCornerShape(50),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
             ) {
                 Text(
                     "Akses Cepat",

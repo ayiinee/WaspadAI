@@ -11,6 +11,11 @@ import id.waspadai.app.feature.verification.data.dto.RecommendedActionDto
 import id.waspadai.app.feature.verification.data.dto.RulebookDto
 import id.waspadai.app.feature.verification.data.dto.SourceDto
 import id.waspadai.app.feature.verification.data.dto.VerificationResponseDto
+import id.waspadai.app.feature.verification.data.dto.OfficialReferralDto
+import id.waspadai.app.feature.verification.data.dto.ResolvedOfficialReferralDto
+import id.waspadai.app.feature.verification.data.dto.ResolvedOfficialRouteDto
+import id.waspadai.app.feature.verification.data.dto.OfficialReportingOptionDto
+import id.waspadai.app.feature.verification.data.dto.OfficialChannelDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -18,6 +23,34 @@ import org.junit.Test
 
 class VerificationMapperTest {
     private val mapper = VerificationMapper()
+
+    @Test
+    fun `referral status controls visibility and priority is preserved`() {
+        val routes = listOf(
+            ResolvedOfficialRouteDto("FUTURE_ROUTE", "PRIMARY", "Unknown", "EXTERNAL_URL", "Unknown"),
+            ResolvedOfficialRouteDto("FINANCIAL_SCAM_REPORTING", "SECONDARY", "Lapor resmi", "GUIDANCE_ONLY", "IASC"),
+            ResolvedOfficialRouteDto("FINANCIAL_PROVIDER", "PRIMARY", "Hubungi bank", "GUIDANCE_ONLY", "Bank"),
+        )
+        fun map(status: String) = mapper.map(VerificationResponseDto(
+            officialReferral = OfficialReferralDto(status = status, mode = "RECOVERY"),
+            resolvedOfficialReferral = ResolvedOfficialReferralDto(status = status, routes = routes,
+                governmentReportingOptions = listOf(OfficialReportingOptionDto(
+                    "SUSPICIOUS_CONTENT", "Aduan Konten", "Laporkan tautan", OfficialChannelDto(
+                        "komdigi-aduan-konten", "Komdigi", "Aduan Konten", "Laporkan tautan",
+                        "https://www.aduankonten.id/")))),
+            recommendedActions = listOf(RecommendedActionDto(code = "NEW_UPSTREAM_CODE", title = "Aman")),
+            presentation = PresentationDto(NarrativeDto("Periksa sumber.")),
+        ))
+        assertTrue(!map("NOT_REQUIRED").officialReferral.isVisible)
+        assertTrue(map("NOT_REQUIRED").officialReferral.governmentReportingOptions.isEmpty())
+        val urgent = map("URGENT")
+        assertTrue(urgent.officialReferral.isVisible)
+        assertEquals("FINANCIAL_PROVIDER", urgent.officialReferral.routes.first().routeType)
+        assertEquals(2, urgent.officialReferral.routes.size)
+        assertEquals("komdigi-aduan-konten", urgent.officialReferral.governmentReportingOptions.first().channelId)
+        assertEquals(listOf("NEW_UPSTREAM_CODE"), urgent.recommendedActionCodes)
+        assertEquals("NEW_UPSTREAM_CODE", urgent.recommendedActionDetails.first().code)
+    }
 
     @Test
     fun `maps direct public API narrative without product wrapper`() {

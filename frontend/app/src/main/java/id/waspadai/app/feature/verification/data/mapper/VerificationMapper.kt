@@ -5,6 +5,10 @@ import id.waspadai.app.core.model.FactualStatus
 import id.waspadai.app.core.model.Verdict
 import id.waspadai.app.core.model.VerificationEvidence
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.core.model.OfficialReferral
+import id.waspadai.app.core.model.OfficialReferralRoute
+import id.waspadai.app.core.model.OfficialReportingOption
+import id.waspadai.app.core.model.RecommendedAction
 import id.waspadai.app.core.model.VerificationSource
 import id.waspadai.app.feature.verification.data.dto.VerificationResponseDto
 import id.waspadai.app.feature.verification.data.dto.HistoryMetaDto
@@ -45,6 +49,48 @@ class VerificationMapper {
                     else -> null
                 }
             },
+            recommendedActionCodes = response.recommendedActions.mapNotNull { it.code },
+            recommendedActionDetails = response.recommendedActions.map { action ->
+                RecommendedAction(action.code, action.title, action.detail)
+            },
+            officialReferral = OfficialReferral(
+                status = response.officialReferral.status,
+                mode = response.officialReferral.mode,
+                reasonCodes = response.officialReferral.reasonCodes,
+                summary = response.officialReferral.summary,
+                routes = if (response.officialReferral.status == "NOT_REQUIRED") emptyList() else
+                    response.resolvedOfficialReferral?.routes.orEmpty()
+                        .filter { it.routeType in knownReferralRoutes }
+                        .map { route ->
+                        OfficialReferralRoute(
+                            routeType = route.routeType,
+                            priority = route.priority,
+                            reason = route.reason,
+                            actionType = route.actionType,
+                            title = route.title,
+                            guidance = route.guidance,
+                            channelId = route.channel?.id,
+                            organization = route.channel?.organizationName,
+                            channelDescription = route.channel?.description,
+                            destinationUrl = route.channel?.destinationUrl?.takeIf(::isPublicHttpsUrl),
+                        )
+                    }.sortedBy { it.priority != "PRIMARY" },
+                governmentReportingOptions = if (response.officialReferral.status == "NOT_REQUIRED")
+                    emptyList() else response.resolvedOfficialReferral?.governmentReportingOptions.orEmpty()
+                    .filter { it.subject in setOf("SUSPICIOUS_NUMBER", "SUSPICIOUS_CONTENT") }
+                    .mapNotNull { option ->
+                        val url = option.channel.destinationUrl.takeIf(::isPublicHttpsUrl)
+                            ?: return@mapNotNull null
+                        OfficialReportingOption(
+                            subject = option.subject,
+                            title = option.title,
+                            description = option.description,
+                            channelId = option.channel.id,
+                            organization = option.channel.organizationName,
+                            destinationUrl = url,
+                        )
+                    },
+            ),
             evidence = response.evidence.mapNotNull { item ->
                 val title = item.title.trim()
                 val excerpt = item.excerpt.trim()
@@ -80,5 +126,15 @@ private fun isPublicHttpUrl(value: String): Boolean = runCatching {
     val uri = java.net.URI(value)
     (uri.scheme == "https" || uri.scheme == "http") && !uri.host.isNullOrBlank()
 }.getOrDefault(false)
+
+private fun isPublicHttpsUrl(value: String): Boolean = runCatching {
+    val uri = java.net.URI(value)
+    uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null
+}.getOrDefault(false)
+
+private val knownReferralRoutes = setOf(
+    "OFFICIAL_INSTITUTION", "ACCOUNT_PROVIDER", "FINANCIAL_PROVIDER",
+    "FINANCIAL_SCAM_REPORTING", "PLATFORM_REPORTING", "DEVICE_RECOVERY",
+)
 
 class MissingNarrativeException : IllegalStateException()

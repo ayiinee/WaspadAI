@@ -7,6 +7,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +34,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -86,6 +91,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import id.waspadai.app.core.model.RiskLevel
 import id.waspadai.app.core.model.VerificationResult
+import id.waspadai.app.core.model.OfficialReferral
+import id.waspadai.app.core.model.OfficialReferralRoute
 import id.waspadai.app.core.ui.BrandBlue
 import id.waspadai.app.core.ui.DeepBlue
 import id.waspadai.app.core.ui.Ink
@@ -600,6 +607,10 @@ fun AnalysisCard(
                 Text("Langkah Paling Aman", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 result.recommendedActions.forEach { Bullet(it) }
             }
+            if (result.officialReferral.isVisible) {
+                Spacer(Modifier.height(14.dp))
+                OfficialReferralCard(result.officialReferral)
+            }
             if (result.sources.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
                 Text("Sumber", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -658,6 +669,112 @@ fun AnalysisCard(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OfficialReferralCard(referral: OfficialReferral) {
+    val context = LocalContext.current
+    var showSheet by remember { mutableStateOf(false) }
+    var selectedChannelUrl by remember { mutableStateOf<String?>(null) }
+    var selectedChannelName by remember { mutableStateOf<String?>(null) }
+    var feedback by remember { mutableStateOf(false) }
+    val urgent = referral.status == "URGENT"
+    val recovery = referral.mode == "RECOVERY" || urgent
+    val heading = if (recovery) "Segera lakukan langkah pemulihan" else "Verifikasi melalui kanal resmi"
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { showSheet = true },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = if (urgent) Color(0xFFFFF8E9) else SoftBlue),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("✦  $heading", color = BrandBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (recovery) "Ada tindakan resmi yang disarankan untuk membantu mengurangi risiko."
+                else "Ada langkah resmi yang dapat kamu gunakan sebelum melanjutkan.",
+                color = Ink, fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(if (recovery) "Lihat langkah pemulihan →" else "Lihat bantuan resmi →", color = BrandBlue, fontWeight = FontWeight.Bold)
+        }
+    }
+    if (showSheet) {
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 640.dp)
+                .verticalScroll(rememberScrollState()).padding(20.dp)) {
+                Text("Rujukan & Bantuan Resmi", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
+                Spacer(Modifier.height(8.dp))
+                Text(heading, color = BrandBlue, fontWeight = FontWeight.Bold)
+                referral.summary?.takeIf(String::isNotBlank)?.let { Text(it, color = Ink, fontSize = 13.sp) }
+                Spacer(Modifier.height(12.dp))
+                referral.routes.forEach { route ->
+                    Card(Modifier.fillMaxWidth().padding(vertical = 5.dp), shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = SoftBlue)) {
+                        Column(Modifier.padding(14.dp)) {
+                            Text(route.title, fontWeight = FontWeight.Bold, color = Ink)
+                            if (route.priority == "PRIMARY") Text("Prioritas utama", color = BrandBlue, fontSize = 12.sp)
+                            route.organization?.let { Text(it, color = BrandBlue, fontSize = 12.sp) }
+                            Text(route.reason, color = Ink, fontSize = 13.sp)
+                            route.guidance?.let { Text(it, color = Ink, fontSize = 13.sp) }
+                            if (route.actionType == "EXTERNAL_URL") {
+                                TextButton(onClick = {
+                                    selectedChannelUrl = route.destinationUrl.orEmpty()
+                                    selectedChannelName = route.title
+                                }) { Text("Buka kanal resmi") }
+                            }
+                        }
+                    }
+                }
+                if (referral.governmentReportingOptions.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text("Kanal pengaduan pemerintah", fontWeight = FontWeight.Bold, color = Ink)
+                    Text("Pilih sesuai yang ingin kamu laporkan. Laporan tidak dikirim otomatis.",
+                        color = Ink, fontSize = 13.sp)
+                    referral.governmentReportingOptions.forEach { option ->
+                        Card(Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = SoftBlue)) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text(option.title, fontWeight = FontWeight.Bold, color = Ink)
+                                Text(option.organization, color = BrandBlue, fontSize = 12.sp)
+                                Text(option.description, color = Ink, fontSize = 13.sp)
+                                TextButton(onClick = {
+                                    selectedChannelUrl = option.destinationUrl
+                                    selectedChannelName = option.title
+                                }) { Text("Buka kanal pengaduan") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    selectedChannelUrl?.let { url ->
+        AlertDialog(
+            onDismissRequest = { selectedChannelUrl = null },
+            title = { Text("Buka kanal resmi?") },
+            text = { Text("Kamu akan diarahkan keluar dari WaspadAI menuju ${selectedChannelName ?: "kanal resmi"}. WaspadAI tidak mengirim laporan atau data secara otomatis.") },
+            confirmButton = { TextButton(onClick = {
+                selectedChannelUrl = null
+                if (!isValidOfficialUrl(url) || runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }.isFailure) feedback = true
+            }) { Text("Buka kanal resmi") } },
+            dismissButton = { TextButton(onClick = { selectedChannelUrl = null }) { Text("Batal") } },
+        )
+    }
+    if (feedback) AlertDialog(
+        onDismissRequest = { feedback = false },
+        title = { Text("Kanal tidak tersedia") },
+        text = { Text("Kanal resmi belum dapat dibuka. Coba lagi nanti.") },
+        confirmButton = { TextButton(onClick = { feedback = false }) { Text("OK") } },
+    )
+}
+
+private fun isValidOfficialUrl(value: String): Boolean = runCatching {
+    val uri = java.net.URI(value)
+    uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null
+}.getOrDefault(false)
 
 @Composable
 private fun Bullet(value: String) {
