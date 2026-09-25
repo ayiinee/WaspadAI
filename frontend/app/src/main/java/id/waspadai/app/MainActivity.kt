@@ -32,6 +32,7 @@ import id.waspadai.app.feature.learning.presentation.LearningScreen
 import id.waspadai.app.feature.learning.presentation.LearningViewModel
 import id.waspadai.app.feature.learning.presentation.LearningAction
 import id.waspadai.app.feature.profile.presentation.ProfileRoute
+import id.waspadai.app.feature.profile.presentation.ProfileAction
 import id.waspadai.app.feature.profile.presentation.ProfileViewModel
 import id.waspadai.app.feature.verification.domain.LoadVerificationConversationDetailUseCase
 import id.waspadai.app.feature.verification.domain.LoadVerificationConversationsUseCase
@@ -253,6 +254,7 @@ private fun WaspadAiApp(
                 verificationViewModel.onAction(VerificationAction.RefreshHistory)
             }
             CommunityRouteName -> communityViewModel.onAction(CommunityAction.RefreshBackend)
+            ProfileRouteName -> profileViewModel.onAction(ProfileAction.Refresh)
         }
     }
 

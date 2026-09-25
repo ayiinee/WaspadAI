@@ -24,7 +24,15 @@ class ProfileRepositoryImpl(private val client: HttpClient) : ProfileRepository 
     )
     override suspend fun updateProfile(baseUrl: String, token: String, name: String, bio: String?) = request<ProfileDto, UserProfile>(
         baseUrl, token, "/api/v1/me/profile",
-        call = { url -> client.patch(url) { auth(token); setBody(ProfileUpdateDto(name, bio)) } },
+        call = { url ->
+            client.patch(url) {
+                auth(token)
+                headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                }
+                setBody(ProfileUpdateDto(name.trim(), bio?.trim()?.ifBlank { null }))
+            }
+        },
         map = { it.toDomain(baseUrl) },
     )
     override suspend fun uploadAvatar(baseUrl: String, token: String, bytes: ByteArray, contentType: String) = request<ProfileDto, UserProfile>(
