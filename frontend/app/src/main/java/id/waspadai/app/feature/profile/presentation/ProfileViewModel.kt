@@ -26,6 +26,7 @@ data class ProfileUiState(
     val saving: Boolean = false,
     val error: String? = null,
     val message: String? = null,
+    val messageIsError: Boolean = false,
     val accessToken: String = "",
     val hasMore: Boolean = false,
     val selectedActivity: ProfileActivityItem? = null,
@@ -69,7 +70,7 @@ class ProfileViewModel(
             is ProfileAction.SaveProfile -> save(action.name, action.bio)
             is ProfileAction.UploadAvatar -> uploadAvatar(action.bytes, action.contentType)
             ProfileAction.DeleteAvatar -> deleteAvatar()
-            ProfileAction.DismissMessage -> _uiState.update { it.copy(message = null, error = null) }
+            ProfileAction.DismissMessage -> _uiState.update { it.copy(message = null, messageIsError = false) }
             ProfileAction.LoadMore -> loadDetail(_uiState.value.page, append = true)
             is ProfileAction.OpenActivity -> _uiState.update {
                 it.copy(page = ProfilePage.ItemDetail, detailParent = it.page, selectedActivity = action.item, selectedLearning = null)
@@ -136,8 +137,8 @@ class ProfileViewModel(
         val token = tokenProvider.currentAccessToken() ?: return@launch
         _uiState.update { it.copy(saving = true, error = null) }
         when (val result = repository.updateProfile(baseUrl, token, name, bio)) {
-            is AppResult.Success -> _uiState.update { it.copy(profile = result.value, saving = false, page = ProfilePage.Dashboard, message = "Profil berhasil diperbarui.") }
-            is AppResult.Failure -> _uiState.update { it.copy(saving = false, error = result.message) }
+            is AppResult.Success -> _uiState.update { it.copy(profile = result.value, saving = false, page = ProfilePage.Dashboard, message = "Profil berhasil diperbarui.", messageIsError = false) }
+            is AppResult.Failure -> _uiState.update { it.copy(saving = false, message = result.message, messageIsError = true) }
         }
     }
 
@@ -145,8 +146,8 @@ class ProfileViewModel(
         val token = tokenProvider.currentAccessToken() ?: return@launch
         _uiState.update { it.copy(saving = true, error = null) }
         when (val result = repository.uploadAvatar(baseUrl, token, bytes, type)) {
-            is AppResult.Success -> _uiState.update { it.copy(profile = result.value, saving = false, message = "Foto profil berhasil diperbarui.") }
-            is AppResult.Failure -> _uiState.update { it.copy(saving = false, error = result.message) }
+            is AppResult.Success -> _uiState.update { it.copy(profile = result.value, saving = false, message = "Foto profil berhasil diperbarui.", messageIsError = false) }
+            is AppResult.Failure -> _uiState.update { it.copy(saving = false, message = result.message, messageIsError = true) }
         }
     }
 
@@ -154,8 +155,8 @@ class ProfileViewModel(
         val token = tokenProvider.currentAccessToken() ?: return@launch
         _uiState.update { it.copy(saving = true) }
         when (val result = repository.deleteAvatar(baseUrl, token)) {
-            is AppResult.Success -> _uiState.update { it.copy(profile = it.profile?.copy(avatarUrl = null), saving = false) }
-            is AppResult.Failure -> _uiState.update { it.copy(saving = false, error = result.message) }
+            is AppResult.Success -> _uiState.update { it.copy(profile = it.profile?.copy(avatarUrl = null), saving = false, message = "Foto profil berhasil dihapus.", messageIsError = false) }
+            is AppResult.Failure -> _uiState.update { it.copy(saving = false, message = result.message, messageIsError = true) }
         }
     }
 

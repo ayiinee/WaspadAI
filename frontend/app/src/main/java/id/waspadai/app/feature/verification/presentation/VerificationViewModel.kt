@@ -321,7 +321,6 @@ class VerificationViewModel(
         } else {
             _state.update { current ->
                 current.copy(
-                    isOverlayModeEnabled = true,
                     isOverlayPrivacyDialogVisible = true,
                     phase = VerificationPhase.Idle,
                 )
@@ -348,7 +347,9 @@ class VerificationViewModel(
             _state.update { current ->
                 current.copy(
                     isOverlayModeEnabled = false,
-                    phase = VerificationPhase.Failure("Izin tampil di atas aplikasi lain belum aktif. Aktifkan izin overlay lalu coba lagi.")
+                    phase = VerificationPhase.Idle,
+                    uiMessage = "Tanyain belum diaktifkan.",
+                    uiMessageRetryAction = null,
                 )
             }
         }
@@ -361,8 +362,10 @@ class VerificationViewModel(
                 phase = if (granted) {
                     VerificationPhase.Idle
                 } else {
-                    VerificationPhase.Failure("Izin tangkapan layar dibatalkan. Mode overlay belum aktif.")
+                    VerificationPhase.Idle
                 },
+                uiMessage = if (granted) null else "Tanyain belum diaktifkan.",
+                uiMessageRetryAction = null,
             )
         }
     }
@@ -721,6 +724,8 @@ class VerificationViewModel(
                         history = current.history.filterNot { it.conversationId == id },
                         pendingDeleteConversationId = null,
                         isConversationMutationRunning = false,
+                        uiMessage = "Percakapan berhasil dihapus.",
+                        uiMessageRetryAction = null,
                         activeConversationId = if (deletingActive) null else current.activeConversationId,
                         activeConversationTitle = if (deletingActive) "Percakapan baru" else current.activeConversationTitle,
                         conversation = if (deletingActive) emptyList() else current.conversation,
@@ -738,7 +743,7 @@ class VerificationViewModel(
                     it.copy(
                         isConversationMutationRunning = false,
                         uiMessage = result.message,
-                        uiMessageRetryAction = VerificationAction.ConfirmDeleteConversation,
+                        uiMessageRetryAction = null,
                     )
                 }
             }

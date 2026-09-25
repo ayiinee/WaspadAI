@@ -123,6 +123,9 @@ class CommunityViewModel(
             CommunityAction.PostManagementErrorDismissed -> _uiState.update {
                 it.copy(postManagementError = null)
             }
+            CommunityAction.PostManagementSuccessDismissed -> _uiState.update {
+                it.copy(postManagementSuccess = null)
+            }
 
             CommunityAction.ShareLinkConsumed -> _uiState.update { it.copy(shareLink = null) }
 
@@ -568,6 +571,7 @@ class CommunityViewModel(
                     state.copy(
                         managingPostId = null,
                         backendMessage = "Postingan berhasil diperbarui.",
+                        postManagementSuccess = "Postingan berhasil diperbarui.",
                         posts = state.posts.map { existing ->
                             if (existing.id == postId) result.value.toPresentation(communityBaseUrl) else existing
                         },
@@ -606,6 +610,7 @@ class CommunityViewModel(
                         state.copy(
                             managingPostId = null,
                             backendMessage = "Postingan berhasil dihapus.",
+                            postManagementSuccess = "Postingan berhasil dihapus.",
                             posts = state.posts.filterNot { it.id == postId },
                             detailByPostId = state.detailByPostId - postId,
                         )

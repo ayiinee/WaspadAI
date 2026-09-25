@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.unit.dp
 import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.feature.verification.presentation.component.VerificationChatShell
@@ -64,6 +65,7 @@ class VerificationChatShellTest {
                 VerificationChatShell(
                     state = VerificationUiState(),
                     listState = rememberLazyListState(),
+                    scrollDirectionListener = nestedScrollConnection,
                     contentGutter = 16.dp,
                     bottomNavigationPadding = 80.dp,
                     showBottomNavigation = true,
@@ -84,6 +86,7 @@ class VerificationChatShellTest {
                         conversation = listOf(VerificationConversationItem.UserMessage("Pesan")),
                     ),
                     listState = rememberLazyListState(),
+                    scrollDirectionListener = nestedScrollConnection,
                     contentGutter = 16.dp,
                     bottomNavigationPadding = 80.dp,
                     showBottomNavigation = true,
@@ -97,6 +100,33 @@ class VerificationChatShellTest {
         composeRule.onAllNodesWithTag("bottom-navigation-wrapper").assertCountEquals(0)
     }
 
+    @Test
+    fun quickAccessButtonIsVisibleAndOpensQuickAccess() {
+        composeRule.setContent {
+            WaspadAITheme {
+                var quickAccessOpened by remember { mutableStateOf(false) }
+                VerificationChatShell(
+                    state = VerificationUiState(),
+                    listState = rememberLazyListState(),
+                    scrollDirectionListener = nestedScrollConnection,
+                    contentGutter = 16.dp,
+                    bottomNavigationPadding = 80.dp,
+                    showBottomNavigation = true,
+                    onAction = {},
+                    onDestinationSelected = {},
+                    onOpenQuickAccess = { quickAccessOpened = true },
+                    composer = { Text("Composer", modifier = it) },
+                )
+                if (quickAccessOpened) Text("Akses cepat terbuka")
+            }
+        }
+
+        composeRule.onNodeWithTag("verification-quick-access")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("Akses cepat terbuka").assertIsDisplayed()
+    }
+
     private fun summary() = VerificationConversationSummary(
         conversationId = "conversation-1",
         title = "Pesan OTP",
@@ -106,4 +136,6 @@ class VerificationChatShellTest {
         createdAt = "2026-09-25T01:00:00Z",
         updatedAt = "2026-09-25T01:00:00Z",
     )
+
+    private val nestedScrollConnection = object : NestedScrollConnection {}
 }

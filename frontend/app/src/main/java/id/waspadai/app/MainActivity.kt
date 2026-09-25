@@ -149,6 +149,7 @@ private fun WaspadAiApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     var showCommunityBadge by rememberSaveable { mutableStateOf(false) }
+    var quickAccessRequest by rememberSaveable { mutableStateOf(0) }
     val verificationViewModel: VerificationViewModel = viewModel(
         factory = VerificationViewModel.Factory(
             submitTextVerification = SubmitTextVerificationUseCase(app.verificationRepository),
@@ -348,6 +349,7 @@ private fun WaspadAiApp(
             }
             VerificationRoute(
                 viewModel = verificationViewModel,
+                openQuickAccessRequest = quickAccessRequest,
                 onDestinationSelected = navigateToTopLevel,
                 onCommunityPublished = { communityId ->
                     showCommunityBadge = true
@@ -461,6 +463,10 @@ private fun WaspadAiApp(
                 onCommunityPostSelected = { communityId ->
                     communityViewModel.onAction(CommunityAction.OpenPublishedPost(communityId))
                     navigateToTopLevel("Koneksi")
+                },
+                onOpenQuickAccess = {
+                    quickAccessRequest += 1
+                    navigateToTopLevel("Periksa")
                 },
             )
         }

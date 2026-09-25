@@ -202,7 +202,7 @@ fun WaspadAIBottomNavigation(
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_magnify_expand),
-                contentDescription = "Periksa informasi",
+                contentDescription = "Periksa layar sekarang",
                 tint = Color.White,
                 modifier = Modifier.size(36.dp),
             )

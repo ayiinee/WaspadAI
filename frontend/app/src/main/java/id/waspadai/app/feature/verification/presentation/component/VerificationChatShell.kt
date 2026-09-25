@@ -26,7 +26,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -35,6 +34,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,11 +47,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.ActionFeedbackHost
+import id.waspadai.app.core.ui.ActionFeedbackKind
+import id.waspadai.app.core.ui.showActionFeedback
 import id.waspadai.app.feature.verification.presentation.VerificationAction
 import id.waspadai.app.feature.verification.presentation.VerificationConversationItem
 import id.waspadai.app.feature.verification.presentation.VerificationPhase
 import id.waspadai.app.feature.verification.presentation.VerificationUiState
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 @Composable
 fun VerificationChatShell(
@@ -63,10 +67,12 @@ fun VerificationChatShell(
     showBottomNavigation: Boolean,
     onAction: (VerificationAction) -> Unit,
     onDestinationSelected: (String) -> Unit,
+    onOpenQuickAccess: () -> Unit = {},
     composer: @Composable (Modifier) -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val snackbar = remember { SnackbarHostState() }
+    val feedbackScope = rememberCoroutineScope()
     val emptyChat = state.conversation.isEmpty() && state.activeConversationId == null
 
     LaunchedEffect(state.isDrawerOpen) {
@@ -85,14 +91,16 @@ fun VerificationChatShell(
     LaunchedEffect(state.uiMessage) {
         state.uiMessage?.let { message ->
             val retry = state.uiMessageRetryAction
-            val result = snackbar.showSnackbar(
-                message = message,
-                actionLabel = retry?.let { "Coba lagi" },
-                withDismissAction = true,
-            )
             onAction(VerificationAction.DismissUiMessage)
-            if (result == SnackbarResult.ActionPerformed && retry != null) {
-                onAction(retry)
+            feedbackScope.launch {
+                val result = snackbar.showActionFeedback(
+                    message = message,
+                    kind = if (message == "Percakapan berhasil dihapus.") ActionFeedbackKind.Success else ActionFeedbackKind.Error,
+                    retry = retry != null,
+                )
+                if (result == SnackbarResult.ActionPerformed && retry != null) {
+                    onAction(retry)
+                }
             }
         }
     }
@@ -130,6 +138,7 @@ fun VerificationChatShell(
                 VerificationMobileHeader(
                     title = if (emptyChat) "WaspadAI" else state.activeConversationTitle,
                     onOpenDrawer = { onAction(VerificationAction.OpenDrawer) },
+                    onOpenQuickAccess = onOpenQuickAccess,
                 )
                 LazyColumn(
                     state = listState,
@@ -202,7 +211,11 @@ fun VerificationChatShell(
             ) {
                 WaspadAIBottomNavigation("Periksa", onDestinationSelected)
             }
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+            ActionFeedbackHost(
+                snackbar,
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = if (emptyChat && showBottomNavigation) bottomNavigationPadding else 0.dp),
+            )
         }
     }
     if (state.pendingDeleteConversationId != null) {

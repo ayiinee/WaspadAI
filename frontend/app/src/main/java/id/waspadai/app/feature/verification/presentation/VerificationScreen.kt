@@ -36,8 +36,13 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -47,6 +52,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +76,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -98,6 +109,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun VerificationRoute(
     viewModel: VerificationViewModel,
+    openQuickAccessRequest: Int = 0,
     isChatScreen: Boolean = false,
     onBackToConversations: () -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
@@ -115,6 +127,7 @@ fun VerificationRoute(
         isChatScreen = isChatScreen,
         onBackToConversations = onBackToConversations,
         onDestinationSelected = onDestinationSelected,
+        openQuickAccessRequest = openQuickAccessRequest,
     )
 }
 
@@ -125,6 +138,7 @@ fun VerificationScreen(
     isChatScreen: Boolean = false,
     onBackToConversations: () -> Unit = {},
     onDestinationSelected: (String) -> Unit = {},
+    openQuickAccessRequest: Int = 0,
 ) {
     val listState = rememberLazyListState()
     val composerFocusRequester = remember { FocusRequester() }
@@ -134,6 +148,10 @@ fun VerificationScreen(
     val quickTileLabel = stringResource(R.string.quick_tile_label)
     val pickerScope = rememberCoroutineScope()
     var showQuickAccess by rememberSaveable { mutableStateOf(false) }
+    var quickTileAdded by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(openQuickAccessRequest) {
+        if (openQuickAccessRequest > 0) showQuickAccess = true
+    }
     val roleManager = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             context.getSystemService(RoleManager::class.java)
@@ -311,9 +329,12 @@ fun VerificationScreen(
                         Icon.createWithResource(context, R.mipmap.ic_launcher),
                         context.mainExecutor,
                     ) {
+                        quickTileAdded = it == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
+                            it == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED
                         Toast.makeText(
                             context,
-                            "Permintaan tile Periksa layar selesai.",
+                            if (quickTileAdded) "Periksa layar ditambahkan ke Quick Settings."
+                            else "Quick Settings belum diubah.",
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -328,9 +349,12 @@ fun VerificationScreen(
             onToggleBubble = {
                 if (state.isOverlayModeEnabled && !state.isOverlayPrivacyDialogVisible) {
                     FloatingVerifyService.stop(context)
+                } else {
+                    showQuickAccess = false
                 }
                 onAction(VerificationAction.RequestOverlayMode)
             },
+            quickTileAdded = quickTileAdded,
         )
     }
 
@@ -517,87 +541,117 @@ fun VerificationScreen(
         showBottomNavigation = shouldShowBottomNavigation,
         onAction = onAction,
         onDestinationSelected = onDestinationSelected,
+        onOpenQuickAccess = {
+            assistantRoleHeld = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                roleManager?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+            showQuickAccess = true
+        },
         composer = verificationComposer,
     )
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun QuickAccessDialog(
     assistantAvailable: Boolean,
     assistantEnabled: Boolean,
     bubbleEnabled: Boolean,
+    quickTileAdded: Boolean,
     onDismiss: () -> Unit,
     onSetAssistant: () -> Unit,
     onOpenAssistantSettings: () -> Unit,
     onAddQuickTile: () -> Unit,
     onToggleBubble: () -> Unit,
 ) {
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Akses Cepat WaspadAI") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    "Pilih cara memanggil verifikasi saat kamu menemukan konten mencurigakan. " +
-                        "Tidak ada screenshot atau teks yang dikirim sebelum kamu menekan Periksa sekarang."
-                )
-                QuickAccessStatus(
-                    title = "Gesture assistant perangkat",
-                    status = when {
-                        assistantEnabled -> "Aktif"
-                        assistantAvailable -> "Belum dipilih"
-                        else -> "Tidak didukung langsung"
-                    },
-                    detail = "Gesture berbeda tiap perangkat: long-press tombol samping, home-hold, atau corner swipe.",
-                )
-                Button(
-                    onClick = onSetAssistant,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !assistantEnabled,
-                ) {
-                    Text(if (assistantEnabled) "WaspadAI sudah menjadi assistant" else "Pilih WaspadAI sebagai assistant")
-                }
-                Text(
-                    "Mengganti assistant sebelumnya memerlukan persetujuan sistem. Kamu dapat mengembalikannya melalui Default Apps.",
-                    fontSize = 12.sp,
-                    color = Color(0xFF557383),
-                )
-                TextButton(
-                    onClick = onOpenAssistantSettings,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Buka pengaturan assistant perangkat")
-                }
-                QuickAccessStatus(
-                    title = "Konteks layar",
-                    status = if (assistantEnabled) "Siap bila diizinkan aplikasi sumber" else "Memerlukan assistant",
-                    detail = "Secure window tetap dilindungi. WaspadAI tidak mencoba melewati FLAG_SECURE.",
-                )
-                QuickAccessStatus(
-                    title = "Quick Settings",
-                    status = "Fallback",
-                    detail = "Tile Periksa layar meminta persetujuan capture satu kali untuk setiap pemeriksaan.",
-                )
-                TextButton(onClick = onAddQuickTile, modifier = Modifier.fillMaxWidth()) {
-                    Text("Tambahkan tile Periksa layar")
-                }
-                QuickAccessStatus(
-                    title = "Floating Verify",
-                    status = if (bubbleEnabled) "Aktif" else "Nonaktif (disarankan)",
-                    detail = "Fallback lanjutan yang membutuhkan izin tampil di atas aplikasi lain.",
-                )
-                TextButton(onClick = onToggleBubble, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (bubbleEnabled) "Matikan floating bubble" else "Aktifkan floating bubble")
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = Color.White,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("Akses Cepat", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Text(
+                "Pilih cara yang paling nyaman untuk menggunakan WaspadAI.",
+                color = Color(0xFF557383),
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(6.dp))
+            QuickAccessSetting(
+                icon = Icons.Rounded.SmartToy,
+                title = "Assistant perangkat",
+                description = "Panggil WaspadAI dengan gesture assistant di perangkatmu.",
+                status = if (assistantEnabled) "Sudah aktif" else "Belum aktif",
+                actionLabel = if (assistantEnabled) null else "Aktifkan",
+                onAction = if (assistantAvailable) onSetAssistant else onOpenAssistantSettings,
+            )
+            QuickAccessSetting(
+                icon = Icons.Rounded.ChatBubbleOutline,
+                title = "Tanyain",
+                description = "Tampilkan tombol mengambang untuk bertanya tentang isi layar.",
+                status = if (bubbleEnabled) "Aktif" else null,
+                switchChecked = bubbleEnabled,
+                onSwitchChanged = { onToggleBubble() },
+            )
+            QuickAccessSetting(
+                icon = Icons.Rounded.GridView,
+                title = "Quick Settings",
+                description = "Tambahkan tombol Periksa layar ke panel cepat.",
+                status = if (quickTileAdded) "Sudah ditambahkan" else "Belum ditambahkan",
+                actionLabel = if (quickTileAdded) null else "Tambahkan",
+                onAction = onAddQuickTile,
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickAccessSetting(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    status: String?,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+    switchChecked: Boolean? = null,
+    onSwitchChanged: (Boolean) -> Unit = {},
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = Color(0xFF547180), modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Text(description, color = Color(0xFF557383), fontSize = 12.sp)
+                if (status != null) {
+                    Text(
+                        status,
+                        color = if (status == "Aktif" || status == "Sudah aktif" || status == "Sudah ditambahkan") {
+                            Color(0xFF237A57)
+                        } else Color(0xFF6B747A),
+                        fontSize = 11.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Selesai") }
-        },
-    )
+            if (switchChecked != null) {
+                Switch(checked = switchChecked, onCheckedChange = onSwitchChanged)
+            } else if (actionLabel != null) {
+                TextButton(onClick = onAction) { Text(actionLabel, fontSize = 12.sp) }
+            }
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 37.dp),
+            thickness = 1.dp,
+            color = Color(0xFFD8E4EC),
+        )
+    }
 }
 
 private fun Context.openAssistantSettings() {
@@ -622,26 +676,6 @@ private fun Context.openAssistantSettings() {
             "Pengaturan assistant belum dapat dibuka.",
             Toast.LENGTH_LONG,
         ).show()
-    }
-}
-
-@Composable
-private fun QuickAccessStatus(title: String, status: String, detail: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F8FB)),
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                Text(status, color = Color(0xFF0A6FA4), fontSize = 12.sp)
-            }
-            Text(detail, color = Color(0xFF557383), fontSize = 12.sp)
-        }
     }
 }
 
@@ -739,15 +773,17 @@ private fun OverlayPrivacyDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Aktifkan Tanya Area") },
+        title = { Text("Aktifkan Tanyain?") },
         text = {
-            Text(
-                "Tombol Tanyain akan bergeser ke kanan saat aktif. Setelah lanjut, Android meminta izin berbagi layar agar kamu dapat memilih area; gambar hanya ditangkap setelah Kirim area dan baru dianalisis setelah kamu menyetujui pratinjaunya."
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Tanyain perlu melihat layar saat kamu meminta bantuan tentang konten yang sedang dibuka.")
+                Text("• Layar hanya dibagikan setelah kamu menyetujui izin Android.")
+                Text("• Konten yang dilindungi aplikasi tetap tidak dapat diakses.")
+            }
         },
         confirmButton = {
             Button(onClick = onContinue) {
-                Text("Lanjut")
+                Text("Lanjutkan")
             }
         },
         dismissButton = {

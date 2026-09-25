@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -400,10 +401,19 @@ internal fun ProfileDetailSurface(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 internal fun ProfileSettingsGroup(
+    onQuickAccess: () -> Unit,
     onPassword: () -> Unit,
     onLogout: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        ProfileSettingsRow(
+            title = "Akses Cepat",
+            subtitle = "Kelola Assistant, Quick Settings, dan Tanyain",
+            icon = Icons.Rounded.TouchApp,
+            contentColor = ProfileMenuIcon,
+            showChevron = true,
+            onClick = onQuickAccess,
+        )
         ProfileSettingsRow(
             title = "Ubah kata sandi",
             subtitle = "Perbarui keamanan akun",

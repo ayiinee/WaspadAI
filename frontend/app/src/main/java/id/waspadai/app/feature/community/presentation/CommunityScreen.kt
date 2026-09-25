@@ -80,6 +80,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -135,6 +136,9 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import id.waspadai.app.R
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.ActionFeedbackHost
+import id.waspadai.app.core.ui.ActionFeedbackKind
+import id.waspadai.app.core.ui.showActionFeedback
 import id.waspadai.app.core.ui.WaspadAIPageHeader
 import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.feature.community.domain.CommunityRepository
@@ -293,6 +297,7 @@ fun CommunityScreen(
     modifier: Modifier = Modifier,
 ) {
     var deletingPost by remember { mutableStateOf<CommunityPost?>(null) }
+    val feedbackHost = remember { SnackbarHostState() }
     var isSearchVisible by rememberSaveable {
         mutableStateOf(uiState.searchQuery.isNotBlank())
     }
@@ -325,11 +330,24 @@ fun CommunityScreen(
     }
 
     val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
+    LaunchedEffect(uiState.postManagementError) {
+        uiState.postManagementError?.let { message ->
+            onAction(CommunityAction.PostManagementErrorDismissed)
+            coroutineScope.launch { feedbackHost.showActionFeedback(message, ActionFeedbackKind.Error) }
+        }
+    }
+    LaunchedEffect(uiState.postManagementSuccess) {
+        uiState.postManagementSuccess?.let { message ->
+            onAction(CommunityAction.PostManagementSuccessDismissed)
+            coroutineScope.launch { feedbackHost.showActionFeedback(message, ActionFeedbackKind.Success) }
+        }
+    }
     Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = WaspadAIBackground,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { ActionFeedbackHost(feedbackHost, Modifier.padding(bottom = bottomNavigationPadding)) },
         ) { innerPadding ->
             Column(
                 modifier = Modifier
@@ -420,7 +438,7 @@ fun CommunityScreen(
         AlertDialog(
             onDismissRequest = { if (uiState.managingPostId == null) deletingPost = null },
             title = { Text("Hapus postingan?") },
-            text = { Text("Postingan akan dihapus dari Koneksi. Konfirmasi untuk melanjutkan.") },
+            text = { Text("Postingan ini akan dihapus secara permanen dan tidak dapat dikembalikan.") },
             confirmButton = {
                 TextButton(
                     enabled = uiState.managingPostId == null,
@@ -428,22 +446,10 @@ fun CommunityScreen(
                         onAction(CommunityAction.DeletePost(post.id))
                         deletingPost = null
                     },
-                ) { Text("Delete", color = WaspadAIHoax) }
+                ) { Text("Hapus", color = WaspadAIHoax) }
             },
             dismissButton = {
                 TextButton(onClick = { deletingPost = null }) { Text("Batal") }
-            },
-        )
-    }
-    uiState.postManagementError?.let { message ->
-        AlertDialog(
-            onDismissRequest = { onAction(CommunityAction.PostManagementErrorDismissed) },
-            title = { Text("Postingan belum dapat diubah") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = { onAction(CommunityAction.PostManagementErrorDismissed) }) {
-                    Text("Tutup")
-                }
             },
         )
     }

@@ -88,6 +88,7 @@ data class CommunityUiState(
     val requestedPostId: String? = null,
     val managingPostId: String? = null,
     val postManagementError: String? = null,
+    val postManagementSuccess: String? = null,
 ) {
     val visiblePosts: List<CommunityPost>
         get() = visiblePosts(selectedFeedScope)
@@ -132,6 +133,7 @@ sealed interface CommunityAction {
     data class EditPost(val postId: String, val caption: String) : CommunityAction
     data class DeletePost(val postId: String) : CommunityAction
     data object PostManagementErrorDismissed : CommunityAction
+    data object PostManagementSuccessDismissed : CommunityAction
     data object ShareLinkConsumed : CommunityAction
     data class VerdictSelected(
         val postId: String,

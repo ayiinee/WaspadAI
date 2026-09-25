@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun VerificationMobileHeader(
     title: String,
     onOpenDrawer: () -> Unit,
+    onOpenQuickAccess: () -> Unit = {},
 ) {
     Box(Modifier.fillMaxWidth().background(WaspadAIBlue)) {
         Image(
@@ -92,6 +93,18 @@ fun VerificationMobileHeader(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
+            TextButton(
+                onClick = onOpenQuickAccess,
+                modifier = Modifier.testTag("verification-quick-access"),
+            ) {
+                Text(
+                    "Akses Cepat",
+                    color = Color.White.copy(alpha = .9f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

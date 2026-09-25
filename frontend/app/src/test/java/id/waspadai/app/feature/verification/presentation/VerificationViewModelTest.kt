@@ -217,12 +217,12 @@ class VerificationViewModelTest {
     }
 
     @Test
-    fun `overlay switch is active while confirmation is visible and resets when cancelled`() {
+    fun `overlay switch stays off until confirmation and system consent succeed`() {
         val viewModel = viewModel(FakeRepository())
 
         viewModel.onAction(VerificationAction.RequestOverlayMode)
 
-        assertTrue(viewModel.state.value.isOverlayModeEnabled)
+        assertTrue(!viewModel.state.value.isOverlayModeEnabled)
         assertTrue(viewModel.state.value.isOverlayPrivacyDialogVisible)
 
         viewModel.onAction(VerificationAction.DismissOverlayPrivacy)
@@ -379,7 +379,7 @@ class VerificationViewModelTest {
         assertEquals("conversation-1", viewModel.state.value.activeConversationId)
         assertEquals(2, viewModel.state.value.conversation.size)
         assertEquals(1, viewModel.state.value.history.size)
-        assertEquals(VerificationAction.ConfirmDeleteConversation, viewModel.state.value.uiMessageRetryAction)
+        assertNull(viewModel.state.value.uiMessageRetryAction)
     }
 
     @Test

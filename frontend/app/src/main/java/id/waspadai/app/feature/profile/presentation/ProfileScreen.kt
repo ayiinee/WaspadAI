@@ -38,6 +38,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +56,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.waspadai.app.core.ui.WaspadAIBottomNavigation
+import id.waspadai.app.core.ui.ActionFeedbackHost
+import id.waspadai.app.core.ui.ActionFeedbackKind
+import id.waspadai.app.core.ui.showActionFeedback
 import id.waspadai.app.core.ui.WaspadAIPageHeader
 import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.feature.profile.domain.ProfileActivityItem
@@ -74,16 +79,20 @@ fun ProfileRoute(
     onChangePassword: suspend (String) -> Result<Unit>,
     onLogout: suspend () -> Unit,
     onCommunityPostSelected: (String) -> Unit,
+    onOpenQuickAccess: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var passwordDialogVisible by remember { mutableStateOf(false) }
+    var logoutConfirmationVisible by remember { mutableStateOf(false) }
+    var deleteAvatarConfirmationVisible by remember { mutableStateOf(false) }
     val bottomNavigationPadding = waspadAIBottomNavigationContentPadding()
 
     LaunchedEffect(state.message) {
         state.message?.let { message ->
-            snackbarHostState.showSnackbar(message)
+            val kind = if (state.messageIsError) ActionFeedbackKind.Error else ActionFeedbackKind.Success
             onAction(ProfileAction.DismissMessage)
+            scope.launch { snackbarHostState.showActionFeedback(message, kind) }
         }
     }
 
@@ -96,7 +105,7 @@ fun ProfileRoute(
             modifier = Modifier.fillMaxSize(),
             containerColor = WaspadAIBackground,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = { ActionFeedbackHost(snackbarHostState, Modifier.padding(bottom = bottomNavigationPadding)) },
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -119,10 +128,14 @@ fun ProfileRoute(
                     when {
                         state.loading -> ProfileLoadingState()
                         state.page == ProfilePage.Dashboard -> ProfileDashboard(state, accessToken, onAction)
-                        state.page == ProfilePage.Edit -> EditProfilePage(state, accessToken, onAction)
+                        state.page == ProfilePage.Edit -> EditProfilePage(
+                            state, accessToken, onAction,
+                            onDeleteAvatarClick = { deleteAvatarConfirmationVisible = true },
+                        )
                         state.page == ProfilePage.Settings -> SettingsPage(
+                            onQuickAccess = onOpenQuickAccess,
                             onPassword = { passwordDialogVisible = true },
-                            onLogout = { scope.launch { onLogout() } },
+                            onLogout = { logoutConfirmationVisible = true },
                         )
                         state.page == ProfilePage.ItemDetail -> ItemDetailPage(state)
                         else -> ActivityDetailPage(state, onAction, onCommunityPostSelected)
@@ -144,16 +157,44 @@ fun ProfileRoute(
                 scope.launch {
                     onChangePassword(password).fold(
                         onSuccess = {
-                            snackbarHostState.showSnackbar("Kata sandi berhasil diperbarui.")
+                            snackbarHostState.showActionFeedback("Kata sandi berhasil diperbarui.", ActionFeedbackKind.Success)
                         },
                         onFailure = {
-                            snackbarHostState.showSnackbar(
-                                it.message ?: "Kata sandi belum dapat diperbarui.",
+                            snackbarHostState.showActionFeedback(
+                                it.message ?: "Kata sandi belum dapat diperbarui.", ActionFeedbackKind.Error,
                             )
                         },
                     )
                     passwordDialogVisible = false
                 }
+            },
+        )
+    }
+    if (logoutConfirmationVisible) {
+        AlertDialog(
+            onDismissRequest = { logoutConfirmationVisible = false },
+            title = { Text("Keluar dari akun?") },
+            text = { Text("Kamu harus masuk kembali untuk mengakses akun ini.") },
+            dismissButton = { TextButton(onClick = { logoutConfirmationVisible = false }) { Text("Tetap di sini") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    logoutConfirmationVisible = false
+                    scope.launch { onLogout() }
+                }) { Text("Keluar") }
+            },
+        )
+    }
+    if (deleteAvatarConfirmationVisible) {
+        AlertDialog(
+            onDismissRequest = { deleteAvatarConfirmationVisible = false },
+            title = { Text("Hapus foto profil?") },
+            text = { Text("Foto profil akan dihapus dari akunmu.") },
+            dismissButton = { TextButton(onClick = { deleteAvatarConfirmationVisible = false }) { Text("Batal") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleteAvatarConfirmationVisible = false
+                    onAction(ProfileAction.DeleteAvatar)
+                }) { Text("Hapus") }
             },
         )
     }
@@ -251,6 +292,7 @@ private fun EditProfilePage(
     state: ProfileUiState,
     accessToken: String,
     onAction: (ProfileAction) -> Unit,
+    onDeleteAvatarClick: () -> Unit,
 ) {
     val profile = state.profile ?: return
     var name by remember(profile.displayName) { mutableStateOf(profile.displayName) }
@@ -276,7 +318,7 @@ private fun EditProfilePage(
                 enabled = !state.saving,
                 onPickAvatar = { picker.launch("image/*") },
                 onDeleteAvatar = if (profile.avatarUrl != null) {
-                    { onAction(ProfileAction.DeleteAvatar) }
+                    onDeleteAvatarClick
                 } else null,
             )
         }
@@ -501,6 +543,7 @@ private fun LearningItemDetail(item: ProfileLearningItem) {
 
 @Composable
 private fun SettingsPage(
+    onQuickAccess: () -> Unit,
     onPassword: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -509,7 +552,11 @@ private fun SettingsPage(
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
     ) {
         item {
-            ProfileSettingsGroup(onPassword = onPassword, onLogout = onLogout)
+            ProfileSettingsGroup(
+                onQuickAccess = onQuickAccess,
+                onPassword = onPassword,
+                onLogout = onLogout,
+            )
         }
     }
 }
