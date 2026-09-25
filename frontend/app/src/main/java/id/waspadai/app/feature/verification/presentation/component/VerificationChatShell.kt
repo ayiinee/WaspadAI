@@ -39,6 +39,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +57,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun VerificationChatShell(
     state: VerificationUiState,
     listState: LazyListState,
+    scrollDirectionListener: NestedScrollConnection,
     contentGutter: Dp,
     bottomNavigationPadding: Dp,
     showBottomNavigation: Boolean,
@@ -125,23 +130,34 @@ fun VerificationChatShell(
                 VerificationMobileHeader(
                     title = if (emptyChat) "WaspadAI" else state.activeConversationTitle,
                     onOpenDrawer = { onAction(VerificationAction.OpenDrawer) },
-                    onNewChat = { onAction(VerificationAction.NewConversation) },
                 )
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).nestedScroll(scrollDirectionListener),
                     contentPadding = PaddingValues(horizontal = contentGutter, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     if (emptyChat && !state.isConversationLoading) item {
                         Column(
-                            modifier = Modifier.fillParentMaxHeight(0.55f).fillMaxWidth(),
+                            modifier = Modifier.fillParentMaxHeight().fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {
-                            Text("Apa yang ingin kamu periksa?", fontSize = 20.sp, color = Color(0xFF122D3D))
+                            Text(
+                                "Apa yang ingin kamu periksa?",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF122D3D),
+                            )
                             Spacer(Modifier.height(8.dp))
-                            Text("Kirim teks, gambar, atau dokumen yang ingin diverifikasi.", color = Color(0xFF557383))
+                            Text(
+                                "Kirim teks, gambar, atau dokumen yang ingin diverifikasi.",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                color = Color(0xFF557383),
+                            )
                         }
                     }
                     if (state.isConversationLoading) item { ThinkingBubble("Memuat percakapan…") }

@@ -56,7 +56,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -90,7 +92,6 @@ import id.waspadai.app.core.ui.waspadAIBottomNavigationContentPadding
 import id.waspadai.app.ui.theme.WaspadAITheme
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -175,33 +176,18 @@ fun VerificationScreen(
 
     BackHandler(enabled = isChatScreen, onBack = onBackToConversations)
 
-    LaunchedEffect(listState) {
-        var previousIndex = listState.firstVisibleItemIndex
-        var previousOffset = listState.firstVisibleItemScrollOffset
-        snapshotFlow {
-            Triple(
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-                listState.isScrollInProgress,
-            )
-        }
-            .distinctUntilChanged()
-            .collect { (index, offset, isScrolling) ->
-                if (index == 0 && offset <= 8) {
-                    isBottomNavigationVisible = true
-                } else if (isScrolling) {
-                    val scrollingDown = index > previousIndex ||
-                        (index == previousIndex && offset > previousOffset)
-                    val scrollingUp = index < previousIndex ||
-                        (index == previousIndex && offset < previousOffset)
+    val scrollDirectionListener = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput) {
                     when {
-                        scrollingDown -> isBottomNavigationVisible = false
-                        scrollingUp -> isBottomNavigationVisible = true
+                        available.y > 0f -> isBottomNavigationVisible = true
+                        available.y < 0f -> isBottomNavigationVisible = false
                     }
                 }
-                previousIndex = index
-                previousOffset = offset
+                return Offset.Zero
             }
+        }
     }
     val mediaProjectionManager = context.getSystemService(MediaProjectionManager::class.java)
     val mediaProjectionConsent = rememberLauncherForActivityResult(
@@ -525,6 +511,7 @@ fun VerificationScreen(
     VerificationChatShell(
         state = state,
         listState = listState,
+        scrollDirectionListener = scrollDirectionListener,
         contentGutter = contentGutter,
         bottomNavigationPadding = bottomNavigationPadding,
         showBottomNavigation = shouldShowBottomNavigation,

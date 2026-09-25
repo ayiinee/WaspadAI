@@ -1,7 +1,10 @@
 package id.waspadai.app.feature.verification.presentation.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,11 +44,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import id.waspadai.app.R
 import id.waspadai.app.feature.verification.domain.VerificationConversationSummary
 import id.waspadai.app.ui.theme.WaspadAIBlue
 import java.time.OffsetDateTime
@@ -57,33 +63,37 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun VerificationMobileHeader(
     title: String,
     onOpenDrawer: () -> Unit,
-    onNewChat: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .height(64.dp)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onOpenDrawer, modifier = Modifier.testTag("verification-hamburger")) {
-            Icon(Icons.Rounded.Menu, contentDescription = "Buka riwayat percakapan", tint = WaspadAIBlue)
-        }
-        Text(
-            text = title,
-            color = Color(0xFF122D3D),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+    Box(Modifier.fillMaxWidth().background(WaspadAIBlue)) {
+        Image(
+            painter = painterResource(R.drawable.community_header_background),
+            contentDescription = null,
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Crop,
+            alpha = .68f,
         )
-        IconButton(onClick = onNewChat, modifier = Modifier.testTag("verification-new-chat-header")) {
-            Icon(Icons.Rounded.Edit, contentDescription = "Chat baru", tint = WaspadAIBlue)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(64.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onOpenDrawer, modifier = Modifier.testTag("verification-hamburger")) {
+                Icon(Icons.Rounded.Menu, contentDescription = "Buka riwayat percakapan", tint = Color.White)
+            }
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            )
         }
     }
-    HorizontalDivider(color = Color(0xFFD8E4EC))
 }
 
 @Composable
